@@ -1,0 +1,58 @@
+import { Button } from "@/components/ui/Button";
+
+export function Navbar() {
+  return (
+    <header
+      className="sticky top-0 z-50 border-b"
+      style={{
+        backgroundColor: "rgba(11, 11, 15, 0.85)",
+        backdropFilter: "blur(12px)",
+        borderColor: "var(--border-subtle)",
+      }}
+    >
+      <nav
+        className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between"
+        aria-label="Main navigation"
+      >
+        {/* Wordmark */}
+        <a
+          href="/"
+          className="text-prose font-semibold tracking-tight text-lg hover:text-accent transition-colors duration-100"
+          style={{ fontFamily: "var(--font-display)" }}
+          aria-label="Bytecode home"
+        >
+          Bytecode
+        </a>
+
+        {/* Nav links — hidden on mobile */}
+        <ul className="hidden md:flex items-center gap-6 list-none m-0 p-0">
+          {[
+            { href: "/curriculum", label: "Curriculum" },
+            { href: "/pricing", label: "Pricing" },
+            { href: "/why-bytecode", label: "Why Bytecode?" },
+            { href: "/forum", label: "Forum" },
+          ].map(({ href, label }) => (
+            <li key={href}>
+              <a
+                href={href}
+                className="text-sm text-prose-muted hover:text-prose transition-colors duration-100"
+              >
+                {label}
+              </a>
+            </li>
+          ))}
+        </ul>
+
+        {/* Auth actions */}
+        <div className="flex items-center gap-3">
+          <Button as="a" href="/signin" variant="ghost" size="sm">
+            Sign in
+          </Button>
+          <Button as="a" href="/signup" variant="primary" size="sm">
+            Start free
+          </Button>
+        </div>
+      </nav>
+    </header>
+  );
+}

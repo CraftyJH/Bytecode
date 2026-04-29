@@ -1,0 +1,30 @@
+# Node
+node_modules/
+.pnpm-store/
+
+# Next.js
+apps/web/.next/
+apps/web/out/
+apps/web/.turbo/
+
+# Gradle / Spring Boot
+apps/api/.gradle/
+apps/api/build/
+apps/api/out/
+*.class
+*.jar
+*.war
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/settings.json
