@@ -7,9 +7,10 @@ import { getLesson, getModule, getTrack, getPrevNext } from "@/lib/curriculum";
 import { buildMdxComponents } from "@/components/mdx/MdxComponents";
 import { LessonSidebar } from "@/components/lesson/LessonSidebar";
 import { MarkComplete } from "@/components/lesson/MarkComplete";
+import { CodePanel } from "@/components/lesson/CodePanel";
 import { Pill } from "@/components/ui/Pill";
 import { createClient } from "@/lib/supabase/server";
-import { Clock, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface LessonPageProps {
   params: Promise<{ track: string; module: string; slug: string }>;
@@ -146,69 +147,12 @@ export default async function LessonPage({ params }: LessonPageProps) {
           </div>
         </article>
 
-        {/* Right — editor panel (40%) */}
-        <aside
-          className="hidden lg:flex flex-col border-l w-[38%] shrink-0"
-          style={{
-            borderColor: "var(--border-subtle)",
-            position: "sticky",
-            top: "56px",
-            height: "calc(100vh - 56px)",
-          }}
-        >
-          {/* Editor placeholder — replaced by Monaco in Sprint 4 */}
-          <div className="flex-1 flex flex-col">
-            <div
-              className="px-4 py-3 border-b flex items-center justify-between"
-              style={{ borderColor: "var(--border-subtle)" }}
-            >
-              <span
-                className="text-xs text-prose-faint"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                // code editor
-              </span>
-              <span
-                className="text-xs text-prose-faint px-2 py-0.5 rounded-sm bg-subtle"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                java
-              </span>
-            </div>
-
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center">
-                <p
-                  className="text-xs text-prose-faint mb-1"
-                  style={{ fontFamily: "var(--font-mono)" }}
-                >
-                  // coming in sprint 4
-                </p>
-                <p className="text-sm text-prose-muted">
-                  Interactive code editor
-                </p>
-                <p className="text-xs text-prose-faint mt-1">
-                  Run Java in your browser — no install needed.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Ask in forum */}
-          <div
-            className="p-4 border-t"
-            style={{ borderColor: "var(--border-subtle)" }}
-          >
-            <a
-              href={`/forum/new?lesson=${lessonSlug}&track=${trackSlug}`}
-              className="flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-md text-sm text-prose-muted border hover:text-prose hover:bg-subtle transition-colors duration-100"
-              style={{ borderColor: "var(--border-emphasis)" }}
-            >
-              <MessageSquare size={14} />
-              Ask in the forum
-            </a>
-          </div>
-        </aside>
+        <CodePanel
+          lessonSlug={lessonSlug}
+          trackSlug={trackSlug}
+          starterCode={lesson.starterCode ?? "public class Main {\n    public static void main(String[] args) {\n        // write your code here\n    }\n}"}
+          expectedOutput={lesson.expectedOutput}
+        />
       </div>
     </div>
   );
