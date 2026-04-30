@@ -59,7 +59,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
 
   // Optional auth — only runs when Supabase env vars are present
   let user = null;
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)) {
     try {
       const supabase = await createClient();
       const { data } = await supabase.auth.getUser();
