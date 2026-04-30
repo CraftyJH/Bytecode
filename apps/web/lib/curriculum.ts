@@ -45,7 +45,7 @@ export const curriculum: TrackMeta[] = [
             order: 1,
             duration: 10,
             isPremium: false,
-            starterCode: `public class HelloWorld {
+            starterCode: `public class Main {
     public static void main(String[] args) {
         System.out.println("Hello, Java");
         // Your code here
@@ -60,7 +60,7 @@ export const curriculum: TrackMeta[] = [
             order: 2,
             duration: 12,
             isPremium: false,
-            starterCode: `public class Constants {
+            starterCode: `public class Main {
     public static void main(String[] args) {
         // Declare GRAVITY here
         // Print GRAVITY here
@@ -74,7 +74,7 @@ export const curriculum: TrackMeta[] = [
             order: 3,
             duration: 12,
             isPremium: false,
-            starterCode: `public class WeeksAndDays {
+            starterCode: `public class Main {
     public static void main(String[] args) {
         int totalDays = 100;
         // Calculate whole weeks and leftover days
@@ -89,7 +89,7 @@ export const curriculum: TrackMeta[] = [
             order: 4,
             duration: 14,
             isPremium: false,
-            starterCode: `public class Greeting {
+            starterCode: `public class Main {
     public static void main(String[] args) {
         int hour = 14;
         // Write your if/else-if/else chain here
@@ -103,7 +103,7 @@ export const curriculum: TrackMeta[] = [
             order: 5,
             duration: 14,
             isPremium: false,
-            starterCode: `public class Multiples {
+            starterCode: `public class Main {
     public static void main(String[] args) {
         int total = 0;
         // Your loop here
@@ -118,7 +118,7 @@ export const curriculum: TrackMeta[] = [
             order: 6,
             duration: 14,
             isPremium: false,
-            starterCode: `public class MaxFinder {
+            starterCode: `public class Main {
     // Write max(int a, int b) here
 
     // Write max(int a, int b, int c) here
@@ -136,7 +136,7 @@ export const curriculum: TrackMeta[] = [
             order: 7,
             duration: 13,
             isPremium: false,
-            starterCode: `public class FindMax {
+            starterCode: `public class Main {
     public static void main(String[] args) {
         int[] numbers = {34, 7, 23, 32, 5, 62};
         int max = numbers[0];
@@ -152,7 +152,7 @@ export const curriculum: TrackMeta[] = [
             order: 8,
             duration: 13,
             isPremium: false,
-            starterCode: `public class Palindrome {
+            starterCode: `public class Main {
     static boolean isPalindrome(String s) {
         String clean = s.toLowerCase();
         // Hint: compare clean to its reverse
