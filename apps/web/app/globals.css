@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-@import "highlight.js/styles/github-dark.css";
 
 /* ─── Syntax theme — override hljs to use Bytecode tokens ─────────────────── */
 .hljs-keyword, .hljs-built_in  { color: #C77B3A; }
