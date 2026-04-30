@@ -1,6 +1,12 @@
+import type { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/Button";
+import { UserMenu } from "@/components/layout/UserMenu";
 
-export function Navbar() {
+interface NavbarProps {
+  user?: User | null;
+}
+
+export function Navbar({ user }: NavbarProps) {
   return (
     <header
       className="sticky top-0 z-50 border-b"
@@ -16,7 +22,7 @@ export function Navbar() {
       >
         {/* Wordmark */}
         <a
-          href="/"
+          href={user ? "/dashboard" : "/"}
           className="text-prose font-semibold tracking-tight text-lg hover:text-accent transition-colors duration-100"
           style={{ fontFamily: "var(--font-display)" }}
           aria-label="Bytecode home"
@@ -45,12 +51,18 @@ export function Navbar() {
 
         {/* Auth actions */}
         <div className="flex items-center gap-3">
-          <Button as="a" href="/signin" variant="ghost" size="sm">
-            Sign in
-          </Button>
-          <Button as="a" href="/signup" variant="primary" size="sm">
-            Start free
-          </Button>
+          {user ? (
+            <UserMenu user={user} />
+          ) : (
+            <>
+              <Button as="a" href="/signin" variant="ghost" size="sm">
+                Sign in
+              </Button>
+              <Button as="a" href="/signup" variant="primary" size="sm">
+                Start free
+              </Button>
+            </>
+          )}
         </div>
       </nav>
     </header>

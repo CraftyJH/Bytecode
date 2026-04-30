@@ -19,6 +19,7 @@ apps/api/out/
 .env
 .env.local
 .env*.local
+!.env*.example
 
 # OS
 .DS_Store
