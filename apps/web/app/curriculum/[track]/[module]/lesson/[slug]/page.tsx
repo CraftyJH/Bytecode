@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypeHighlight from "rehype-highlight";
+import remarkGfm from "remark-gfm";
 import path from "path";
 import fs from "fs";
 import { getLesson, getModule, getTrack, getPrevNext } from "@/lib/curriculum";
@@ -119,6 +120,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
               options={{
                 mdxOptions: {
                   useDynamicImport: true,
+                  remarkPlugins: [remarkGfm],
                   rehypePlugins: [rehypeHighlight],
                 },
                 blockJS: false,
