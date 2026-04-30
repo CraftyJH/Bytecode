@@ -1,11 +1,13 @@
 spring:
   application:
     name: bytecode-api
+
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/bytecode_dev}
     username: ${DATABASE_USER:bytecode}
     password: ${DATABASE_PASSWORD:bytecode}
     driver-class-name: org.postgresql.Driver
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -14,11 +16,21 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
   security:
-    # Disable default security auto-config until Sprint 2 (auth)
-    # In production this is replaced with JWT + Supabase
-    user:
-      password: ${SPRING_SECURITY_USER_PASSWORD:disabled}
+    oauth2:
+      resourceserver:
+        jwt:
+          # Supabase exposes a JWKS endpoint at this path for your project
+          # Replace <project-ref> with your Supabase project reference
+          jwk-set-uri: ${SUPABASE_JWKS_URI:https://<project-ref>.supabase.co/auth/v1/keys}
+          # Alternatively, use the symmetric secret for HS256 tokens:
+          # secret: ${SUPABASE_JWT_SECRET:}
 
 server:
   port: ${PORT:8080}
@@ -39,3 +51,4 @@ logging:
   level:
     dev.bytecode: DEBUG
     org.springframework.security: WARN
+    org.flywaydb: INFO
