@@ -57,9 +57,15 @@ export default async function LessonPage({ params }: LessonPageProps) {
 
   const { prev, next } = getPrevNext(trackSlug, moduleSlug, lessonSlug);
 
-  // Optional auth — show progress if signed in
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Optional auth — only runs when Supabase env vars are present
+  let user = null;
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      user = data.user;
+    } catch { /* continue without auth */ }
+  }
 
   const components = buildMdxComponents();
   const progressKey = `bytecode:progress:${trackSlug}:${moduleSlug}`;
