@@ -11,7 +11,8 @@ import { MarkComplete } from "@/components/lesson/MarkComplete";
 import { CodePanel } from "@/components/lesson/CodePanel";
 import { Pill } from "@/components/ui/Pill";
 import { createClient } from "@/lib/supabase/server";
-import { Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
+import { askFromLessonHref } from "@/lib/forum";
 
 interface LessonPageProps {
   params: Promise<{ track: string; module: string; slug: string }>;
@@ -131,7 +132,20 @@ export default async function LessonPage({ params }: LessonPageProps) {
           {/* Bottom actions */}
           <div className="mt-10 pt-8 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
             style={{ borderColor: "var(--border-subtle)" }}>
-            <MarkComplete lessonSlug={lessonSlug} storageKey={progressKey} />
+            <div className="flex flex-wrap items-center gap-3">
+              <MarkComplete lessonSlug={lessonSlug} storageKey={progressKey} />
+              <a
+                href={askFromLessonHref({
+                  lessonSlug,
+                  lessonTitle: lesson.title,
+                  trackSlug,
+                  moduleSlug,
+                })}
+                className="flex items-center gap-1.5 text-xs text-prose-faint hover:text-prose transition-colors duration-100"
+              >
+                <MessageSquare size={12} /> Stuck? Ask the forum
+              </a>
+            </div>
 
             {/* Prev / Next nav */}
             <div className="flex items-center gap-3 ml-auto">
