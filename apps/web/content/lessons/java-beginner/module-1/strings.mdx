@@ -17,6 +17,16 @@ System.out.println(s.substring(7, 12));`,
     expectedOutput: "13\nW\nWorld",
     explanation: "length() is 13 characters. charAt(7) is 'W' (index 7 in \"Hello, World!\"). substring(7, 12) extracts from index 7 up to but not including 12, giving \"World\".",
   },
+  endQ1: {
+    id: "st-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `String s = "Hello";
+System.out.println(s.length());
+System.out.println(s.toUpperCase());`,
+    expectedOutput: "5\nHELLO",
+    explanation: "\"Hello\" has 5 characters. toUpperCase() returns a new string with all characters uppercased. The original string s is not modified.",
+  },
   endChoice: {
     id: "st-end-2",
     type: "multiple_choice",
@@ -155,7 +165,7 @@ public class StringDemo {
 Write a method `isPalindrome(String s)` that returns `true` if the string reads the same forwards and backwards (ignore case). Test it with at least three strings.
 
 ```java
-public class Palindrome {
+public class Main {
     static boolean isPalindrome(String s) {
         String clean = s.toLowerCase();
         // Hint: compare clean to its reverse
@@ -176,7 +186,7 @@ public class Palindrome {
 
 ## End-of-lesson quiz
 
-<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
 
 <Quiz data={quizzes.endChoice} label="question 2 of 4" />
 

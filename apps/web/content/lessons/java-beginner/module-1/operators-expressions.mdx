@@ -16,6 +16,15 @@ System.out.println(a / b);`,
     expectedOutput: "3",
     explanation: "When both operands are int, Java performs integer division and truncates the decimal. 7 / 2 = 3.5, truncated to 3.",
   },
+  endQ1: {
+    id: "oe-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `System.out.println("Score: " + 9 + 1);
+System.out.println("Score: " + (9 + 1));`,
+    expectedOutput: "Score: 91\nScore: 10",
+    explanation: "Without parentheses, + evaluates left-to-right: \"Score: \" + 9 gives \"Score: 9\", then + 1 gives \"Score: 91\". With parentheses, 9 + 1 = 10 is computed first, giving \"Score: 10\".",
+  },
   endQ2: {
     id: "oe-end-2",
     type: "fill_in_blank",
@@ -141,7 +150,7 @@ public class Operators {
 Write a program that calculates and prints the number of whole weeks and leftover days in a given number of days (use 100 days as the input).
 
 ```java
-public class WeeksAndDays {
+public class Main {
     public static void main(String[] args) {
         int totalDays = 100;
         // Calculate whole weeks and leftover days
@@ -156,7 +165,7 @@ public class WeeksAndDays {
 
 ## End-of-lesson quiz
 
-<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
 
 <Quiz data={quizzes.endQ2} label="question 2 of 4" />
 

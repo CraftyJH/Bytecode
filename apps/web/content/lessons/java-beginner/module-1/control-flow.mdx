@@ -16,6 +16,19 @@ System.out.println(grade);`,
     expectedOutput: "B",
     explanation: "score is 72. The first condition (score >= 90) is false. The second (score >= 70) is true, so grade is \"B\".",
   },
+  endQ1: {
+    id: "cf-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `int x = 15;
+if (x > 10) {
+    System.out.println("big");
+} else {
+    System.out.println("small");
+}`,
+    expectedOutput: "big",
+    explanation: "15 > 10 is true, so the if block runs and prints \"big\". The else block is skipped entirely.",
+  },
   endQ2: {
     id: "cf-end-2",
     type: "find_the_bug",
@@ -161,7 +174,7 @@ public class ControlFlow {
 Write a program that takes an integer `hour` (0–23) and prints `"Good morning"` for hours 5–11, `"Good afternoon"` for 12–17, `"Good evening"` for 18–21, and `"Good night"` otherwise.
 
 ```java
-public class Greeting {
+public class Main {
     public static void main(String[] args) {
         int hour = 14;
         // Write your if/else-if/else chain here
@@ -175,7 +188,7 @@ public class Greeting {
 
 ## End-of-lesson quiz
 
-<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
 
 <Quiz data={quizzes.endQ2} label="question 2 of 4" />
 

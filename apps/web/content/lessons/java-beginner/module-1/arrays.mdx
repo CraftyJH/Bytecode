@@ -17,6 +17,16 @@ System.out.println(nums[nums.length - 1]);`,
     expectedOutput: "10\n30\n50",
     explanation: "Arrays are 0-indexed. nums[0] is 10, nums[2] is 30 (the third element), and nums[nums.length - 1] is nums[4] which is 50 — the last element.",
   },
+  endQ1: {
+    id: "ar-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `int[] nums = {5, 10, 15};
+System.out.println(nums.length);
+System.out.println(nums[1]);`,
+    expectedOutput: "3\n10",
+    explanation: "nums.length is 3 (three elements). nums[1] is 10 — arrays are zero-indexed, so index 1 is the second element.",
+  },
   endChoice: {
     id: "ar-end-2",
     type: "multiple_choice",
@@ -137,7 +147,7 @@ public class ArrayAverage {
 Given an array of integers, find and print the largest value without using any helper library.
 
 ```java
-public class FindMax {
+public class Main {
     public static void main(String[] args) {
         int[] numbers = {34, 7, 23, 32, 5, 62};
         int max = numbers[0];
@@ -153,7 +163,7 @@ public class FindMax {
 
 ## End-of-lesson quiz
 
-<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
 
 <Quiz data={quizzes.endChoice} label="question 2 of 4" />
 

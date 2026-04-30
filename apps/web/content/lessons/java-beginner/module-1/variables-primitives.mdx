@@ -16,6 +16,17 @@ System.out.println(x + y);`,
     expectedOutput: "15",
     explanation: "x holds 5 and y holds 10. Adding two ints gives 15, which println prints followed by a newline.",
   },
+  endQ1: {
+    id: "vp-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `boolean isActive = true;
+char grade = 'A';
+System.out.println(isActive);
+System.out.println(grade);`,
+    expectedOutput: "true\nA",
+    explanation: "println converts each value to its string representation. A boolean prints as \"true\" or \"false\"; a char prints as its character.",
+  },
   endQ2: {
     id: "vp-end-2",
     type: "fill_in_blank",
@@ -117,7 +128,7 @@ public class Variables {
 Declare a `final double` constant named `GRAVITY` set to `9.81`, then print it.
 
 ```java
-public class Constants {
+public class Main {
     public static void main(String[] args) {
         // Declare GRAVITY here
         // Print GRAVITY here
@@ -131,7 +142,7 @@ public class Constants {
 
 ## End-of-lesson quiz
 
-<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
 
 <Quiz data={quizzes.endQ2} label="question 2 of 4" />
 

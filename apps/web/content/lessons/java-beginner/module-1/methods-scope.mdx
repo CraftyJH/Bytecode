@@ -22,6 +22,22 @@ export const quizzes = {
     expectedOutput: "6\n20",
     explanation: "double(3) returns 3 * 2 = 6. double(10) returns 10 * 2 = 20. Each call is independent.",
   },
+  endQ1: {
+    id: "ms-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    static int add(int a, int b) {
+        return a + b;
+    }
+    public static void main(String[] args) {
+        System.out.println(add(3, 4));
+        System.out.println(add(10, 5));
+    }
+}`,
+    expectedOutput: "7\n15",
+    explanation: "add(3, 4) returns 3 + 4 = 7. add(10, 5) returns 10 + 5 = 15. Each call executes the method body independently.",
+  },
   endChoice: {
     id: "ms-end-2",
     type: "multiple_choice",
@@ -160,7 +176,7 @@ public class Scope {
 Write two overloaded `max` methods: one that takes two `int` parameters and returns the larger one, and one that takes three `int` parameters and returns the largest. Call both from `main` and print the results.
 
 ```java
-public class MaxFinder {
+public class Main {
     // Write max(int a, int b) here
 
     // Write max(int a, int b, int c) here
@@ -178,7 +194,7 @@ public class MaxFinder {
 
 ## End-of-lesson quiz
 
-<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
 
 <Quiz data={quizzes.endChoice} label="question 2 of 4" />
 

@@ -19,6 +19,15 @@ export const quizzes = {
     ],
     explanation: "Every Java program begins execution at the public static void main(String[] args) method.",
   },
+  endQ1: {
+    id: "hj-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `System.out.println("Hello");
+System.out.println("World");`,
+    expectedOutput: "Hello\nWorld",
+    explanation: "System.out.println() prints its argument followed by a newline. Two calls produce two separate lines of output.",
+  },
   endQ2: {
     id: "hj-end-2",
     type: "fill_in_blank",
@@ -83,7 +92,7 @@ Now try changing the string to your name and running again.
 Modify the program to print your name on a second line.
 
 ```java
-public class HelloWorld {
+public class Main {
     public static void main(String[] args) {
         System.out.println("Hello, Java");
         // Your code here
@@ -101,7 +110,7 @@ public class HelloWorld {
 
 ## End-of-lesson quiz
 
-<Quiz data={quizzes.midLesson} label="question 1 of 3" />
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
 
 <Quiz data={quizzes.endQ2} label="question 2 of 3" />
 

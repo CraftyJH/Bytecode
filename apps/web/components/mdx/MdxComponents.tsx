@@ -72,5 +72,29 @@ export function buildMdxComponents(): Record<string, any> {
         {...p}
       />
     ),
+    table: (p: HtmlProps) => (
+      <div className="overflow-x-auto my-6">
+        <table className="w-full text-sm border-collapse" {...p} />
+      </div>
+    ),
+    thead: (p: HtmlProps) => <thead {...p} />,
+    tbody: (p: HtmlProps) => <tbody {...p} />,
+    tr: (p: HtmlProps) => (
+      <tr
+        className="border-b"
+        style={{ borderBottomColor: "var(--border-subtle)" }}
+        {...p}
+      />
+    ),
+    th: (p: HtmlProps) => (
+      <th
+        className="text-left py-2 px-3 font-semibold text-prose text-xs uppercase tracking-wide"
+        style={{ borderBottomColor: "var(--border-emphasis)", borderBottomWidth: "1px", borderBottomStyle: "solid" }}
+        {...p}
+      />
+    ),
+    td: (p: HtmlProps) => (
+      <td className="py-2 px-3 text-prose-muted leading-relaxed" {...p} />
+    ),
   };
 }
