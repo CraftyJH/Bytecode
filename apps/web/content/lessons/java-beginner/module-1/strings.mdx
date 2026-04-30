@@ -1,0 +1,204 @@
+export const meta = {
+  title: "Strings",
+  duration: 13,
+  order: 8,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "st-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `String s = "Hello, World!";
+System.out.println(s.length());
+System.out.println(s.charAt(7));
+System.out.println(s.substring(7, 12));`,
+    expectedOutput: "13\nW\nWorld",
+    explanation: "length() is 13 characters. charAt(7) is 'W' (index 7 in \"Hello, World!\"). substring(7, 12) extracts from index 7 up to but not including 12, giving \"World\".",
+  },
+  endChoice: {
+    id: "st-end-2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which is the correct way to check if two String variables have the same content?",
+    options: [
+      { text: "<code>a == b</code>", correct: false, feedback: "== compares object references for Strings, not content. Two separate String objects with the same text will return false." },
+      { text: "<code>a.equals(b)</code>", correct: true },
+      { text: "<code>a.compareTo(b) == true</code>", correct: false, feedback: "compareTo returns an int (0, negative, or positive), not a boolean." },
+      { text: "<code>a.match(b)</code>", correct: false, feedback: "match is not a standard String method in Java." },
+    ],
+    explanation: "String.equals() compares the character content of two strings. == only checks whether both variables point to the exact same object in memory, which is not reliable for string comparison.",
+  },
+  endFill: {
+    id: "st-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the method call that converts the String variable word to uppercase:",
+    code: 'String upper = word.___();',
+    correctAnswers: ["toUpperCase"],
+    caseSensitive: true,
+    explanation: "toUpperCase() returns a new String with all characters converted to uppercase. Strings are immutable in Java, so it never modifies the original.",
+  },
+  endBug: {
+    id: "st-end-4",
+    type: "find_the_bug",
+    difficulty: "easy",
+    code: `public class PasswordCheck {
+    public static void main(String[] args) {
+        String input = "secret";
+        String password = "secret";
+        if (input == password) {
+            System.out.println("Access granted");
+        } else {
+            System.out.println("Access denied");
+        }
+    }
+}`,
+    buggyLine: 5,
+    issue: "Using == to compare String content instead of .equals()",
+    explanation: "== checks reference equality (are they the same object?), not value equality (do they contain the same characters?). Use input.equals(password) for reliable content comparison.",
+  },
+};
+
+Strings are the workhorse of any program that deals with text — user names, messages, file paths, configuration values. In Java, `String` is a **class**, not a primitive type. That distinction has a practical consequence you'll hit quickly: you cannot compare strings with `==`. Understanding how strings work saves you from one of the most common Java bugs.
+
+## String basics
+
+A String literal is enclosed in double quotes. String objects come with a rich set of built-in methods:
+
+```java
+public class StringBasics {
+    public static void main(String[] args) {
+        String name = "Java Programming";
+
+        System.out.println(name.length());           // 16
+        System.out.println(name.toUpperCase());      // JAVA PROGRAMMING
+        System.out.println(name.toLowerCase());      // java programming
+        System.out.println(name.charAt(5));          // P
+        System.out.println(name.substring(5));       // Programming
+        System.out.println(name.substring(5, 8));    // Pro
+        System.out.println(name.contains("Java"));  // true
+        System.out.println(name.replace("Java", "Python")); // Python Programming
+    }
+}
+```
+
+Strings are **immutable** — every method returns a new String rather than modifying the original. `name.toUpperCase()` does not change `name`; it produces a fresh String object.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## == vs .equals()
+
+This is the single most common Java string bug. Use `.equals()` to compare content:
+
+```java
+String a = new String("hello");
+String b = new String("hello");
+
+System.out.println(a == b);        // false — different objects
+System.out.println(a.equals(b));   // true  — same content
+```
+
+When you write a string literal like `"hello"`, Java may reuse an existing object from a pool, so `==` can sometimes return `true` by coincidence. Never rely on this — always use `.equals()` for string comparison.
+
+To avoid NullPointerException when one side might be null, put the known-safe string on the left: `"expected".equals(userInput)`.
+
+## String concatenation and StringBuilder
+
+The `+` operator concatenates strings. For simple cases it's fine. When you're building a string inside a loop, use `StringBuilder` to avoid creating many temporary objects:
+
+```java
+// Fine for a few concatenations
+String greeting = "Hello, " + "World" + "!";
+
+// Better for loop-based building
+StringBuilder sb = new StringBuilder();
+for (int i = 1; i <= 5; i++) {
+    sb.append("item").append(i).append("\n");
+}
+String result = sb.toString();
+System.out.print(result);
+```
+
+## String.format()
+
+`String.format()` builds strings using placeholders — cleaner than chaining `+` for complex output:
+
+```java
+String name = "Alice";
+int score = 95;
+double gpa = 3.87;
+
+String report = String.format("Student: %-10s | Score: %3d | GPA: %.2f", name, score, gpa);
+System.out.println(report);
+// Student: Alice      | Score:  95 | GPA: 3.87
+```
+
+Common format specifiers: `%s` for strings, `%d` for integers, `%f` or `%.2f` for floating-point numbers.
+
+## Try it
+
+```java
+public class StringDemo {
+    public static void main(String[] args) {
+        String sentence = "  The quick brown fox  ";
+        System.out.println(sentence.trim());            // strips whitespace
+        System.out.println(sentence.trim().split(" ").length); // word count
+        System.out.println(sentence.indexOf("fox"));   // first occurrence
+    }
+}
+```
+
+## Exercise
+
+Write a method `isPalindrome(String s)` that returns `true` if the string reads the same forwards and backwards (ignore case). Test it with at least three strings.
+
+```java
+public class Palindrome {
+    static boolean isPalindrome(String s) {
+        String clean = s.toLowerCase();
+        // Hint: compare clean to its reverse
+        return false; // replace this
+    }
+
+    public static void main(String[] args) {
+        System.out.println(isPalindrome("racecar")); // true
+        System.out.println(isPalindrome("hello"));   // false
+        System.out.println(isPalindrome("Level"));   // true
+    }
+}
+```
+
+<Note>Hint: use a StringBuilder to reverse the string — new StringBuilder(clean).reverse().toString() — then compare with .equals().</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Using `==` to compare strings** → almost always gives wrong results outside the string pool. Use `.equals()` every time.
+- **Expecting string methods to mutate** → `s.toUpperCase()` does not change `s`. Capture the return value: `s = s.toUpperCase();`
+- **Off-by-one in `substring`** → `substring(start, end)` includes the character at `start` but excludes the one at `end`.
+- **Concatenating in a tight loop** → each `+` creates a new object. Use `StringBuilder.append()` when building strings iteratively.
+
+## Recap
+
+- `String` is an immutable class; every method returns a new `String`
+- Key methods: `length()`, `charAt()`, `substring()`, `contains()`, `toUpperCase()`, `toLowerCase()`, `replace()`, `trim()`
+- Always compare string content with `.equals()`, never with `==`
+- Use `StringBuilder` for efficient loop-based string construction
+- `String.format()` produces readable formatted output using `%s`, `%d`, `%.2f` placeholders
+
+**Up next:** Object-Oriented Programming — Classes and Objects.

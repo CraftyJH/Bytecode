@@ -1,0 +1,203 @@
+export const meta = {
+  title: "Control Flow",
+  duration: 14,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "cf-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `int score = 72;
+String grade = (score >= 90) ? "A" : (score >= 70) ? "B" : "C";
+System.out.println(grade);`,
+    expectedOutput: "B",
+    explanation: "score is 72. The first condition (score >= 90) is false. The second (score >= 70) is true, so grade is \"B\".",
+  },
+  endQ2: {
+    id: "cf-end-2",
+    type: "find_the_bug",
+    difficulty: "easy",
+    code: `public class Classifier {
+    public static void main(String[] args) {
+        int x = 0;
+        if (x > 0) {
+            System.out.println("positive");
+        }
+        if (x < 0) {
+            System.out.println("negative");
+        }
+        System.out.println("zero");
+    }
+}`,
+    buggyLine: 10,
+    issue: "The final println runs unconditionally — it should be in an else block",
+    explanation: "Without else, \"zero\" prints for every value of x, not just when x == 0. The last if block needs to be else { System.out.println(\"zero\"); }",
+  },
+  endQ3: {
+    id: "cf-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the ternary expression that sets status to \"on\" when active is true, otherwise \"off\":",
+    code: 'String status = active ___ "on" : "off";',
+    correctAnswers: ["?"],
+    caseSensitive: true,
+    explanation: "The ternary operator syntax is: condition ? valueIfTrue : valueIfFalse. The ? separates the condition from the two possible values.",
+  },
+  endQ4: {
+    id: "cf-end-4",
+    type: "order_the_steps",
+    difficulty: "medium",
+    prompt: "Put these else-if chain conditions in the correct order so that the highest matching grade is printed for score = 85:",
+    items: [
+      { id: "a", text: "if (score >= 90) → print \"A\"" },
+      { id: "b", text: "else if (score >= 80) → print \"B\"" },
+      { id: "c", text: "else if (score >= 70) → print \"C\"" },
+      { id: "d", text: "else → print \"F\"" },
+    ],
+    correctOrder: ["a", "b", "c", "d"],
+    explanation: "Conditions must go from highest to lowest. If you check >= 70 first, a score of 85 would match it and never reach the >= 80 branch.",
+  },
+};
+
+Programs that only run top-to-bottom aren't very useful. Control flow lets you make decisions, choose between paths, and handle cases — the fundamental skill that separates a working program from a useful one.
+
+## if / else if / else
+
+The `if` statement evaluates a boolean expression and executes a block only when it's true.
+
+```java
+int temperature = 22;
+
+if (temperature >= 30) {
+    System.out.println("Hot day");
+} else if (temperature >= 20) {
+    System.out.println("Warm day");
+} else if (temperature >= 10) {
+    System.out.println("Cool day");
+} else {
+    System.out.println("Cold day");
+}
+```
+
+**Always use curly braces `{}`**, even for single-line bodies. Omitting them is legal but causes notorious bugs when you add a second line later and forget to add braces.
+
+Java checks each condition top-to-bottom and stops at the first one that's true. Order matters: put the most specific (or highest-value) conditions first.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## The ternary operator
+
+The ternary operator is a compact way to pick between two values based on a condition:
+
+```java
+// condition ? valueIfTrue : valueIfFalse
+int age = 20;
+String label = (age >= 18) ? "adult" : "minor";
+System.out.println(label);  // adult
+```
+
+Use ternary for simple value selection. For anything with side effects or multiple statements, stick with a regular `if/else`.
+
+## switch
+
+`switch` compares one variable against multiple constant values. Traditional switch uses `break` to prevent fall-through:
+
+```java
+int day = 3;
+switch (day) {
+    case 1:
+        System.out.println("Monday");
+        break;
+    case 2:
+        System.out.println("Tuesday");
+        break;
+    case 3:
+        System.out.println("Wednesday");
+        break;
+    default:
+        System.out.println("Other day");
+}
+```
+
+Java 14+ introduced **switch expressions** with `->` that are cleaner and don't fall through:
+
+```java
+String dayName = switch (day) {
+    case 1 -> "Monday";
+    case 2 -> "Tuesday";
+    case 3 -> "Wednesday";
+    default -> "Other day";
+};
+System.out.println(dayName);
+```
+
+Prefer the arrow form when your Java version supports it — it's less error-prone.
+
+## Try it
+
+```java
+public class ControlFlow {
+    public static void main(String[] args) {
+        int score = 85;
+
+        String grade = switch (score / 10) {
+            case 10, 9 -> "A";
+            case 8     -> "B";
+            case 7     -> "C";
+            case 6     -> "D";
+            default    -> "F";
+        };
+
+        System.out.println("Grade: " + grade);
+    }
+}
+```
+
+## Exercise
+
+Write a program that takes an integer `hour` (0–23) and prints `"Good morning"` for hours 5–11, `"Good afternoon"` for 12–17, `"Good evening"` for 18–21, and `"Good night"` otherwise.
+
+```java
+public class Greeting {
+    public static void main(String[] args) {
+        int hour = 14;
+        // Write your if/else-if/else chain here
+    }
+}
+```
+
+<Note>Hint: use >= and <= together to check a range, e.g. hour >= 5 && hour <= 11.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Omitting `{}`** → adding a second line to an if body without braces silently breaks the logic.
+- **Missing `break` in traditional switch** → execution falls through to the next case. Use the arrow form to avoid this entirely.
+- **Condition order in else-if** → if a broad condition comes first, narrower ones below it are never reached.
+- **Assignment in condition** → `if (x = 5)` won't compile in Java, but double-check you mean `==` for comparison.
+
+## Recap
+
+- `if / else if / else` selects a branch based on boolean conditions — evaluated top to bottom
+- Always wrap bodies in `{}`, even single statements
+- The ternary `condition ? a : b` is a concise value selector, not a replacement for complex logic
+- Traditional `switch` requires `break`; the modern arrow form (`->`) does not fall through
+- Order conditions from most specific to least specific
+
+**Up next:** Loops.

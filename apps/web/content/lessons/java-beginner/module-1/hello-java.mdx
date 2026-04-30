@@ -1,0 +1,125 @@
+export const meta = {
+  title: "Hello, Java",
+  duration: 10,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "hj-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is the entry point of every Java program?",
+    options: [
+      { text: "<code>public class Main</code>", correct: false, feedback: "That's the class declaration, not the entry point." },
+      { text: "<code>public static void main(String[] args)</code>", correct: true },
+      { text: "<code>function main()</code>", correct: false, feedback: "That's JavaScript syntax." },
+      { text: "<code>void start()</code>", correct: false, feedback: "No special method named start in standard Java." },
+    ],
+    explanation: "Every Java program begins execution at the public static void main(String[] args) method.",
+  },
+  endQ2: {
+    id: "hj-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the line that prints \"Hi\" followed by a newline:",
+    code: '___.out.println("Hi");',
+    correctAnswers: ["System"],
+    caseSensitive: true,
+    explanation: "System is the class that exposes the out stream. System.out.println() is the standard way to print a line.",
+  },
+  endQ3: {
+    id: "hj-end-3",
+    type: "find_the_bug",
+    difficulty: "easy",
+    code: `public class Greeting {
+    public static void main(String[] args) {
+        System.out.println("Hello, Java")
+    }
+}`,
+    buggyLine: 3,
+    issue: "Missing semicolon",
+    explanation: "Every statement in Java must end with a semicolon (;). The compiler will reject this with: error: ';' expected",
+  },
+};
+
+Java is the language behind a huge portion of the world's software — bank backends, Android apps, the systems that route your flights and process your card payments. It was designed in 1995 around a simple promise: *write once, run anywhere.* That promise is why Java still powers so much critical infrastructure thirty years later.
+
+You don't need to install anything for this lesson. The editor on the right runs real Java in a sandbox.
+
+## Every Java program starts with a class
+
+Java organizes all code into **classes**. A class is just a named container for code. Inside the class, the special method `main` is where the program starts running.
+
+```java
+public class HelloWorld {
+    public static void main(String[] args) {
+        System.out.println("Hello, Java");
+    }
+}
+```
+
+Three things to notice:
+
+- `public class HelloWorld` — the container, named whatever we want
+- `public static void main(String[] args)` — the special starting point. Memorize this signature; we'll explain every word over the next few lessons.
+- `System.out.println(...)` — prints text to the screen, then moves to a new line
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Try it
+
+Click **Run** in the editor. You should see:
+
+```
+Hello, Java
+```
+
+Now try changing the string to your name and running again.
+
+## Exercise
+
+Modify the program to print your name on a second line.
+
+```java
+public class HelloWorld {
+    public static void main(String[] args) {
+        System.out.println("Hello, Java");
+        // Your code here
+    }
+}
+```
+
+**What the tests check:**
+- First line of output is `Hello, Java`
+- Second line is non-empty
+
+<Note>Hint: add another `System.out.println(...)` line below the first one.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.midLesson} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting the semicolon** → `error: ';' expected`. Every statement ends with `;`.
+- **Single quotes around text** → in Java, single quotes are for single characters (`'A'`), not strings. Use `"double quotes"` for text.
+- **Misspelling `main`** → the program compiles but won't run as a standalone application.
+
+## Recap
+
+- Java code lives in **classes**
+- `public static void main(String[] args)` is where execution starts
+- `System.out.println(...)` prints a line of text
+- Statements end with `;`
+
+**Up next:** Storing values — variables and primitive types.

@@ -1,0 +1,159 @@
+export const meta = {
+  title: "Variables and Primitives",
+  duration: 12,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "vp-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `int x = 5;
+int y = 10;
+System.out.println(x + y);`,
+    expectedOutput: "15",
+    explanation: "x holds 5 and y holds 10. Adding two ints gives 15, which println prints followed by a newline.",
+  },
+  endQ2: {
+    id: "vp-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Declare a constant integer named MAX_SIZE set to 100:",
+    code: "___ int MAX_SIZE = 100;",
+    correctAnswers: ["final"],
+    caseSensitive: true,
+    explanation: "The final keyword makes a variable a constant. Once assigned, a final variable cannot be reassigned.",
+  },
+  endQ3: {
+    id: "vp-end-3",
+    type: "find_the_bug",
+    difficulty: "easy",
+    code: `public class Height {
+    public static void main(String[] args) {
+        int height = 1.75;
+        System.out.println(height);
+    }
+}`,
+    buggyLine: 3,
+    issue: "Assigning a decimal (double) literal to an int variable",
+    explanation: "int can only hold whole numbers. 1.75 is a double literal. Either change the type to double, or use an integer value like int height = 175;",
+  },
+  endQ4: {
+    id: "vp-end-4",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which primitive type would you use to store the value true or false?",
+    options: [
+      { text: "<code>int</code>", correct: false, feedback: "int stores whole numbers, not true/false values." },
+      { text: "<code>char</code>", correct: false, feedback: "char stores a single character like 'A'." },
+      { text: "<code>boolean</code>", correct: true },
+      { text: "<code>byte</code>", correct: false, feedback: "byte stores a small whole number (-128 to 127)." },
+    ],
+    explanation: "boolean is Java's primitive type for truth values. It can hold exactly two values: true or false.",
+  },
+};
+
+Java is a **statically typed** language — before you can store a value, you must tell the compiler exactly what kind of value it is. This might feel strict coming from other languages, but it catches entire categories of bugs before your program ever runs.
+
+## Declaring variables
+
+The syntax is always: `type name = value;`
+
+```java
+int age = 25;
+double price = 9.99;
+boolean isLoggedIn = true;
+String username = "alice";
+```
+
+Java has exactly **eight primitive types** built into the language. In practice you'll use four of them almost exclusively:
+
+| Type | Use for | Example |
+|------|---------|---------|
+| `int` | whole numbers | `int count = 0;` |
+| `double` | decimal numbers | `double pi = 3.14;` |
+| `boolean` | true / false flags | `boolean done = false;` |
+| `char` | a single character | `char grade = 'A';` |
+
+The other four — `byte`, `short`, `long`, `float` — exist for specific performance or range needs. `long` needs an `L` suffix on its literal: `long bigNum = 9_000_000_000L;`
+
+`String` is not a primitive (it's a class), but it's so fundamental that it feels like one.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## Constants with final
+
+When a value should never change after it's first assigned, mark it `final`. By convention, constant names are written in SCREAMING_SNAKE_CASE.
+
+```java
+final int MAX_RETRIES = 3;
+final double TAX_RATE = 0.08;
+
+// This would cause a compile error:
+// MAX_RETRIES = 5;
+```
+
+## Try it
+
+Declare three variables — one `int`, one `double`, and one `boolean` — then print all three on separate lines.
+
+```java
+public class Variables {
+    public static void main(String[] args) {
+        int score = 42;
+        double temperature = 98.6;
+        boolean isRaining = false;
+        System.out.println(score);
+        System.out.println(temperature);
+        System.out.println(isRaining);
+    }
+}
+```
+
+## Exercise
+
+Declare a `final double` constant named `GRAVITY` set to `9.81`, then print it.
+
+```java
+public class Constants {
+    public static void main(String[] args) {
+        // Declare GRAVITY here
+        // Print GRAVITY here
+    }
+}
+```
+
+<Note>Hint: use the final keyword before the type, and end the name in all caps by convention.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Assigning a decimal to an int** → `int x = 1.5;` is a compile error. Use `double` for decimals.
+- **Forgetting `L` on long literals** → `long n = 10000000000;` won't compile. Write `10000000000L`.
+- **Using `=` instead of `==`** → `=` assigns a value; `==` compares two values. Mixing them up causes logic bugs or compile errors.
+- **Comparing with `==` for non-primitive types** → for `String` and other objects, use `.equals()`, not `==`.
+
+## Recap
+
+- Every variable has a fixed type declared before its name
+- The four workhorse primitives: `int`, `double`, `boolean`, `char`
+- `String` is a class, not a primitive, but is used like one
+- Use `final` to declare constants; name them in SCREAMING_SNAKE_CASE
+- `long` literals need an `L` suffix; `float` literals need an `F` suffix
+
+**Up next:** Operators and Expressions.

@@ -1,0 +1,206 @@
+export const meta = {
+  title: "Methods and Scope",
+  duration: 14,
+  order: 6,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "ms-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Demo {
+    static int double(int n) {
+        return n * 2;
+    }
+    public static void main(String[] args) {
+        System.out.println(double(3));
+        System.out.println(double(10));
+    }
+}`,
+    expectedOutput: "6\n20",
+    explanation: "double(3) returns 3 * 2 = 6. double(10) returns 10 * 2 = 20. Each call is independent.",
+  },
+  endChoice: {
+    id: "ms-end-2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What return type should a method have if it performs an action but does not produce a value?",
+    options: [
+      { text: "<code>int</code>", correct: false, feedback: "int means the method returns a whole number." },
+      { text: "<code>null</code>", correct: false, feedback: "null is a value, not a return type." },
+      { text: "<code>void</code>", correct: true },
+      { text: "<code>empty</code>", correct: false, feedback: "empty is not a valid Java return type." },
+    ],
+    explanation: "void tells the compiler that the method does not return anything. A void method can still use a bare return; statement to exit early.",
+  },
+  endBug: {
+    id: "ms-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Calculator {
+    static int add(int a, int b) {
+        int result = a + b;
+    }
+    public static void main(String[] args) {
+        System.out.println(add(3, 4));
+    }
+}`,
+    buggyLine: 3,
+    issue: "Method declares int return type but never returns a value",
+    explanation: "The method signature says it returns an int, but there is no return statement. Add return result; as the last line of the method body.",
+  },
+  endOrder: {
+    id: "ms-end-4",
+    type: "order_the_steps",
+    difficulty: "medium",
+    prompt: "Put these steps in the correct order to define and call a method that greets a user by name:",
+    items: [
+      { id: "a", text: "Write the method signature: static void greet(String name)" },
+      { id: "b", text: "Write the method body: System.out.println(\"Hello, \" + name);" },
+      { id: "c", text: "Close the method with }" },
+      { id: "d", text: "In main, call the method: greet(\"Alice\");" },
+    ],
+    correctOrder: ["a", "b", "c", "d"],
+    explanation: "A method must be fully defined before (or alongside) main. Define the signature, fill in the body, close the brace, then call it from main.",
+  },
+};
+
+Methods are named, reusable blocks of code. Instead of writing the same logic in five places, you write it once as a method and call it wherever you need it. Good methods are short, focused, and named so clearly that the call site reads like plain English.
+
+## Declaring and calling methods
+
+Every method has a return type, a name, a parameter list (possibly empty), and a body:
+
+```java
+public class Methods {
+    // A method that returns an int
+    static int square(int n) {
+        return n * n;
+    }
+
+    // A void method — no return value
+    static void printLine(String text) {
+        System.out.println(">>> " + text);
+    }
+
+    public static void main(String[] args) {
+        int result = square(7);
+        System.out.println(result);   // 49
+
+        printLine("Hello");           // >>> Hello
+        printLine("World");           // >>> World
+    }
+}
+```
+
+The `return` statement both provides the value and immediately exits the method. A `void` method can have a bare `return;` to exit early, but doesn't have to.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## Method overloading
+
+Java lets you define multiple methods with the same name as long as their parameter lists differ. The compiler picks the right one based on the argument types at the call site:
+
+```java
+static int add(int a, int b) {
+    return a + b;
+}
+
+static double add(double a, double b) {
+    return a + b;
+}
+
+// add(3, 4)      → calls the int version → 7
+// add(1.5, 2.5)  → calls the double version → 4.0
+```
+
+Overloading is useful for convenience methods that work with different types. Don't overload just to avoid naming things — different behaviour should usually get different names.
+
+## Variable scope
+
+A variable only exists within the block `{}` where it was declared. This is called **scope**:
+
+```java
+static void scopeDemo() {
+    int x = 10;                // declared in method scope
+
+    if (x > 5) {
+        int y = 20;            // declared in if-block scope
+        System.out.println(x + y); // OK — both visible here
+    }
+
+    // System.out.println(y);  // compile error — y is out of scope
+}
+```
+
+Local variables (declared inside a method) are only visible within that method. They cease to exist when the method returns. Parameters behave like local variables — they're copies of the values passed in, not references to the originals (for primitives).
+
+## Try it
+
+```java
+public class Scope {
+    static int clamp(int value, int min, int max) {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(clamp(5, 0, 10));   // 5
+        System.out.println(clamp(-3, 0, 10));  // 0
+        System.out.println(clamp(15, 0, 10));  // 10
+    }
+}
+```
+
+## Exercise
+
+Write two overloaded `max` methods: one that takes two `int` parameters and returns the larger one, and one that takes three `int` parameters and returns the largest. Call both from `main` and print the results.
+
+```java
+public class MaxFinder {
+    // Write max(int a, int b) here
+
+    // Write max(int a, int b, int c) here
+
+    public static void main(String[] args) {
+        System.out.println(max(3, 7));       // 7
+        System.out.println(max(4, 9, 2));    // 9
+    }
+}
+```
+
+<Note>Hint: the three-argument version can reuse the two-argument version — call max(a, b) to get the bigger of the first two, then call max(result, c).</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 3 of 4" />
+
+<Quiz data={quizzes.endOrder} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting `return`** → a non-void method without a reachable `return` statement is a compile error.
+- **Using a variable outside its scope** → declaring a variable inside an `if` block and trying to read it after the block ends causes a compile error.
+- **Thinking parameters are the original variables** → modifying a primitive parameter inside a method does not affect the variable at the call site.
+- **Overloading with the same parameters, different return type** → Java does not allow this. The return type alone is not enough to distinguish overloads.
+
+## Recap
+
+- Methods have: return type, name, parameter list, and a body
+- `void` methods perform actions; non-void methods compute and return a value
+- `return` provides the value and exits the method immediately
+- Overloading lets multiple methods share a name when their parameters differ
+- Variables are scoped to the block `{}` where they are declared
+
+**Up next:** Arrays.
