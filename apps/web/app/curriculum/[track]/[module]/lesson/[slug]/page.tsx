@@ -111,8 +111,10 @@ export default async function LessonPage({ params }: LessonPageProps) {
               components={components}
               options={{
                 mdxOptions: {
+                  useDynamicImport: true,
                   rehypePlugins: [rehypeHighlight],
                 },
+                blockJS: false,
               }}
             />
           </div>
