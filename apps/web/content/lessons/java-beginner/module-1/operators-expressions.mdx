@@ -1,0 +1,184 @@
+export const meta = {
+  title: "Operators and Expressions",
+  duration: 12,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "oe-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `int a = 7;
+int b = 2;
+System.out.println(a / b);`,
+    expectedOutput: "3",
+    explanation: "When both operands are int, Java performs integer division and truncates the decimal. 7 / 2 = 3.5, truncated to 3.",
+  },
+  endQ2: {
+    id: "oe-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the logical operator that means AND:",
+    code: `if (age >= 18 ___ hasID) {
+    System.out.println("Entry allowed");
+}`,
+    correctAnswers: ["&&"],
+    caseSensitive: true,
+    explanation: "&& is the logical AND operator. Both sides must be true for the whole expression to be true.",
+  },
+  endQ3: {
+    id: "oe-end-3",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does the % operator return?",
+    options: [
+      { text: "The quotient of a division", correct: false, feedback: "That's what / does." },
+      { text: "The remainder after integer division", correct: true },
+      { text: "A percentage value between 0 and 100", correct: false, feedback: "% has nothing to do with percentage notation in Java." },
+      { text: "The absolute value of a number", correct: false, feedback: "Use Math.abs() for absolute value." },
+    ],
+    explanation: "The modulo operator (%) gives the remainder. 10 % 3 is 1 because 10 = 3 * 3 + 1. It's commonly used to check if a number is even (n % 2 == 0).",
+  },
+  endQ4: {
+    id: "oe-end-4",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `int x = 10;
+x += 3;
+x *= 2;
+System.out.println(x);`,
+    expectedOutput: "26",
+    explanation: "x starts at 10. += 3 makes it 13. *= 2 makes it 26.",
+  },
+};
+
+Expressions are the calculations at the heart of every Java program. An expression combines values, variables, and operators to produce a new value. Understanding how Java evaluates them — and the surprises that come from integer division — will save you hours of debugging.
+
+## Arithmetic operators
+
+The five arithmetic operators work exactly as you'd expect, with one important exception:
+
+```java
+int a = 10;
+int b = 3;
+
+System.out.println(a + b);  // 13
+System.out.println(a - b);  // 7
+System.out.println(a * b);  // 30
+System.out.println(a / b);  // 3  ← truncates, not 3.333!
+System.out.println(a % b);  // 1  ← remainder
+```
+
+**Integer division truncates toward zero.** `7 / 2` gives `3`, not `3.5`. If you need the decimal, make at least one operand a `double`: `7.0 / 2` or `(double) 7 / 2`.
+
+Compound assignment operators are shorthand: `x += 5` is the same as `x = x + 5`. The same pattern works for `-=`, `*=`, `/=`, and `%=`.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## Comparison and logical operators
+
+Comparison operators return a `boolean`:
+
+```java
+int score = 85;
+System.out.println(score >= 90);   // false
+System.out.println(score != 100);  // true
+System.out.println(score == 85);   // true
+```
+
+Logical operators combine boolean expressions:
+
+```java
+boolean isAdult = age >= 18;
+boolean hasTicket = true;
+
+System.out.println(isAdult && hasTicket);  // true only if both
+System.out.println(isAdult || hasTicket);  // true if either
+System.out.println(!isAdult);              // flips the value
+```
+
+## String concatenation
+
+The `+` operator doubles as string concatenation. When one side is a `String`, Java converts the other side to a string automatically:
+
+```java
+String name = "Alice";
+int score = 95;
+System.out.println("Player " + name + " scored " + score + " points.");
+// Player Alice scored 95 points.
+```
+
+Watch out: `"Result: " + 1 + 2` prints `"Result: 12"` (left-to-right string concat), not `"Result: 3"`. Use parentheses to force arithmetic first: `"Result: " + (1 + 2)`.
+
+## Operator precedence
+
+Java follows standard math precedence: `*`, `/`, `%` before `+`, `-`. When in doubt, use parentheses — they make intent clear and eliminate ambiguity.
+
+```java
+int result = 2 + 3 * 4;    // 14, not 20
+int clear  = (2 + 3) * 4;  // 20
+```
+
+## Try it
+
+Predict the output, then run the code to confirm.
+
+```java
+public class Operators {
+    public static void main(String[] args) {
+        System.out.println(10 % 3);
+        System.out.println(5 + 2 * 3);
+        System.out.println(9 / 2);
+        System.out.println(9.0 / 2);
+    }
+}
+```
+
+## Exercise
+
+Write a program that calculates and prints the number of whole weeks and leftover days in a given number of days (use 100 days as the input).
+
+```java
+public class WeeksAndDays {
+    public static void main(String[] args) {
+        int totalDays = 100;
+        // Calculate whole weeks and leftover days
+        // Print: "Weeks: X, Days: Y"
+    }
+}
+```
+
+<Note>Hint: use / for whole weeks and % for the remaining days.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **int / int truncates** → `5 / 2` is `2`, not `2.5`. Cast one operand to `double` if you need decimals.
+- **String + int + int** → `"x=" + 1 + 2` gives `"x=12"`. Wrap the math in parentheses: `"x=" + (1 + 2)`.
+- **Using `=` in a condition** → `if (x = 5)` is a compile error in Java (unlike C). You want `==`.
+- **Confusing `&&` and `&`** → `&&` short-circuits (stops early if left side is false); `&` always evaluates both sides.
+
+## Recap
+
+- `+`, `-`, `*`, `/`, `%` are the arithmetic operators; `%` gives the remainder
+- `int / int` performs integer division and drops the decimal
+- `==`, `!=`, `>`, `<`, `>=`, `<=` compare values and return `boolean`
+- `&&` (AND), `||` (OR), `!` (NOT) combine boolean expressions
+- `+` concatenates strings; use parentheses to control evaluation order
+
+**Up next:** Control Flow.

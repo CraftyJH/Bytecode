@@ -1,0 +1,191 @@
+export const meta = {
+  title: "Loops",
+  duration: 14,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "lp-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `for (int i = 0; i < 5; i++) {
+    if (i == 2) continue;
+    System.out.println(i);
+}`,
+    expectedOutput: "0\n1\n3\n4",
+    explanation: "The loop runs i from 0 to 4. When i equals 2, continue skips the rest of that iteration, so 2 is never printed. All other values print normally.",
+  },
+  endBug: {
+    id: "lp-end-2",
+    type: "find_the_bug",
+    difficulty: "easy",
+    code: `public class Counter {
+    public static void main(String[] args) {
+        int i = 0;
+        while (i < 5) {
+            System.out.println(i);
+        }
+    }
+}`,
+    buggyLine: 4,
+    issue: "Missing i++ — the loop variable never changes, causing an infinite loop",
+    explanation: "i is always 0, so the condition i < 5 is always true. Add i++ inside the loop body to increment i on each iteration.",
+  },
+  endFill: {
+    id: "lp-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the blank to add the loop variable to total on each iteration:",
+    code: `int total = 0;
+for (int i = 1; i <= 10; i++) {
+    total ___ i;
+}`,
+    correctAnswers: ["+="],
+    caseSensitive: true,
+    explanation: "+= is the compound addition assignment. total += i is shorthand for total = total + i, accumulating the sum on every pass.",
+  },
+  endOrder: {
+    id: "lp-end-4",
+    type: "order_the_steps",
+    difficulty: "medium",
+    prompt: "Order these steps to correctly accumulate the sum of 1 through 5:",
+    items: [
+      { id: "a", text: "Declare: int sum = 0;" },
+      { id: "b", text: "Start loop: for (int i = 1; i <= 5; i++)" },
+      { id: "c", text: "Inside loop body: sum += i;" },
+      { id: "d", text: "After loop: System.out.println(sum);" },
+    ],
+    correctOrder: ["a", "b", "c", "d"],
+    explanation: "You must initialize the accumulator before the loop, run the loop that adds each value, then print after the loop ends. Printing inside the loop would show a partial sum on every iteration.",
+  },
+};
+
+Loops let you repeat a block of code without copy-pasting it. Every meaningful program uses them — iterating over a list, reading input until the user quits, counting down a timer. Java gives you three loop constructs, each suited to different situations.
+
+## The for loop
+
+Use a `for` loop when you know in advance how many times to iterate. The three parts of the header — init, condition, update — keep everything in one place:
+
+```java
+public class ForLoop {
+    public static void main(String[] args) {
+        for (int i = 0; i < 5; i++) {
+            System.out.println("Iteration " + i);
+        }
+        // Prints: Iteration 0, 1, 2, 3, 4
+    }
+}
+```
+
+The init (`int i = 0`) runs once before the loop starts. The condition (`i < 5`) is checked before each iteration — if false, the loop ends. The update (`i++`) runs after each iteration. A common mistake is writing `i <= 5` when you mean `i < 5`, producing one extra iteration (off-by-one error).
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## The while loop
+
+Use a `while` loop when the number of iterations isn't known upfront:
+
+```java
+public class WhileLoop {
+    public static void main(String[] args) {
+        int n = 1;
+        while (n < 100) {
+            n *= 2;
+        }
+        System.out.println(n); // 128 — first power of 2 >= 100
+    }
+}
+```
+
+The most dangerous mistake with `while` is forgetting to update the loop variable inside the body, which creates an infinite loop. Always ensure the condition will eventually become false.
+
+## The do-while loop
+
+`do-while` guarantees the body runs at least once, because the condition is checked after the body:
+
+```java
+public class DoWhile {
+    public static void main(String[] args) {
+        int count = 10;
+        do {
+            System.out.println("count is " + count);
+            count--;
+        } while (count > 0);
+    }
+}
+```
+
+## break and continue
+
+`break` exits the loop immediately. `continue` skips the rest of the current iteration and moves to the next:
+
+```java
+for (int i = 0; i < 10; i++) {
+    if (i == 7) break;      // stop entirely at 7
+    if (i % 2 == 0) continue; // skip even numbers
+    System.out.println(i);  // prints 1, 3, 5
+}
+```
+
+## Try it
+
+```java
+public class SumLoop {
+    public static void main(String[] args) {
+        int sum = 0;
+        for (int i = 1; i <= 100; i++) {
+            sum += i;
+        }
+        System.out.println("Sum 1-100: " + sum); // 5050
+    }
+}
+```
+
+## Exercise
+
+Print all multiples of 3 from 3 to 30, one per line. Then print their total.
+
+```java
+public class Multiples {
+    public static void main(String[] args) {
+        int total = 0;
+        // Your loop here
+        System.out.println("Total: " + total);
+    }
+}
+```
+
+<Note>Hint: use the % operator to check divisibility, or simply start your loop at 3 and step by 3 each time using i += 3.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.midPredict} label="question 1 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endOrder} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Off-by-one errors** → `i < n` iterates n times (0 through n-1); `i <= n` iterates n+1 times (0 through n).
+- **Infinite loops** → forgetting to update the loop variable in a `while` loop. The program hangs silently.
+- **Modifying the loop variable inside the body** → changing `i` inside a `for` loop body makes the iteration count unpredictable.
+- **Using `break` too eagerly** → sometimes a well-crafted condition is cleaner than `break`. Reach for it when the exit condition is genuinely complex.
+
+## Recap
+
+- `for` loops are best when the iteration count is known: `for (init; condition; update)`
+- `while` loops run as long as a condition is true — check for infinite loop risk
+- `do-while` always executes the body at least once
+- `break` exits the loop; `continue` skips to the next iteration
+- Off-by-one errors (`<` vs `<=`) are among the most common loop bugs
+
+**Up next:** Methods and Scope.
