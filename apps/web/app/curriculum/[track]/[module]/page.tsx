@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTrack, getModule, curriculum } from "@/lib/curriculum";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Pill } from "@/components/ui/Pill";
-import { Clock, ChevronRight } from "lucide-react";
+import { Clock, ChevronRight, Trophy } from "lucide-react";
 
 interface ModulePageProps {
   params: Promise<{ track: string; module: string }>;
@@ -115,6 +115,48 @@ export default async function ModulePage({ params }: ModulePageProps) {
           </a>
         ))}
       </div>
+
+      {/* Capstone — only Java Beginner Module 1 has one for now */}
+      {trackSlug === "java-beginner" && moduleSlug === "module-1" && (
+        <div className="mt-8">
+          <p
+            className="text-prose-faint text-xs mb-3"
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
+            // capstone challenge
+          </p>
+          <a
+            href={`/curriculum/${trackSlug}/${moduleSlug}/capstone`}
+            className="flex items-center justify-between gap-4 px-5 py-4 rounded-lg border transition-colors duration-100 hover:border-[var(--border-default)] group"
+            style={{
+              backgroundColor: "var(--color-elevated)",
+              borderColor: "var(--border-subtle)",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <Trophy size={14} className="text-accent shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-prose-muted group-hover:text-prose transition-colors duration-100">
+                  Number Guessing Game
+                </p>
+                <p
+                  className="text-xs text-prose-faint mt-0.5"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  ~30 min · 14 tests · badge + certificate
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Pill variant="premium" />
+              <ChevronRight
+                size={14}
+                className="text-prose-faint group-hover:text-prose-muted transition-colors duration-100"
+              />
+            </div>
+          </a>
+        </div>
+      )}
     </div>
   );
 }
