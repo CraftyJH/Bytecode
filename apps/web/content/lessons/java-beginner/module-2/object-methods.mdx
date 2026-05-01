@@ -1,0 +1,274 @@
+export const meta = {
+  title: "toString, equals, and hashCode",
+  duration: 12,
+  order: 8,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "om-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Demo {
+    public static void main(String[] args) {
+        Point p = new Point(2, 5);
+        System.out.println(p);
+    }
+}
+
+class Point {
+    int x, y;
+    Point(int x, int y) { this.x = x; this.y = y; }
+
+    @Override
+    public String toString() {
+        return "(" + x + ", " + y + ")";
+    }
+}`,
+    expectedOutput: "(2, 5)",
+    explanation: "println(p) calls p.toString() automatically. Without the override you'd get something like 'Point@1b6d3586' (the default Object.toString). Overriding lets you decide what makes sense for your class.",
+  },
+  endQ1: {
+    id: "om-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Point a = new Point(1, 2);
+        Point b = new Point(1, 2);
+        System.out.println(a == b);
+        System.out.println(a.equals(b));
+    }
+}
+
+class Point {
+    int x, y;
+    Point(int x, int y) { this.x = x; this.y = y; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Point)) return false;
+        Point p = (Point) o;
+        return x == p.x && y == p.y;
+    }
+}`,
+    expectedOutput: "false\ntrue",
+    explanation: "== compares references; a and b are two different Point objects, so == is false. equals() is overridden to compare field values, so it returns true. The two are independent — overriding equals does not change ==.",
+  },
+  endChoice: {
+    id: "om-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why must <code>hashCode</code> stay consistent with <code>equals</code>?",
+    options: [
+      { text: "Java throws an error if they disagree.", correct: false, feedback: "Java does not enforce the contract — but containers built on hashing assume it." },
+      { text: "Hash-based containers (<code>HashMap</code>, <code>HashSet</code>) bucket objects by hashCode and only compare equals within a bucket.", correct: true },
+      { text: "<code>toString</code> uses both internally.", correct: false, feedback: "toString does not depend on equals or hashCode." },
+      { text: "Both methods are deprecated unless overridden together.", correct: false, feedback: "Neither is deprecated; you simply must keep them consistent." },
+    ],
+    explanation: "If two objects are equal by your equals() but produce different hashCodes, a HashMap will put them in different buckets and never realise they're the same key — your get() will fail to find what you just put(). The contract: equal objects must have equal hashCodes.",
+  },
+  endFill: {
+    id: "om-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the annotation that signals you intend to override an Object method:",
+    code: "___\npublic String toString() { return \"hi\"; }",
+    correctAnswers: ["@Override"],
+    caseSensitive: true,
+    explanation: "@Override tells the compiler to verify you really are overriding an inherited method. If you misspell the name or get the signature wrong, the compiler errors out — without @Override, you'd silently create a brand-new method.",
+  },
+  endBug: {
+    id: "om-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class Point {
+    int x, y;
+    Point(int x, int y) { this.x = x; this.y = y; }
+
+    @Override
+    public boolean equals(Point other) {
+        return x == other.x && y == other.y;
+    }
+}`,
+    buggyLine: 6,
+    issue: "Parameter type is Point, not Object — this overloads, it does not override",
+    explanation: "Object.equals takes an Object parameter. By declaring the parameter as Point, you've created a *different* method that overloads alongside the inherited equals(Object). Calls from frameworks (like collections) still go through the inherited Object version. The fix: parameter type Object, then instanceof + cast inside.",
+  },
+};
+
+Every class in Java silently inherits from `Object` — the universal parent — and therefore inherits three methods you'll override over and over again: `toString()`, `equals()`, and `hashCode()`. The defaults are usually wrong for your data, and getting them right is the difference between a class that "just works" and one that surprises you.
+
+## `toString` — the printable form
+
+By default, `Object.toString()` returns something like `Point@1b6d3586` — the class name and a memory hash. Useless for humans. Override it to produce a readable representation:
+
+```java
+class Point {
+    int x, y;
+    Point(int x, int y) { this.x = x; this.y = y; }
+
+    @Override
+    public String toString() {
+        return "(" + x + ", " + y + ")";
+    }
+}
+
+System.out.println(new Point(3, 4));   // (3, 4)
+```
+
+`println` and string concatenation both call `toString()` automatically. The moment you override it, your objects start printing usefully everywhere — debugger tooltips, log statements, error messages.
+
+A good `toString` includes enough information to identify the object in a debug log, but isn't so verbose it overwhelms the line.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## `equals` — value equality
+
+The default `Object.equals()` is just `==` — it returns `true` only when both references point to the same object. For most data classes that's the wrong question. You usually want **value equality**: two Points are equal when they have the same x and y, even if they're different objects.
+
+```java
+class Point {
+    int x, y;
+    Point(int x, int y) { this.x = x; this.y = y; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;          // optional fast-path
+        if (!(o instanceof Point)) return false;
+        Point p = (Point) o;
+        return x == p.x && y == p.y;
+    }
+}
+
+new Point(1, 2).equals(new Point(1, 2));   // true
+```
+
+The signature must take `Object`, not `Point`. If you write `equals(Point p)`, you've **overloaded** the inherited method instead of overriding it — and frameworks that call `equals(Object)` won't go through your version. Always annotate with `@Override` so the compiler catches this.
+
+The structure of a correct `equals`:
+
+1. Quick reference check (`this == o`) — optional optimisation.
+2. Type check via `instanceof`.
+3. Cast to your type.
+4. Compare the fields that matter.
+
+## `hashCode` — and the contract that ties them together
+
+Hash-based containers (`HashMap`, `HashSet`) work by bucketing objects according to their `hashCode`. Two objects that are `.equals()` *must* return the same `hashCode`, or those containers will lose track of them.
+
+```java
+class Point {
+    int x, y;
+    // ...constructor, equals from above...
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(x, y);
+    }
+}
+```
+
+`Objects.hash(...)` combines the given values into a reasonable hash. You can write hash code by hand (`return 31 * x + y;`), but `Objects.hash` is shorter and uses the same fields you'd use in `equals` — making it easy to keep them in sync.
+
+The contract:
+
+- If `a.equals(b)`, then `a.hashCode() == b.hashCode()` — **required**
+- If `a.hashCode() == b.hashCode()`, the objects might *or might not* be equal — **collisions are allowed**
+
+Get this wrong and you'll have bugs that look like memory corruption: you put a key in a HashMap, then `get` returns null even though the equal key is right there.
+
+## When to override the Big Three
+
+Override all three together for any class whose objects you want to compare by value, store in a `Set`, or use as `Map` keys. For purely behavioural classes (a `Logger`, a `RequestHandler`), the defaults are usually fine — there's no meaningful "equal Logger" concept.
+
+Modern Java has `record` types that auto-generate all three for you. We'll cover those later — for now, learn to write them by hand, because you'll see the pattern in every Java codebase.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Point a = new Point(2, 3);
+        Point b = new Point(2, 3);
+        System.out.println(a);              // (2, 3)
+        System.out.println(a.equals(b));    // true
+        System.out.println(a.hashCode() == b.hashCode());   // true
+    }
+}
+
+class Point {
+    int x, y;
+    Point(int x, int y) { this.x = x; this.y = y; }
+
+    @Override public String toString() { return "(" + x + ", " + y + ")"; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Point)) return false;
+        Point p = (Point) o;
+        return x == p.x && y == p.y;
+    }
+
+    @Override public int hashCode() { return java.util.Objects.hash(x, y); }
+}
+```
+
+## Exercise
+
+Override `toString` and `equals` on `Point` so the output is `(1, 2)\ntrue\nfalse`.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Point a = new Point(1, 2);
+        Point b = new Point(1, 2);
+        Point c = new Point(3, 4);
+        System.out.println(a);
+        System.out.println(a.equals(b));
+        System.out.println(a.equals(c));
+    }
+}
+
+class Point {
+    int x, y;
+    Point(int x, int y) { this.x = x; this.y = y; }
+
+    // Override toString() to return "(x, y)"
+    // Override equals(Object o) so two Points are equal when their x and y match
+}
+```
+
+<Note>Hint: `toString` returns a String. For `equals`, take an Object parameter, check `instanceof Point`, cast to Point, and compare both x and y.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **`equals(Point p)` instead of `equals(Object o)`** → that's an overload, not an override. The framework's `equals(Object)` calls won't reach it. `@Override` will catch it; use it.
+- **Overriding `equals` but not `hashCode`** → your objects appear equal but vanish into the wrong bucket of any HashMap. Always override both together.
+- **Comparing strings with `==` inside `equals`** → for object fields like Strings, use `.equals()`. Only primitives use `==`.
+- **Including transient or derived state in equals** → only compare the fields that define the identity of the value. A cached computation isn't part of "what makes this object equal to that one".
+
+## Recap
+
+- Every class inherits `toString`, `equals`, and `hashCode` from `Object`
+- Override `toString` for readable output in logs, debuggers, and println
+- Override `equals(Object)` for value equality — guard with `instanceof` and cast inside
+- Override `hashCode` consistently with `equals` — equal objects must hash to the same value
+- Always annotate overrides with `@Override` so the compiler catches signature mistakes
+
+**End of module.** You now have the OOP foundation needed for collections, generics, interfaces, and most real-world Java code.

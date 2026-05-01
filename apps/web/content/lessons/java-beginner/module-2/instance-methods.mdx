@@ -1,0 +1,263 @@
+export const meta = {
+  title: "Methods That Use Object State",
+  duration: 12,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "im-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Demo {
+    public static void main(String[] args) {
+        Counter c = new Counter();
+        c.bump();
+        c.bump();
+        c.bump();
+        System.out.println(c.value);
+    }
+}
+
+class Counter {
+    int value = 0;
+    void bump() {
+        value++;
+    }
+}`,
+    expectedOutput: "3",
+    explanation: "Each call to c.bump() increments the value field of the specific Counter object c. Three calls leave value at 3.",
+  },
+  endQ1: {
+    id: "im-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Lamp l = new Lamp();
+        System.out.println(l.isOn());
+        l.toggle();
+        System.out.println(l.isOn());
+    }
+}
+
+class Lamp {
+    boolean on = false;
+    void toggle() { on = !on; }
+    boolean isOn() { return on; }
+}`,
+    expectedOutput: "false\ntrue",
+    explanation: "The lamp starts off (default for boolean is false). toggle() flips on to true. isOn() reads the field — both reads return the value at the moment of the call.",
+  },
+  endChoice: {
+    id: "im-end-2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What's the difference between a static method and an instance method?",
+    options: [
+      { text: "Static methods are faster.", correct: false, feedback: "Performance is not the meaningful difference; they exist at different levels (class vs object)." },
+      { text: "Static methods belong to the class; instance methods belong to a specific object.", correct: true },
+      { text: "Instance methods cannot have parameters.", correct: false, feedback: "Instance methods can have any parameters they like." },
+      { text: "Static methods can call instance methods directly without an object.", correct: false, feedback: "A static method needs an object to call any instance method on it." },
+    ],
+    explanation: "Static methods are called on the class (`Math.max(...)`) and have no `this`. Instance methods are called on an object (`d.bark()`) and have access to the object's fields via `this`. Use instance methods when behaviour depends on object state; use static when it doesn't.",
+  },
+  endFill: {
+    id: "im-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the call site so that `bark()` is called on the dog `d`:",
+    code: "Dog d = new Dog(\"Rex\");\nd.___();",
+    correctAnswers: ["bark"],
+    caseSensitive: true,
+    explanation: "Instance methods are called with `object.methodName()`. The dot operator looks up the method on the object's class and runs it with `this` bound to that object.",
+  },
+  endBug: {
+    id: "im-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Counter c = new Counter();
+        bump(c);
+        System.out.println(c.value);
+    }
+}
+
+class Counter {
+    int value = 0;
+    void bump() { value++; }
+}`,
+    buggyLine: 4,
+    issue: "Calling bump as if it were a static method instead of an instance method on c",
+    explanation: "`bump()` is an instance method — it must be called on a Counter object. Write `c.bump();`. Calling `bump(c)` looks for a static method `bump` that takes a Counter parameter, which doesn't exist.",
+  },
+};
+
+A class without methods is just a record — somewhere to store data. The point of OOP is that objects also **do things**. An **instance method** is a method that runs in the context of one specific object and has free access to that object's fields through `this`.
+
+## Defining and calling instance methods
+
+Instance methods look like the static methods you already know, but without the `static` keyword:
+
+```java
+class Dog {
+    String name;
+    int age;
+
+    Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    void bark() {
+        System.out.println(name + " says woof!");
+    }
+
+    void birthday() {
+        age++;
+    }
+}
+```
+
+Both `bark` and `birthday` operate on the Dog they were called on. You call them with the dot operator:
+
+```java
+Dog rex = new Dog("Rex", 4);
+rex.bark();        // Rex says woof!
+rex.birthday();
+System.out.println(rex.age);  // 5
+```
+
+The variable `rex` is implicitly passed in as `this`, so inside the method, `name` is `rex.name` and `age++` increments `rex.age`. If you had a second Dog `buddy`, `buddy.bark()` would print Buddy's name — same code, different object.
+
+<Note>Inside an instance method you can write `name` or `this.name` — both refer to the same field. Use `this.` only when needed to disambiguate from a parameter, or to make the access deliberately explicit.</Note>
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## Instance methods that return values
+
+Methods aren't only for mutating state. They can also read it and return a result:
+
+```java
+class Rectangle {
+    int width, height;
+    Rectangle(int w, int h) { this.width = w; this.height = h; }
+
+    int area() {
+        return width * height;
+    }
+
+    boolean isSquare() {
+        return width == height;
+    }
+}
+
+Rectangle r = new Rectangle(4, 7);
+System.out.println(r.area());      // 28
+System.out.println(r.isSquare());  // false
+```
+
+This pattern — a tiny method that derives one value from the object's fields — is everywhere in Java. It's how you avoid scattering `width * height` across the rest of your code.
+
+## Static vs instance — when to use which
+
+Instance methods need an object. Static methods don't:
+
+```java
+class Math2 {
+    static int square(int n) {     // no object needed
+        return n * n;
+    }
+}
+
+Math2.square(5);                   // 25 — call on the class
+```
+
+Use **static** for utilities whose result depends only on the inputs (`Math.max`, `Math.sqrt`). Use **instance** when the behaviour depends on the object's state (`dog.bark()`, `account.deposit(50)`).
+
+A static method has no `this` — if you try to read an instance field from inside one, you get a compile error.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Counter c = new Counter();
+        c.bump();
+        c.bump();
+        c.bump();
+        c.bump();
+        System.out.println(c.value);   // 4
+    }
+}
+
+class Counter {
+    int value = 0;
+    void bump() { value++; }
+}
+```
+
+## Exercise
+
+Add two instance methods to the `Dog` class:
+
+- `bark()` — prints `<name> says woof!` (where `<name>` is the dog's name)
+- `birthday()` — increments `age` by 1
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Dog d = new Dog("Rex", 4);
+        d.bark();
+        d.birthday();
+        System.out.println(d.name + " is now " + d.age);
+    }
+}
+
+class Dog {
+    String name;
+    int age;
+
+    Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    // Write bark() — prints "<name> says woof!"
+    // Write birthday() — increments age by 1
+}
+```
+
+<Note>Hint: instance methods drop the `static` keyword. Inside the method body, `name` and `age` already refer to the current Dog's fields.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling an instance method without an object** → `bark();` from outside the class is a compile error. You must write `dog.bark();` so Java knows which Dog's `name` to use.
+- **Adding `static` to an instance method by accident** → static methods can't read instance fields. You'll get "non-static field cannot be referenced from a static context".
+- **Returning a value from a `void` method** → declared return type and `return` statement must agree. Either change the type or remove the value.
+- **Mutating fields from outside the class when an instance method would be cleaner** → if `birthday()` exists, prefer `dog.birthday()` over `dog.age = dog.age + 1;` from elsewhere.
+
+## Recap
+
+- Instance methods are defined without `static` and called as `object.method(args)`
+- Inside an instance method, fields are read and written through the implicit `this` reference
+- Static methods belong to the class; instance methods belong to a specific object
+- Methods can return computed values that depend on object state — keep these methods short and focused
+
+**Up next:** Encapsulation — hide your fields behind methods and stop other code from touching them directly.

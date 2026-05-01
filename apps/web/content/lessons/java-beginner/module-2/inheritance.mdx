@@ -1,0 +1,286 @@
+export const meta = {
+  title: "Extending Classes",
+  duration: 14,
+  order: 6,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "inh-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Demo {
+    public static void main(String[] args) {
+        Dog d = new Dog("Rex");
+        d.speak();
+    }
+}
+
+class Animal {
+    String name;
+    Animal(String name) { this.name = name; }
+    void speak() { System.out.println(name + " makes a sound"); }
+}
+
+class Dog extends Animal {
+    Dog(String name) { super(name); }
+    @Override
+    void speak() { System.out.println(name + " says woof!"); }
+}`,
+    expectedOutput: "Rex says woof!",
+    explanation: "Dog inherits the name field from Animal via super(name). When d.speak() runs, Java calls the most specific version — Dog's override — which prints 'Rex says woof!'.",
+  },
+  endQ1: {
+    id: "inh-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Cat c = new Cat("Whiskers");
+        c.describe();
+        c.purr();
+    }
+}
+
+class Animal {
+    String name;
+    Animal(String name) { this.name = name; }
+    void describe() { System.out.println("An animal named " + name); }
+}
+
+class Cat extends Animal {
+    Cat(String name) { super(name); }
+    void purr() { System.out.println(name + " purrs"); }
+}`,
+    expectedOutput: "An animal named Whiskers\nWhiskers purrs",
+    explanation: "Cat doesn't override describe(), so the inherited Animal version runs. Cat adds a new method purr() that uses the inherited name field. Inheritance gives you the parent's behaviour for free, plus whatever you add.",
+  },
+  endChoice: {
+    id: "inh-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What does <code>super(name)</code> do on the first line of a subclass constructor?",
+    options: [
+      { text: "Renames the current object to <code>name</code>.", correct: false, feedback: "There is no built-in 'rename' in Java." },
+      { text: "Calls the parent class's constructor with <code>name</code>.", correct: true },
+      { text: "Returns from the constructor early.", correct: false, feedback: "super() does not exit the constructor; it delegates initialisation to the parent." },
+      { text: "Marks the class as a superclass.", correct: false, feedback: "A class becomes a superclass simply by being extended; super() is unrelated." },
+    ],
+    explanation: "`super(args)` invokes the parent's constructor with the given arguments — usually to initialise inherited fields. It must be the first statement of the subclass constructor. If you don't write it, Java inserts an implicit `super()` call to the parent's no-arg constructor.",
+  },
+  endBug: {
+    id: "inh-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class Animal {
+    String name;
+    Animal(String name) { this.name = name; }
+}
+
+class Dog extends Animal {
+    Dog(String name) {
+        this.name = name;
+    }
+}`,
+    buggyLine: 8,
+    issue: "Subclass constructor doesn't call super(name); parent has no no-arg constructor",
+    explanation: "Animal has only a one-arg constructor, so Java's implicit `super()` call won't compile. The Dog constructor must explicitly call `super(name);` on its first line to initialise the inherited field through the parent's constructor.",
+  },
+  endFill: {
+    id: "inh-end-4",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the keyword that makes Dog a subclass of Animal:",
+    code: "class Dog ___ Animal { ... }",
+    correctAnswers: ["extends"],
+    caseSensitive: true,
+    explanation: "`extends` declares a parent-child relationship. Dog gets all of Animal's non-private fields and methods, and may add or override behaviour.",
+  },
+};
+
+When two classes share most of their data and behaviour, you don't have to copy code between them. **Inheritance** lets you declare one class as an extension of another — a `Dog` is an `Animal`, a `Manager` is an `Employee` — and reuse everything the parent already does.
+
+## `extends` — declaring a subclass
+
+Use `extends` to say "this class is a kind of that class":
+
+```java
+class Animal {
+    String name;
+    Animal(String name) {
+        this.name = name;
+    }
+    void speak() {
+        System.out.println(name + " makes a sound");
+    }
+}
+
+class Dog extends Animal {
+    Dog(String name) {
+        super(name);
+    }
+}
+```
+
+Now `Dog` automatically has the `name` field and the `speak()` method:
+
+```java
+Dog rex = new Dog("Rex");
+rex.speak();   // Rex makes a sound
+```
+
+You wrote no `name` field and no `speak()` method on `Dog`, but the inherited ones work as if you did.
+
+## `super(...)` — calling the parent constructor
+
+A subclass constructor must initialise the parent before it does its own work. The `super(...)` call invokes a parent constructor with whatever arguments it needs:
+
+```java
+class Dog extends Animal {
+    int age;
+    Dog(String name, int age) {
+        super(name);          // calls Animal(String) with name
+        this.age = age;       // then initialises Dog's own field
+    }
+}
+```
+
+`super(...)` must be the first statement in the constructor. If you don't write one, Java inserts a hidden `super()` call to the parent's no-arg constructor — which is a compile error if the parent doesn't have one.
+
+<Note>The relationship is asymmetric. A Dog is an Animal, but an Animal is not necessarily a Dog. You can write `Animal a = new Dog("Rex");` (a Dog assigned to an Animal-typed variable). You cannot write `Dog d = new Animal("X");` — not every Animal is a Dog.</Note>
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## Overriding methods
+
+When the inherited behaviour isn't what you want, **override** it: write a method in the subclass with the same signature as the parent's, and add `@Override` so the compiler can verify it really is replacing something:
+
+```java
+class Dog extends Animal {
+    Dog(String name) { super(name); }
+
+    @Override
+    void speak() {
+        System.out.println(name + " says woof!");
+    }
+}
+```
+
+Now:
+
+```java
+Animal a = new Animal("Generic");
+Dog d = new Dog("Rex");
+a.speak();   // Generic makes a sound
+d.speak();   // Rex says woof!
+```
+
+The `@Override` annotation is optional but strongly recommended. If you mistype the signature (`speek` instead of `speak`, or wrong parameter types), you'll silently create a *new* method instead of overriding — and `@Override` makes the compiler catch that.
+
+## Calling the parent's version
+
+Inside an override, you can still reach the parent's behaviour with `super.methodName(...)`:
+
+```java
+class Dog extends Animal {
+    Dog(String name) { super(name); }
+
+    @Override
+    void speak() {
+        super.speak();                 // first do the generic Animal sound
+        System.out.println("...woof!"); // then add the Dog flavour
+    }
+}
+```
+
+This is useful when you want to extend the parent's behaviour rather than replace it entirely.
+
+## What's inherited (and what isn't)
+
+A subclass inherits everything from its parent **except**:
+
+- `private` fields and methods — those stay locked inside the parent class
+- Constructors — every class declares its own, and chains to the parent via `super(...)`
+
+`public`, `protected`, and package-private members all come along automatically.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Cat c = new Cat("Whiskers");
+        c.speak();   // Whiskers says meow
+    }
+}
+
+class Animal {
+    String name;
+    Animal(String name) { this.name = name; }
+    void speak() { System.out.println(name); }
+}
+
+class Cat extends Animal {
+    Cat(String name) { super(name); }
+    @Override
+    void speak() { System.out.println(name + " says meow"); }
+}
+```
+
+## Exercise
+
+Make `Dog` extend `Animal`. Override `speak()` so a Dog prints `<name> says woof!`.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Animal a = new Animal("Generic");
+        Dog d = new Dog("Rex");
+        a.speak();
+        d.speak();
+    }
+}
+
+class Animal {
+    String name;
+    Animal(String name) { this.name = name; }
+    void speak() { System.out.println(name + " makes a sound"); }
+}
+
+// Write a Dog class that extends Animal and overrides speak()
+// to print "<name> says woof!"
+```
+
+<Note>Hint: `class Dog extends Animal` then a constructor `Dog(String name) { super(name); }`. Annotate the override with `@Override` and use the inherited `name` field.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 3 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting `super(...)` when the parent has no no-arg constructor** → Java inserts an implicit `super()`. If the parent doesn't have one, you must call `super(args)` explicitly.
+- **Spelling override wrong** → without `@Override`, a typo creates a *new* method silently. Always annotate intended overrides.
+- **Trying to inherit `private` members** → private is private even from subclasses. Use `protected` or expose a getter/setter if a subclass legitimately needs the data.
+- **Inheritance for code reuse alone** → if a Truck isn't really an Engine, don't extend Engine just to share methods. Use composition (a Truck *has* an Engine) instead.
+
+## Recap
+
+- `class B extends A` makes B a subclass of A, inheriting non-private members
+- `super(args)` calls a parent constructor; must be the first statement of a child constructor
+- Override a method by writing the same signature in the subclass; annotate with `@Override`
+- `super.method(...)` calls the parent's version from within an override
+- Use inheritance only when there's a real "is a" relationship, not just for code sharing
+
+**Up next:** Polymorphism — one variable type, many runtime behaviours.

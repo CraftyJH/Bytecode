@@ -1,0 +1,266 @@
+export const meta = {
+  title: "One Reference, Many Forms",
+  duration: 14,
+  order: 7,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "poly-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Demo {
+    public static void main(String[] args) {
+        Animal a = new Dog();
+        a.speak();
+    }
+}
+
+class Animal {
+    void speak() { System.out.println("Some sound"); }
+}
+
+class Dog extends Animal {
+    @Override void speak() { System.out.println("Woof"); }
+}`,
+    expectedOutput: "Woof",
+    explanation: "Even though the variable a is declared as Animal, the actual object is a Dog. Java looks up the speak() method on the runtime type — Dog — and calls Dog's override. This is dynamic dispatch.",
+  },
+  endQ1: {
+    id: "poly-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Shape[] shapes = { new Circle(), new Square(), new Shape() };
+        for (Shape s : shapes) {
+            s.draw();
+        }
+    }
+}
+
+class Shape {
+    void draw() { System.out.println("shape"); }
+}
+class Circle extends Shape {
+    @Override void draw() { System.out.println("circle"); }
+}
+class Square extends Shape {
+    @Override void draw() { System.out.println("square"); }
+}`,
+    expectedOutput: "circle\nsquare\nshape",
+    explanation: "The array's element type is Shape, but each element holds a different runtime type. The for-each loop calls draw() on each one; Java dispatches to the runtime type's override. This is exactly why polymorphism matters — one loop, three different behaviours.",
+  },
+  endChoice: {
+    id: "poly-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When you call <code>a.speak()</code> where <code>a</code> is declared <code>Animal</code> but holds a <code>Dog</code>, which method runs?",
+    options: [
+      { text: "Whichever was first in the source file.", correct: false, feedback: "Source order has no effect on dispatch." },
+      { text: "Always Animal's, because <code>a</code> is declared as Animal.", correct: false, feedback: "That would be 'static dispatch'. Java does the opposite by default." },
+      { text: "Dog's, because the actual object is a Dog (dynamic dispatch).", correct: true },
+      { text: "It's a compile error.", correct: false, feedback: "It compiles fine — Animal has a speak() method, so the call is valid at compile time." },
+    ],
+    explanation: "Java resolves overridden methods at runtime, based on the *actual* type of the object. The compile-time type only determines which methods are visible to the compiler; the runtime type decides which version actually runs.",
+  },
+  endFill: {
+    id: "poly-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Fill in the blank so the loop calls each shape's specific draw() method:",
+    code: "Shape[] shapes = { new Circle(), new Square() };\nfor (Shape s : shapes) {\n    s.___();\n}",
+    correctAnswers: ["draw"],
+    caseSensitive: true,
+    explanation: "draw() is defined on Shape and overridden on each subclass. Calling s.draw() inside the loop dispatches to the right override for each element automatically.",
+  },
+  endBug: {
+    id: "poly-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class Animal {
+    void speak() { System.out.println("animal"); }
+}
+
+class Dog extends Animal {
+    void bark() { System.out.println("woof"); }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Animal a = new Dog();
+        a.bark();
+    }
+}`,
+    buggyLine: 12,
+    issue: "bark() is not declared on Animal; the compiler only sees methods on the declared type",
+    explanation: "Even though `a` actually holds a Dog, its declared type is Animal. The compiler looks up bark() on Animal and doesn't find it, so the call fails. To call bark(), you'd need to either declare a Dog `Dog a = new Dog();` or cast: `((Dog) a).bark();`.",
+  },
+};
+
+Inheritance gives subclasses their own behaviour. **Polymorphism** — literally "many forms" — is what happens when you write code that doesn't care *which* subclass it's working with: one variable type, multiple actual classes, each behaving as itself.
+
+## A parent reference can hold any subclass
+
+If `Dog` extends `Animal`, a variable of type `Animal` can point to a `Dog`:
+
+```java
+Animal a = new Dog();    // legal — a Dog is an Animal
+a.speak();               // dispatches to Dog.speak()
+```
+
+The variable `a` has the **declared type** `Animal` but the **runtime type** `Dog`. When you call `a.speak()`, Java looks up the method on the runtime type and runs Dog's override. This is **dynamic dispatch**.
+
+The declared type matters too — it tells the compiler which methods you're allowed to call. If `bark()` is only declared on `Dog` (not `Animal`), then `a.bark()` won't compile, even when `a` actually holds a Dog.
+
+## Why this matters: one loop, many types
+
+The real value of polymorphism shows up when you have a collection of mixed types:
+
+```java
+Animal[] zoo = { new Dog("Rex"), new Cat("Whiskers"), new Cow("Bessie") };
+
+for (Animal a : zoo) {
+    a.speak();            // dispatches to whichever subclass each element is
+}
+```
+
+The loop has no idea what's in the array — it just calls `speak()`. Java picks the right override per element. Adding a new subclass (`Sheep`) doesn't require touching this loop at all.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## Static dispatch (overloading) vs dynamic dispatch (overriding)
+
+It's worth contrasting:
+
+- **Overloading** (multiple methods with the same name in the *same* class, different parameters) is resolved at **compile time** based on the argument types.
+- **Overriding** (a subclass replaces an inherited method's body) is resolved at **runtime** based on the actual object's type.
+
+```java
+class Printer {
+    void print(int n)    { System.out.println("int: " + n); }
+    void print(String s) { System.out.println("str: " + s); }
+}
+// overloading: which print runs is decided by the compiler
+```
+
+```java
+Animal a = new Dog();
+a.speak();
+// overriding: which speak runs is decided at runtime
+```
+
+## Casting back down
+
+Sometimes you genuinely need to call a subclass-only method on a parent-typed variable. You can downcast — but only if the runtime type really is that subclass:
+
+```java
+Animal a = new Dog();
+if (a instanceof Dog) {
+    Dog d = (Dog) a;
+    d.bark();              // safe — we just checked
+}
+```
+
+`(Dog) a` is a cast: a runtime check that throws `ClassCastException` if `a` isn't actually a Dog. Always guard with `instanceof` first. Better: design your method hierarchies so you don't need to cast in the first place.
+
+## Abstract — methods that *must* be overridden
+
+Sometimes the parent class has no useful default behaviour — every subclass should provide its own. Mark those methods `abstract`:
+
+```java
+abstract class Shape {
+    abstract double area();         // no body — every subclass must define it
+}
+
+class Circle extends Shape {
+    double radius;
+    Circle(double r) { this.radius = r; }
+    @Override
+    double area() {
+        return Math.PI * radius * radius;
+    }
+}
+```
+
+An `abstract` class can't be instantiated directly (`new Shape()` is a compile error). It's a contract: any concrete subclass must implement the abstract methods, or the compiler refuses.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Animal[] pets = { new Dog(), new Cat() };
+        for (Animal p : pets) p.speak();
+    }
+}
+
+class Animal {
+    void speak() { System.out.println("..."); }
+}
+class Dog extends Animal {
+    @Override void speak() { System.out.println("Woof"); }
+}
+class Cat extends Animal {
+    @Override void speak() { System.out.println("Meow"); }
+}
+```
+
+## Exercise
+
+Loop through the `zoo` array and call `speak()` on each element. The output should be `Woof\nMeow\nSome sound`.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Animal[] zoo = { new Dog(), new Cat(), new Animal() };
+        // Loop through zoo and call speak() on each
+    }
+}
+
+class Animal {
+    void speak() { System.out.println("Some sound"); }
+}
+
+class Dog extends Animal {
+    @Override void speak() { System.out.println("Woof"); }
+}
+
+class Cat extends Animal {
+    @Override void speak() { System.out.println("Meow"); }
+}
+```
+
+<Note>Hint: a for-each loop is the cleanest tool here. `for (Animal a : zoo) a.speak();` — Java handles the dispatch automatically.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling a subclass-only method through a parent reference** → the compiler only sees what's declared on the parent type. Either change the variable's type or downcast with `instanceof` first.
+- **Casting without checking** → `(Dog) someAnimal` throws ClassCastException at runtime if the object isn't actually a Dog. Always pair the cast with `instanceof`.
+- **Confusing overloading with overriding** → overloading varies parameters in the same class; overriding replaces an inherited method in a subclass. They're resolved at different times and behave differently.
+- **Reaching for casts often** → if you find yourself casting all over the place, the design is fighting you. Lift the method up to the parent (or an abstract method) so polymorphism does the work.
+
+## Recap
+
+- A parent-typed variable can hold any subclass instance
+- Method calls are dispatched on the runtime type, not the declared type
+- The declared type controls which methods are *visible* to the compiler
+- `abstract` methods force subclasses to provide their own implementation
+- Polymorphism + a parent-typed collection = one loop, any number of behaviours
+
+**Up next:** `toString`, `equals`, and `hashCode` — the three methods every well-behaved class overrides.

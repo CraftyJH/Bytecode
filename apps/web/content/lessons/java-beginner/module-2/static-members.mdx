@@ -1,0 +1,264 @@
+export const meta = {
+  title: "Static Fields and Methods",
+  duration: 12,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "st-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Demo {
+    public static void main(String[] args) {
+        new Widget();
+        new Widget();
+        new Widget();
+        System.out.println(Widget.count);
+    }
+}
+
+class Widget {
+    static int count = 0;
+    Widget() {
+        count++;
+    }
+}`,
+    expectedOutput: "3",
+    explanation: "There's exactly one count field shared by every Widget. Each constructor call increments the same shared counter, so after three `new Widget()` calls it reads 3.",
+  },
+  endQ1: {
+    id: "st-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Item a = new Item();
+        Item b = new Item();
+        a.shared++;
+        b.shared++;
+        System.out.println(Item.shared);
+    }
+}
+
+class Item {
+    static int shared = 0;
+}`,
+    expectedOutput: "2",
+    explanation: "Although a.shared and b.shared look like they're modifying different things, `shared` is static — there's one copy on the class, not one per object. Both increments hit the same field. (Calling a static field through an instance reference is legal but discouraged exactly because it hides this.)",
+  },
+  endChoice: {
+    id: "st-end-2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "When should a method be <code>static</code>?",
+    options: [
+      { text: "When the method is short.", correct: false, feedback: "Length has nothing to do with it." },
+      { text: "When the result depends only on the inputs, not on object state.", correct: true },
+      { text: "When the method should run faster.", correct: false, feedback: "Static methods are not meaningfully faster than instance methods." },
+      { text: "When the method needs access to private fields.", correct: false, feedback: "Static methods cannot access instance fields directly — they have no `this`." },
+    ],
+    explanation: "Static methods can't reach object state, so they're appropriate for utilities like `Math.max(a, b)` whose result is a pure function of the inputs. Use instance methods when the behaviour depends on a specific object's fields.",
+  },
+  endFill: {
+    id: "st-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the keyword that makes a field belong to the class rather than to each instance:",
+    code: "class Counter {\n    ___ int count = 0;\n}",
+    correctAnswers: ["static"],
+    caseSensitive: true,
+    explanation: "`static` makes the field exist once on the class itself. Every instance reads and writes the same shared value.",
+  },
+  endBug: {
+    id: "st-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class Counter {
+    int value = 0;
+    static int read() {
+        return value;
+    }
+}`,
+    buggyLine: 4,
+    issue: "Static method trying to read an instance field",
+    explanation: "`value` is per-object, but a static method has no `this` — it doesn't know which object's value to read. Either make `value` static (one shared field) or make `read()` an instance method.",
+  },
+};
+
+So far every field and method you've written has been per-object: each Dog has its own `name`, each Counter its own `value`. Sometimes you want the opposite — one piece of data or one method that belongs to the **class**, not to any particular instance. That's what `static` is for.
+
+## Static fields
+
+A static field exists once, no matter how many objects you create:
+
+```java
+class User {
+    static int count = 0;     // one shared int, on the class
+    String name;              // one per User
+
+    User(String name) {
+        this.name = name;
+        count++;              // increment the shared counter
+    }
+}
+```
+
+Every `new User(...)` runs the constructor, which increments the same shared `count`. To read it from outside, address the class directly:
+
+```java
+new User("Ada");
+new User("Linus");
+new User("Grace");
+
+System.out.println(User.count);   // 3
+```
+
+You'll occasionally see `someUser.count` — Java allows it, but it's misleading. Always access static fields through the class name (`User.count`) so it's obvious the field is shared.
+
+## Static methods
+
+A static method belongs to the class. It has no `this`, so it cannot read or write instance fields directly:
+
+```java
+class MathUtils {
+    static int square(int n) {
+        return n * n;
+    }
+}
+
+System.out.println(MathUtils.square(7));   // 49
+```
+
+You've already been using static methods all along — `Math.max(a, b)`, `Integer.parseInt("42")`, and your own `main` method are all static.
+
+The right rule of thumb: if the method's result depends only on its parameters, make it static. If it needs the state of a specific object, make it an instance method.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## Static and instance can coexist
+
+A class often has a mix:
+
+```java
+class User {
+    static int count = 0;          // class-wide counter
+    private String name;           // per-user
+
+    User(String name) {
+        this.name = name;
+        count++;
+    }
+
+    public String getName() {       // instance — reads this.name
+        return name;
+    }
+
+    public static int howMany() {  // static — reads the class field
+        return count;
+    }
+}
+
+User u1 = new User("Ada");
+User u2 = new User("Grace");
+System.out.println(u1.getName());     // Ada
+System.out.println(User.howMany());   // 2
+```
+
+Inside `howMany`, you cannot write `name` — there's no `this`. But you *can* write `count`, because static methods can freely access static fields.
+
+## Constants — `static final`
+
+A constant is a value that never changes. Combine `static` (one copy) with `final` (no reassignment):
+
+```java
+class Circle {
+    static final double PI = 3.14159265;
+
+    double radius;
+    Circle(double r) { this.radius = r; }
+
+    double area() {
+        return PI * radius * radius;
+    }
+}
+```
+
+Convention: name `static final` constants in `UPPER_SNAKE_CASE`. The compiler will refuse any code that tries to reassign `Circle.PI`.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        new Page();
+        new Page();
+        new Page();
+        new Page();
+        System.out.println(Page.created);   // 4
+    }
+}
+
+class Page {
+    static int created = 0;
+    Page() {
+        created++;
+    }
+}
+```
+
+## Exercise
+
+Add a static `count` field to `User` that tracks how many `User`s have been created. Each new `User` should increment it.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        new User("Ada");
+        new User("Linus");
+        new User("Grace");
+        System.out.println("Users created: " + User.count);
+    }
+}
+
+class User {
+    String name;
+    // 1. Add a static int field "count" starting at 0
+    // 2. Write a constructor that takes a name, assigns it,
+    //    and increments count
+}
+```
+
+<Note>Hint: declare `static int count = 0;` on the class. Inside the constructor, write `this.name = name;` then `count++;` — the static field is in scope without any prefix.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Reading an instance field from a static method** → "non-static field cannot be referenced from a static context". The static method has no object to read from.
+- **Accessing static through an instance reference** → `someUser.count` compiles but reads as if it were a per-object field. Always go through the class name: `User.count`.
+- **Making everything static** → if you find yourself passing the same object repeatedly to static methods, those should probably be instance methods on that class.
+- **Forgetting `final` on constants** → `static int PI = 3.14` is technically reassignable. Use `static final` (and uppercase the name).
+
+## Recap
+
+- `static` makes a field or method belong to the class, not to any one instance
+- Access static members through the class name (`User.count`, `Math.max(...)`)
+- Static methods have no `this` — they can't read instance fields without an explicit object
+- Use static for utilities and class-wide state; use instance for behaviour tied to a specific object
+- `static final UPPER_SNAKE_CASE` is the standard for constants
+
+**Up next:** Inheritance — define one class as an extension of another and reuse its fields and methods.

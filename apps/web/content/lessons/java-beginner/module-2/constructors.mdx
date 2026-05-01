@@ -1,0 +1,249 @@
+export const meta = {
+  title: "Constructors and this",
+  duration: 12,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "ctor-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Demo {
+    public static void main(String[] args) {
+        Point p = new Point(3, 7);
+        System.out.println(p.x + ", " + p.y);
+    }
+}
+
+class Point {
+    int x, y;
+    Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}`,
+    expectedOutput: "3, 7",
+    explanation: "The constructor receives 3 and 7 as parameters, and assigns them to this.x and this.y — the fields of the new object. Without `this.`, the assignment `x = x` would assign the parameter to itself.",
+  },
+  endQ1: {
+    id: "ctor-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Box b = new Box(2, 3, 4);
+        System.out.println(b.w * b.h * b.d);
+    }
+}
+
+class Box {
+    int w, h, d;
+    Box(int w, int h, int d) {
+        this.w = w;
+        this.h = h;
+        this.d = d;
+    }
+}`,
+    expectedOutput: "24",
+    explanation: "The constructor stores 2, 3, 4 in the box's three fields. 2 * 3 * 4 is 24.",
+  },
+  endChoice: {
+    id: "ctor-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Inside a constructor, what does <code>this</code> refer to?",
+    options: [
+      { text: "The class itself.", correct: false, feedback: "The class is the blueprint; `this` refers to a specific object built from it." },
+      { text: "The object currently being constructed.", correct: true },
+      { text: "The previous object created.", correct: false, feedback: "Java does not track 'previous' objects — `this` is always about the current one." },
+      { text: "The first parameter passed in.", correct: false, feedback: "Parameters are named individually. `this` is a separate, automatic reference." },
+    ],
+    explanation: "`this` is an implicit reference to the current object — the one whose constructor is running. It lets you distinguish a field (`this.x`) from a parameter or local variable that shares its name (`x`).",
+  },
+  endBug: {
+    id: "ctor-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class Person {
+    String name;
+    int age;
+    Person(String name, int age) {
+        name = name;
+        age = age;
+    }
+}`,
+    buggyLine: 5,
+    issue: "Assigning the parameter to itself instead of to the field",
+    explanation: "Inside the constructor, `name` (without `this.`) refers to the parameter, not the field. `name = name` just copies the parameter onto itself — the field stays null. Use `this.name = name;` to write to the field.",
+  },
+  endOrder: {
+    id: "ctor-end-4",
+    type: "order_the_steps",
+    difficulty: "medium",
+    prompt: "Put these steps in the correct order for constructing a new object with `new Dog(\"Rex\", 4)`:",
+    items: [
+      { id: "a", text: "JVM allocates memory for a new Dog and zero-initializes its fields" },
+      { id: "b", text: "The constructor runs, assigning name and age via this.name and this.age" },
+      { id: "c", text: "The new operator returns a reference to the constructed object" },
+      { id: "d", text: "The reference is stored in the variable on the left of `=`" },
+    ],
+    correctOrder: ["a", "b", "c", "d"],
+    explanation: "`new` first allocates and zero-initializes memory, then the constructor body executes to fill in fields, then the resulting reference is returned and assigned to the variable.",
+  },
+};
+
+In the previous lesson you created a Dog and then assigned its fields one line at a time. That's tedious, easy to forget, and leaves the object in a half-built state between assignments. **Constructors** solve this: they're special methods that run automatically when an object is created, so you can supply all the data up front.
+
+## A constructor is a method named after the class
+
+A constructor has the same name as the class, no return type, and runs once per object — when `new` is used:
+
+```java
+class Dog {
+    String name;
+    int age;
+
+    Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+}
+```
+
+Now creation is one line:
+
+```java
+Dog rex = new Dog("Rex", 4);
+System.out.println(rex.name + " is " + rex.age);  // Rex is 4
+```
+
+The arguments to `new Dog(...)` are passed to the constructor's parameters. The constructor body assigns them to fields, and the freshly built object is handed back.
+
+## What `this` is for
+
+When the parameter and the field share a name, plain `name` refers to the parameter (the closer scope wins). To reach the field, you need an explicit reference to the current object:
+
+```java
+Dog(String name, int age) {
+    this.name = name;   // this.name is the field, name is the parameter
+    this.age = age;
+}
+```
+
+`this` is an implicit reference to the object whose constructor (or instance method) is running. You can also use it explicitly to call other methods or read other fields on the same object.
+
+<Note>You can avoid `this` entirely by naming the parameters differently — `Dog(String n, int a)` and then `name = n;`. Most Java code prefers the matching-name + `this.` style; it makes the field assignments obvious at a glance.</Note>
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## The default constructor
+
+If you write a class with **no** constructors, Java provides a hidden no-argument constructor for free. That's why `new Dog()` worked in the previous lesson — Java synthesized `Dog() { }` for you. The moment you define any constructor of your own, that free one disappears:
+
+```java
+class Dog {
+    String name;
+
+    Dog(String name) {       // we defined a one-arg constructor
+        this.name = name;
+    }
+}
+
+// new Dog();           // compile error — no zero-arg constructor exists
+new Dog("Rex");          // OK
+```
+
+If you want both forms, you can write multiple constructors (constructor overloading works just like method overloading):
+
+```java
+class Dog {
+    String name;
+    int age;
+
+    Dog() {
+        this.name = "Unknown";
+        this.age = 0;
+    }
+    Dog(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+}
+```
+
+`new Dog()` calls the first; `new Dog("Rex", 4)` calls the second.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Point p = new Point(10, 20);
+        System.out.println(p.x);   // 10
+        System.out.println(p.y);   // 20
+    }
+}
+
+class Point {
+    int x, y;
+    Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+```
+
+## Exercise
+
+Add a constructor to the `Dog` class so that `new Dog("Rex", 4)` creates a Dog with `name = "Rex"` and `age = 4`.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Dog d = new Dog("Rex", 4);
+        System.out.println(d.name + " is " + d.age);
+    }
+}
+
+class Dog {
+    String name;
+    int age;
+
+    // Write a constructor that takes name and age and assigns them to the fields
+}
+```
+
+<Note>Hint: name the parameters `name` and `age` to match the fields, then use `this.name = name;` and `this.age = age;` inside the constructor body.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 3 of 4" />
+
+<Quiz data={quizzes.endOrder} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Giving the constructor a return type** → `void Dog(...)` is not a constructor; it's a regular method that happens to share the class's name. Constructors have no return type at all.
+- **Assigning a parameter to itself** → without `this.`, `name = name;` is a no-op. The field never gets written.
+- **Forgetting that defining one constructor removes the default** → if you write `Dog(String name)`, then `new Dog()` no longer compiles unless you also write a no-arg constructor.
+- **Calling another constructor with plain `Dog(...)`** → you can chain to another constructor, but the syntax is `this(...)` on the first line, not `Dog(...)`.
+
+## Recap
+
+- A constructor has the same name as the class and no return type
+- It runs once when `new` is used, and is the right place to initialise fields
+- `this.field = parameter;` is the idiom for writing the field when names collide
+- Java provides a default no-arg constructor only if you define no constructors yourself
+- Multiple constructors with different parameter lists let callers create objects different ways
+
+**Up next:** Instance methods — give your objects behaviour, not just data.

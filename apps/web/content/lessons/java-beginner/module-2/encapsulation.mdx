@@ -1,0 +1,278 @@
+export const meta = {
+  title: "Private Fields and Accessors",
+  duration: 14,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midPredict: {
+    id: "enc-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Demo {
+    public static void main(String[] args) {
+        Account a = new Account();
+        a.deposit(50);
+        a.deposit(30);
+        System.out.println(a.getBalance());
+    }
+}
+
+class Account {
+    private int balance = 0;
+    public void deposit(int amount) {
+        if (amount > 0) balance += amount;
+    }
+    public int getBalance() {
+        return balance;
+    }
+}`,
+    expectedOutput: "80",
+    explanation: "Both deposits pass the `amount > 0` check and add to balance. getBalance() returns the field through the public method. The private keyword prevents outside code from touching balance directly, but the class itself can.",
+  },
+  endQ1: {
+    id: "enc-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Account a = new Account();
+        a.deposit(100);
+        a.deposit(-40);
+        a.deposit(20);
+        System.out.println(a.getBalance());
+    }
+}
+
+class Account {
+    private int balance = 0;
+    public void deposit(int amount) {
+        if (amount > 0) balance += amount;
+    }
+    public int getBalance() { return balance; }
+}`,
+    expectedOutput: "120",
+    explanation: "100 is added (balance = 100). -40 fails the amount > 0 check and is ignored. 20 is added (balance = 120). The validation in deposit() is exactly the kind of guarantee encapsulation is designed to enforce.",
+  },
+  endChoice: {
+    id: "enc-end-2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Why mark a field <code>private</code>?",
+    options: [
+      { text: "It makes the field run faster.", correct: false, feedback: "Access modifiers are about visibility, not performance." },
+      { text: "It prevents code outside the class from reading or writing the field directly.", correct: true },
+      { text: "It hides the field from the JVM at runtime.", correct: false, feedback: "Java has reflection that can reach private fields; the keyword is a compile-time access rule." },
+      { text: "It deletes the field after the constructor finishes.", correct: false, feedback: "private has nothing to do with object lifetime." },
+    ],
+    explanation: "private restricts access at compile time: only code inside the same class can read or write the field. This lets the class enforce invariants — like `balance is never negative` — that would be impossible if any caller could write any value.",
+  },
+  endBug: {
+    id: "enc-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Account a = new Account();
+        a.balance = 1000000;
+        System.out.println(a.getBalance());
+    }
+}
+
+class Account {
+    private int balance = 0;
+    public int getBalance() { return balance; }
+}`,
+    buggyLine: 4,
+    issue: "Trying to assign to a private field from outside its class",
+    explanation: "balance is private to Account, so `a.balance = 1000000;` does not compile from outside Account. To change the balance, the caller must go through a public method like deposit() — which is exactly the safety net encapsulation provides.",
+  },
+  endOrder: {
+    id: "enc-end-4",
+    type: "order_the_steps",
+    difficulty: "medium",
+    prompt: "Encapsulating a previously-public field — put the steps in order:",
+    items: [
+      { id: "a", text: "Change `public int balance` to `private int balance`" },
+      { id: "b", text: "Add a `public int getBalance()` method that returns balance" },
+      { id: "c", text: "Add a `public void setBalance(int v)` (or a more focused mutator like deposit) with any validation" },
+      { id: "d", text: "Update callers that read balance to use getBalance(); update callers that write to use the new mutator" },
+    ],
+    correctOrder: ["a", "b", "c", "d"],
+    explanation: "Make the field private first so the compiler tells you every external read/write. Then add the public accessors and mutators with the validation you want. Finally update each caller to go through the methods.",
+  },
+};
+
+You've been writing fields as if anyone could touch them directly: `dog.age = -5;` is a perfectly legal assignment. That's a problem when those fields need to follow rules — a balance shouldn't go negative, an email needs an `@`, an age can't be a string. **Encapsulation** is the practice of hiding the fields behind methods so the class can enforce its own rules.
+
+## The `private` modifier
+
+Add `private` before a field, and only the class itself can read or write it:
+
+```java
+class Account {
+    private int balance = 0;
+
+    public void deposit(int amount) {
+        if (amount > 0) {
+            balance += amount;
+        }
+    }
+
+    public int getBalance() {
+        return balance;
+    }
+}
+```
+
+From outside `Account`:
+
+```java
+Account a = new Account();
+a.deposit(100);              // OK — public method
+System.out.println(a.getBalance());  // 100
+
+a.balance = 999;             // compile error — balance is private
+```
+
+The compiler refuses to let outside code touch `balance` directly. Anyone who wants to change the balance has to go through `deposit`, which contains the validation.
+
+## Public, private, and the default
+
+Java has four access levels. The two you'll use 95% of the time:
+
+| Modifier   | Visible to                              |
+| ---------- | --------------------------------------- |
+| `private`  | Only the class itself                   |
+| `public`   | Everyone                                |
+| (none)     | Code in the same package                |
+| `protected` | Same package + subclasses (covered with inheritance) |
+
+Default to `private` for fields, `public` for methods you intend to be the class's API. Make private anything that is an implementation detail.
+
+<Quiz data={quizzes.midPredict} label="quick check" />
+
+## Getters and setters
+
+When outside code needs to read or write a private field, expose a method:
+
+```java
+class Person {
+    private String name;
+    private int age;
+
+    public String getName()      { return name; }
+    public void   setName(String n) { this.name = n; }
+
+    public int  getAge()         { return age; }
+    public void setAge(int a) {
+        if (a >= 0) this.age = a;     // reject negative ages
+    }
+}
+```
+
+These are called **getters** (`getX()`) and **setters** (`setX(...)`). The naming convention is universal — IDE tools, JSON libraries, and frameworks all rely on it.
+
+A setter is the right place to put validation. If `setAge(-5)` silently rejects the value, no caller can corrupt the object.
+
+## When NOT to add a setter
+
+A getter doesn't have to come with a setter. If a value should never change after construction, leave it without one:
+
+```java
+class Person {
+    private final String id;       // assigned once, in the constructor
+    private String name;
+
+    Person(String id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public String getId()    { return id; }
+    public String getName()  { return name; }
+    public void setName(String n) { this.name = n; }
+    // no setId() — id is fixed for the lifetime of the Person
+}
+```
+
+This is **immutability** for a single field. `final` makes the compiler refuse a second assignment, and the lack of a setter prevents anyone from trying.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        Account a = new Account();
+        a.deposit(50);
+        a.deposit(-200);   // ignored
+        a.deposit(75);
+        System.out.println(a.getBalance());  // 125
+    }
+}
+
+class Account {
+    private int balance = 0;
+    public void deposit(int amount) {
+        if (amount > 0) balance += amount;
+    }
+    public int getBalance() { return balance; }
+}
+```
+
+## Exercise
+
+Make `balance` private, add `getBalance()` that returns it, and add `deposit(int amount)` that adds the amount only when `amount > 0` (otherwise it should do nothing).
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        BankAccount a = new BankAccount();
+        a.deposit(100);
+        a.deposit(-50);  // should be ignored
+        a.deposit(25);
+        System.out.println("Balance: " + a.getBalance());
+    }
+}
+
+class BankAccount {
+    // 1. Make balance private
+    // 2. Add getBalance() that returns balance
+    // 3. Add deposit(int amount) that adds amount only if amount > 0
+    int balance = 0;
+}
+```
+
+<Note>Hint: change `int balance = 0;` to `private int balance = 0;`. Then write `public int getBalance()` and `public void deposit(int amount)`. Inside deposit, guard with `if (amount &gt; 0) balance += amount;`.</Note>
+
+---
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 3 of 4" />
+
+<Quiz data={quizzes.endOrder} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Public fields with no validation** → if `balance` is public, any caller can write any value, and your invariants are unenforceable. Make fields private by default.
+- **Exposing every field with a getter and setter** → if a field shouldn't change after construction, leave the setter off. Getters and setters aren't free — each one is part of your class's public contract.
+- **Getter that returns a mutable internal object** → if `getItems()` returns the actual `List` field, callers can call `.clear()` on it and bypass your encapsulation. Return a copy or a read-only view.
+- **Validation in the wrong place** → if every caller has to remember to check `amount > 0`, eventually someone forgets. Put the check inside the setter / mutator.
+
+## Recap
+
+- `private` restricts a field or method to the class that declares it
+- `public` exposes a method or field to all code
+- Default to private fields + public methods — let the class be the gatekeeper of its own state
+- A getter exposes a read; a setter exposes a write (often with validation)
+- Omit setters for fields that should be immutable after construction; consider `final` to enforce that
+
+**Up next:** Static fields and methods — when something belongs to the class, not to an object.
