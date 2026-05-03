@@ -193,7 +193,7 @@ The NIO.2 API gives Java a clean, modern way to talk about and manipulate filesy
 - **`Files`** is the static utility class — every read, write, list, copy, or delete starts with `Files.something(path)`.
 - Path objects don't touch the filesystem on their own. You must call a `Files` method (or `Files.exists`) to interact with disk.
 
-**Up next:** Reading text files — turn a Path into a String or a List<String> with one method call.
+**Up next:** Reading text files — turn a Path into a String or a `List<String>` with one method call.
 
 <Exercise>
 Create a `Path` for `/tmp/example.txt` and print its filename, parent, and whether it's absolute. Then use `resolve` to derive `/tmp/notes/today.md` from `/tmp`.
