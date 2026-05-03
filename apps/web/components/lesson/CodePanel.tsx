@@ -20,6 +20,7 @@ const CodeEditor = dynamic(
 interface CodePanelProps {
   lessonSlug: string;
   trackSlug: string;
+  moduleSlug: string;
   starterCode: string;
   expectedOutput?: string;
 }
@@ -38,7 +39,7 @@ function gradeOutput(stdout: string, expected: string): boolean {
   return got === expected.trim();
 }
 
-export function CodePanel({ lessonSlug, trackSlug, starterCode, expectedOutput }: CodePanelProps) {
+export function CodePanel({ lessonSlug, trackSlug, moduleSlug, starterCode, expectedOutput }: CodePanelProps) {
   const [code, setCode] = useState(starterCode);
   const [result, setResult] = useState<RunResult | null>(null);
   const [runState, setRunState] = useState<RunState>("idle");
@@ -78,7 +79,19 @@ export function CodePanel({ lessonSlug, trackSlug, starterCode, expectedOutput }
       }
 
       if (expectedOutput) {
-        setRunState(gradeOutput(data.stdout, expectedOutput) ? "passed" : "failed");
+        const passed = gradeOutput(data.stdout, expectedOutput);
+        setRunState(passed ? "passed" : "failed");
+        if (passed) {
+          try {
+            const key = `bytecode:progress:${trackSlug}:${moduleSlug}`;
+            const prev = JSON.parse(localStorage.getItem(key) ?? "[]") as string[];
+            if (!prev.includes(lessonSlug)) {
+              const next = [...prev, lessonSlug];
+              localStorage.setItem(key, JSON.stringify(next));
+              window.dispatchEvent(new StorageEvent("storage", { key, newValue: JSON.stringify(next) }));
+            }
+          } catch { /* ignore */ }
+        }
       } else {
         setRunState("idle");
       }

@@ -7,10 +7,9 @@ import fs from "fs";
 import { getLesson, getModule, getTrack, getPrevNext } from "@/lib/curriculum";
 import { buildMdxComponents } from "@/components/mdx/MdxComponents";
 import { LessonSidebar } from "@/components/lesson/LessonSidebar";
-import { MarkComplete } from "@/components/lesson/MarkComplete";
 import { CodePanel } from "@/components/lesson/CodePanel";
+import { ModuleProgress } from "@/components/lesson/ModuleProgress";
 import { Pill } from "@/components/ui/Pill";
-import { createClient } from "@/lib/supabase/server";
 import { Clock, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import { askFromLessonHref } from "@/lib/forum";
 
@@ -59,21 +58,10 @@ export default async function LessonPage({ params }: LessonPageProps) {
 
   const { prev, next } = getPrevNext(trackSlug, moduleSlug, lessonSlug);
 
-  // Optional auth — only runs when Supabase env vars are present
-  let user = null;
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)) {
-    try {
-      const supabase = await createClient();
-      const { data } = await supabase.auth.getUser();
-      user = data.user;
-    } catch { /* continue without auth */ }
-  }
-
   const components = buildMdxComponents();
-  const progressKey = `bytecode:progress:${trackSlug}:${moduleSlug}`;
 
   return (
-    <div className="flex min-h-screen" style={{ paddingTop: "56px" }}>
+    <div className="flex min-h-screen">
       <LessonSidebar
         trackSlug={trackSlug}
         moduleSlug={moduleSlug}
@@ -133,7 +121,6 @@ export default async function LessonPage({ params }: LessonPageProps) {
           <div className="mt-10 pt-8 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
             style={{ borderColor: "var(--border-subtle)" }}>
             <div className="flex flex-wrap items-center gap-3">
-              <MarkComplete lessonSlug={lessonSlug} storageKey={progressKey} />
               <a
                 href={askFromLessonHref({
                   lessonSlug,
@@ -172,10 +159,13 @@ export default async function LessonPage({ params }: LessonPageProps) {
         <CodePanel
           lessonSlug={lessonSlug}
           trackSlug={trackSlug}
+          moduleSlug={moduleSlug}
           starterCode={lesson.starterCode ?? "public class Main {\n    public static void main(String[] args) {\n        // write your code here\n    }\n}"}
           expectedOutput={lesson.expectedOutput}
         />
       </div>
+
+      <ModuleProgress lessons={mod.lessons} trackSlug={trackSlug} moduleSlug={moduleSlug} />
     </div>
   );
 }
