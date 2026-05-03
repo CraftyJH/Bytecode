@@ -35,7 +35,7 @@ export default async function AdminOverviewPage() {
     .slice(0, 10);
 
   return (
-    <div className="px-8 py-10">
+    <div className="px-4 py-6 sm:px-8 sm:py-10">
       <div className="mb-8">
         <p
           className="text-prose-faint text-xs mb-1"
@@ -72,10 +72,10 @@ export default async function AdminOverviewPage() {
           // recent signups
         </p>
         <div
-          className="rounded-xl border overflow-hidden"
+          className="rounded-xl border overflow-x-auto"
           style={{ borderColor: "var(--border-subtle)" }}
         >
-          <table className="w-full">
+          <table className="w-full min-w-[480px]">
             <thead>
               <tr
                 className="border-b"

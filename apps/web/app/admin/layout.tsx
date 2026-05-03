@@ -30,10 +30,47 @@ export default async function AdminLayout({
   if (freshUser?.app_metadata?.role !== "admin") redirect("/");
 
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Mobile top bar */}
+      <header
+        className="lg:hidden border-b shrink-0"
+        style={{
+          backgroundColor: "var(--bg-elevated)",
+          borderColor: "var(--border-subtle)",
+        }}
+      >
+        <div className="flex items-center gap-2 px-4 h-12 border-b" style={{ borderColor: "var(--border-subtle)" }}>
+          <Shield size={14} className="text-accent" />
+          <span
+            className="text-sm font-semibold text-prose tracking-tight"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Admin
+          </span>
+          <a
+            href="/dashboard"
+            className="ml-auto text-xs text-prose-faint hover:text-prose-muted transition-colors duration-100"
+          >
+            ← App
+          </a>
+        </div>
+        <nav className="flex px-2 py-1.5 gap-1 overflow-x-auto">
+          {NAV.map(({ href, label, icon: Icon }) => (
+            <a
+              key={href}
+              href={href}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm text-prose-muted hover:text-prose hover:bg-subtle transition-colors duration-100 whitespace-nowrap shrink-0"
+            >
+              <Icon size={13} className="shrink-0" />
+              {label}
+            </a>
+          ))}
+        </nav>
+      </header>
+
+      {/* Desktop sidebar */}
       <aside
-        className="w-56 shrink-0 border-r flex flex-col"
+        className="hidden lg:flex w-56 shrink-0 border-r flex-col"
         style={{
           backgroundColor: "var(--bg-elevated)",
           borderColor: "var(--border-subtle)",

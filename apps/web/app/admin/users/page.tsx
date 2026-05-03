@@ -19,7 +19,7 @@ export default async function AdminUsersPage() {
   );
 
   return (
-    <div className="px-8 py-10">
+    <div className="px-4 py-6 sm:px-8 sm:py-10">
       <div className="mb-8">
         <p
           className="text-prose-faint text-xs mb-1"

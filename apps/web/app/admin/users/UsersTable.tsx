@@ -84,10 +84,10 @@ export function UsersTable({ users }: UsersTableProps) {
       </div>
 
       <div
-        className="rounded-xl border overflow-hidden"
+        className="rounded-xl border overflow-x-auto"
         style={{ borderColor: "var(--border-subtle)" }}
       >
-        <table className="w-full">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr
               className="border-b"
