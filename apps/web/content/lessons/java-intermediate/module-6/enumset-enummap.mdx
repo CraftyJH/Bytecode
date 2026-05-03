@@ -1,0 +1,316 @@
+export const meta = {
+  title: "EnumSet and EnumMap",
+  duration: 12,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "esem-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which `EnumSet` factory method creates a set containing every constant of a given enum type?",
+    options: [
+      { text: "`EnumSet.of(Day.class)`", correct: false, feedback: "`of` takes one or more constants, not a `Class`. Passing the class object would not even compile." },
+      { text: "`EnumSet.allOf(Day.class)`", correct: true, feedback: "Correct — `allOf` returns a set containing every constant of the supplied enum type, in declaration order." },
+      { text: "`EnumSet.fullOf(Day.class)`", correct: false, feedback: "There is no `fullOf` factory. The standard name is `allOf`." },
+      { text: "`new EnumSet<>(Day.class)`", correct: false, feedback: "`EnumSet` is abstract, so you cannot construct it with `new`. You must call one of the factories." },
+    ],
+    explanation: "`EnumSet` exposes only static factory methods — `of`, `allOf`, `noneOf`, `complementOf`, `range`, `copyOf` — because the optimal subclass (`RegularEnumSet` for ≤ 64 constants, `JumboEnumSet` otherwise) is chosen automatically.",
+    hint: "Look for a factory that takes a `Class<E>` argument.",
+  },
+  endQ1: {
+    id: "esem-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    enum Day { MON, TUE, WED, THU, FRI, SAT, SUN }
+
+    public static void main(String[] args) {
+        EnumSet<Day> weekend = EnumSet.of(Day.SAT, Day.SUN);
+        EnumSet<Day> weekday = EnumSet.complementOf(weekend);
+        System.out.println(weekday);
+    }
+}`,
+    expectedOutput: "[MON, TUE, WED, THU, FRI]",
+    explanation: "`complementOf` returns every constant *not* in the supplied set, in declaration order. The five weekdays appear in order, and the result prints as a list.",
+  },
+  endQ2: {
+    id: "esem-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why is `EnumSet` typically much faster than `HashSet<MyEnum>`?",
+    options: [
+      { text: "It avoids hashing by storing membership as bits in one or more `long` values.", correct: true, feedback: "Correct — for enums with up to 64 constants, the entire set is a single `long`, and operations are bitwise. That is dramatically faster than hashing." },
+      { text: "It caches the result of every previous lookup.", correct: false, feedback: "There is no per-lookup cache. The speed comes from the bit-vector representation, not memoization." },
+      { text: "It uses native code in the JVM.", correct: false, feedback: "It is plain Java. The win is algorithmic — bitwise operations on a primitive `long`." },
+      { text: "It internally uses an `EnumMap` and shares its storage.", correct: false, feedback: "Each implementation has its own backing storage; one does not delegate to the other." },
+    ],
+    explanation: "An enum with N constants needs only N bits to represent any subset. `EnumSet` packs those bits into a primitive `long` (or array of longs), and uses bitwise AND/OR/XOR for set operations. That is faster than hashing and far smaller than a `HashSet`.",
+    hint: "Think about the smallest possible representation of a subset of N known values.",
+  },
+  endQ3: {
+    id: "esem-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the constructor call so the `EnumMap` knows which enum class it is keyed by:",
+    code: "EnumMap<Day, String> mood = new EnumMap<>(Day.___);",
+    correctAnswers: ["class"],
+    caseSensitive: true,
+    explanation: "`EnumMap` needs the runtime `Class<E>` so it can size its backing array. The expression `Day.class` produces that class object.",
+  },
+  endQ4: {
+    id: "esem-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When you iterate an `EnumMap` or an `EnumSet`, what order do the entries come out in?",
+    options: [
+      { text: "Insertion order, like `LinkedHashMap`.", correct: false, feedback: "Insertion order is irrelevant. Both classes ignore *when* you added an entry." },
+      { text: "Alphabetical order of the constant names.", correct: false, feedback: "There is no alphabetical sorting; ordering follows declaration, not letters." },
+      { text: "The natural order of the enum — declaration order.", correct: true, feedback: "Correct — both `EnumSet` and `EnumMap` iterate in the order the constants were declared in the enum source." },
+      { text: "Undefined — it depends on the hash codes.", correct: false, feedback: "Hash codes do not influence either class. Iteration order is deterministic." },
+    ],
+    explanation: "Both collections store entries in arrays indexed by `ordinal()`. Iteration walks the array, which yields entries in declaration order — predictable and reproducible.",
+    hint: "Think about what `ordinal()` represents and how the collections might use it.",
+  },
+};
+
+The standard `HashMap` and `HashSet` are workhorses, but they pay for their generality. They hash, they handle collisions, they grow, and they wrap every primitive in a boxed object. When the keys come from a known, finite set — an enum — you can do *much* better. Java's `java.util` package ships two specialized collection types tailor-made for enum keys: `EnumSet` and `EnumMap`. Both are blazing fast, memory-efficient, and produce predictable iteration order. They are also genuinely pleasant to use.
+
+## EnumSet — a set as a bunch of bits
+
+For an enum with N constants, any subset of those constants needs only N bits. `EnumSet` exploits that: for enums with up to 64 constants it stores the entire set in a single primitive `long`, with bit *i* representing whether the constant whose `ordinal()` is *i* is present. For larger enums it uses an array of `long`s. Either way, every operation — `add`, `contains`, `union`, `intersection` — boils down to bitwise arithmetic.
+
+The result is dramatic. An `EnumSet` is typically several times faster than a `HashSet<MyEnum>` and uses a fraction of the memory. There is no hashing, no collision handling, no boxing, and no wasted slots.
+
+```java
+enum Day { MON, TUE, WED, THU, FRI, SAT, SUN }
+
+EnumSet<Day> weekend = EnumSet.of(Day.SAT, Day.SUN);
+System.out.println(weekend.contains(Day.SUN));   // true
+System.out.println(weekend.size());              // 2
+```
+
+## The factory methods you need to know
+
+`EnumSet` is an abstract class — you never use `new` on it. Instead, call one of these static factories:
+
+- `EnumSet.of(E first, E... rest)` — a set with the listed constants. The compiler refuses if you mix enum types.
+- `EnumSet.allOf(Class<E> type)` — every constant of the type, in declaration order.
+- `EnumSet.noneOf(Class<E> type)` — an empty set you can add to later.
+- `EnumSet.complementOf(EnumSet<E> s)` — every constant **not** in `s`.
+- `EnumSet.range(E from, E to)` — all constants between `from` and `to` *inclusive*, in declaration order.
+- `EnumSet.copyOf(Collection<E> src)` — a new `EnumSet` with the same elements as `src`. Useful when you have a `List<MyEnum>` and want fast set semantics.
+
+```java
+EnumSet<Day> all      = EnumSet.allOf(Day.class);            // [MON..SUN]
+EnumSet<Day> none     = EnumSet.noneOf(Day.class);           // []
+EnumSet<Day> weekend  = EnumSet.of(Day.SAT, Day.SUN);        // [SAT, SUN]
+EnumSet<Day> weekday  = EnumSet.complementOf(weekend);       // [MON..FRI]
+EnumSet<Day> midweek  = EnumSet.range(Day.TUE, Day.THU);     // [TUE, WED, THU]
+```
+
+<Note>`range` is *inclusive* on both ends — `range(TUE, THU)` includes both `TUE` and `THU`. The arguments must be in declaration order; passing them in reverse throws `IllegalArgumentException`.</Note>
+
+## EnumSet supports the full Set API
+
+Once constructed, an `EnumSet` is a perfectly ordinary `Set<E>`: every method on `java.util.Set` works, including `add`, `remove`, `addAll`, `retainAll`, `removeAll`, and the new bulk methods on `Collection`. The internal bit operations make these calls extremely fast:
+
+```java
+EnumSet<Day> work = EnumSet.allOf(Day.class);
+work.removeAll(EnumSet.of(Day.SAT, Day.SUN));
+System.out.println(work);                              // [MON, TUE, WED, THU, FRI]
+
+EnumSet<Day> meetings = EnumSet.of(Day.MON, Day.WED, Day.FRI);
+EnumSet<Day> overlap  = EnumSet.copyOf(work);
+overlap.retainAll(meetings);
+System.out.println(overlap);                           // [MON, WED, FRI]
+```
+
+Iteration walks the bits in order, producing constants in declaration order — `MON, TUE, WED, ...` — *not* the order in which you added them. That predictability is one of the quiet joys of using `EnumSet`.
+
+## EnumMap — a map keyed by an enum
+
+`EnumMap<K extends Enum<K>, V>` is the same idea applied to maps. Internally it is just an array of length `K.values().length`, indexed by `ordinal()`. Lookup is one array access. There are no hash codes, no buckets, no resizing, and no boxing of the key.
+
+```java
+EnumMap<Day, String> mood = new EnumMap<>(Day.class);
+mood.put(Day.MON, "tired");
+mood.put(Day.FRI, "happy");
+mood.put(Day.SAT, "ecstatic");
+
+System.out.println(mood.get(Day.FRI));                 // happy
+System.out.println(mood.containsKey(Day.WED));         // false
+System.out.println(mood.size());                       // 3
+```
+
+Like `EnumSet`, an `EnumMap` is a fully fledged `Map`. You can call `entrySet()`, `keySet()`, `values()`, `forEach`, anything you would call on a `HashMap`.
+
+<Note>The `Day.class` argument is mandatory because Java's generics are erased at runtime. Without that runtime class object, the map cannot size its backing array. This is one of the few times you must pass a `Class` token explicitly.</Note>
+
+## A real-world analogy: a hotel keytag rack
+
+Imagine the rack of room keys behind a hotel reception desk. There are exactly N rooms, so the rack has exactly N hooks, each labeled with a room number. Looking up "is room 7 occupied?" is a single glance at hook 7 — no searching, no hashing. `EnumMap` is exactly that rack: the array is the hooks, the room numbers are the constants' ordinals, and lookup is direct indexing. `HashMap` would be more like asking the receptionist to flip through a binder of guest names — flexible, but slower for this fixed-domain problem.
+
+## Iteration order
+
+Both `EnumSet` and `EnumMap` iterate in **declaration order**. That property is both convenient — you can rely on `MON` always coming before `TUE` — and a reason to be a little careful when you reorder constants in your source. If a downstream report depends on iteration order, reordering the enum changes the report. Treat the order as part of the public API of your enum.
+
+## A second, more practical example: weekly menus
+
+```java
+enum Day { MON, TUE, WED, THU, FRI, SAT, SUN }
+
+EnumMap<Day, String> menu = new EnumMap<>(Day.class);
+menu.put(Day.MON, "Soup");
+menu.put(Day.TUE, "Tacos");
+menu.put(Day.WED, "Stir-fry");
+menu.put(Day.THU, "Pasta");
+menu.put(Day.FRI, "Pizza");
+menu.put(Day.SAT, "Brunch");
+menu.put(Day.SUN, "Roast");
+
+EnumSet<Day> openDays = EnumSet.complementOf(EnumSet.of(Day.MON));   // closed Mondays
+
+for (Day d : openDays) {
+    System.out.println(d + " — " + menu.get(d));
+}
+// TUE — Tacos
+// WED — Stir-fry
+// ...
+// SUN — Roast
+```
+
+The combination of `EnumMap` for per-day data and `EnumSet` for "which days are open" is idiomatic and very fast. No hashing happens anywhere.
+
+## Performance, plainly
+
+For a typical enum with a handful of constants on a modern JVM:
+
+- `EnumSet.contains` is a bit-test: one or two machine instructions.
+- `EnumMap.get` is an array load: also one or two machine instructions.
+- `HashSet.contains` and `HashMap.get` involve hashing, an array load, and at least one equality check.
+
+The asymptotic complexity is the same — O(1) — but the constant factors are dramatically smaller. Most importantly, `EnumSet` and `EnumMap` allocate **once** at construction. After that they do almost no garbage collection work, which matters in tight loops and long-running services.
+
+## When NOT to use them
+
+These are specialized tools. Reach for the regular `HashSet` or `HashMap` when:
+
+- The keys are not from a single enum type — for example, mixed enums, strings, or arbitrary objects.
+- The set of legal keys is genuinely open-ended.
+- You need a thread-safe map without external synchronization. `EnumMap` is *not* thread-safe; wrap it with `Collections.synchronizedMap` or use `ConcurrentHashMap` if needed.
+
+For everything else where the keys come from a known enum, prefer `EnumSet` and `EnumMap`. They exist precisely because that case is so common that the standard library deserves first-class support for it.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Run the starter code. The output demonstrates an `EnumSet` produced by `complementOf` plus an `EnumMap` iterated in declaration order:
+
+```
+Weekend: [SAT, SUN]
+Weekday: [MON, TUE, WED, THU, FRI]
+MON: tired
+FRI: happy
+SAT: ecstatic
+```
+
+Notice that `mood.entrySet()` walks the entries in declaration order — `MON` before `FRI` before `SAT` — even though we inserted them in that same order *coincidentally*. Re-order the `put` calls; the iteration order does not change.
+
+## Combining EnumSet and EnumMap
+
+A common pattern is to use one as the keys of the other — for example, an `EnumMap<Day, EnumSet<Tag>>` representing which tags apply each day:
+
+```java
+enum Tag { OPEN, DELIVERY, BRUNCH }
+
+EnumMap<Day, EnumSet<Tag>> tags = new EnumMap<>(Day.class);
+for (Day d : Day.values()) {
+    tags.put(d, EnumSet.of(Tag.OPEN));
+}
+tags.get(Day.SAT).add(Tag.BRUNCH);
+tags.get(Day.SUN).add(Tag.BRUNCH);
+tags.get(Day.MON).remove(Tag.OPEN);                      // closed Mondays
+```
+
+Every operation here — `put`, `get`, `add`, `remove` — is essentially an array or bit operation. The whole structure is small enough to fit in a CPU cache line.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Trying `new EnumSet<>()`.** `EnumSet` is abstract — the JVM picks the right subclass based on enum size. Always use the factory methods (`of`, `allOf`, `noneOf`, ...).
+- **Forgetting the `Class` token in `EnumMap`'s constructor.** Erasure means the map cannot infer the key type. `new EnumMap<>(Day.class)` is the correct call.
+- **Calling `EnumSet.range(THU, MON)` in the wrong order.** `range` requires the first argument to come *before* the second in declaration order. Otherwise it throws `IllegalArgumentException`.
+- **Assuming `EnumMap` is thread-safe.** It is not. Concurrent puts or removes from multiple threads can corrupt the backing array. Use `Collections.synchronizedMap` or a different `Map` implementation for shared mutability.
+- **Relying on iteration order across enum reorders.** Iteration order follows declaration order. If you rearrange the constants in the source, your reports change. Treat the order as part of your public API.
+
+## Recap
+
+`EnumSet` and `EnumMap` are the standard library's gift to anyone working with enums.
+
+- **`EnumSet`** is a bit-vector-backed `Set` for enum elements. Construct it via static factories: `of`, `allOf`, `noneOf`, `complementOf`, `range`, `copyOf`.
+- **`EnumMap`** is an array-backed `Map` keyed by an enum type. Construct it with `new EnumMap<>(MyEnum.class)`.
+- Both are dramatically faster and smaller than `HashSet` / `HashMap` for enum keys.
+- Both iterate in **declaration order**, which is deterministic and predictable.
+- Neither is thread-safe — synchronize externally or pick a concurrent map if you share them between threads.
+
+You now have the full module-6 toolkit: declare an enum, give it data, give it behavior, plug it into interfaces, and store it in fast specialized collections. The next module pivots away from enums to nested and inner classes — another case of putting types where the data lives.
+
+**Up next:** Static Nested Classes — a small helper type that lives inside a class without depending on any instance.
+
+<Exercise>
+Run the program. The output demonstrates `EnumSet.complementOf` producing the weekdays from the weekend set, plus an `EnumMap` printing entries in declaration order:
+
+```
+Weekend: [SAT, SUN]
+Weekday: [MON, TUE, WED, THU, FRI]
+MON: tired
+FRI: happy
+SAT: ecstatic
+```
+
+```java
+import java.util.*;
+
+public class Main {
+    enum Day { MON, TUE, WED, THU, FRI, SAT, SUN }
+
+    public static void main(String[] args) {
+        EnumSet<Day> weekend = EnumSet.of(Day.SAT, Day.SUN);
+        EnumSet<Day> weekday = EnumSet.complementOf(weekend);
+        System.out.println("Weekend: " + weekend);
+        System.out.println("Weekday: " + weekday);
+
+        EnumMap<Day, String> mood = new EnumMap<>(Day.class);
+        mood.put(Day.MON, "tired");
+        mood.put(Day.FRI, "happy");
+        mood.put(Day.SAT, "ecstatic");
+        for (Map.Entry<Day, String> e : mood.entrySet()) {
+            System.out.println(e.getKey() + ": " + e.getValue());
+        }
+    }
+}
+```
+
+**What the program should do:**
+- Build an `EnumSet<Day>` containing `SAT` and `SUN` via `EnumSet.of`.
+- Compute the complement to get the weekdays.
+- Print both sets — they should appear in declaration order.
+- Build an `EnumMap<Day, String>` with three entries.
+- Iterate the map and print each entry in declaration order, regardless of insertion order.
+
+<Note>Hint: try inserting the `mood.put` calls in a different order — the iteration output stays the same because `EnumMap` walks entries by `ordinal()`, not by when you added them.</Note>
+</Exercise>

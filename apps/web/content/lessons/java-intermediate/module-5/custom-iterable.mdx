@@ -1,0 +1,330 @@
+export const meta = {
+  title: "Building a Custom Iterable",
+  duration: 14,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ci-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which interface must your class implement so that callers can use it in a for-each loop?",
+    options: [
+      { text: "`Iterator<T>`", correct: false, feedback: "`Iterator` is the cursor itself. The for-each loop wants something it can *get* an iterator from." },
+      { text: "`Iterable<T>`", correct: true, feedback: "Correct — `Iterable<T>` has one method, `iterator()`, and that's exactly what the enhanced for loop calls under the hood." },
+      { text: "`Collection<T>`", correct: false, feedback: "`Collection` is far heavier — `add`, `remove`, `size`, `contains`, etc. For-each only needs `Iterable`." },
+      { text: "`Comparable<T>`", correct: false, feedback: "`Comparable` is for ordering, not iteration." },
+    ],
+    explanation: "The for-each loop is defined for arrays and for any `Iterable<T>`. By implementing `Iterable`, your class joins the standard library's collections in supporting `for (T x : myObj)`.",
+    hint: "Read the names carefully — one ends in *able* and the other ends in *or*.",
+  },
+  endQ1: {
+    id: "ci-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+class Range implements Iterable<Integer> {
+    private final int start, end;
+    Range(int start, int end) { this.start = start; this.end = end; }
+    public Iterator<Integer> iterator() {
+        return new Iterator<Integer>() {
+            int n = start;
+            public boolean hasNext() { return n < end; }
+            public Integer next() { return n++; }
+        };
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        int sum = 0;
+        for (int n : new Range(1, 5)) sum += n;
+        System.out.println(sum);
+    }
+}`,
+    expectedOutput: "10",
+    explanation: "`Range(1, 5)` yields 1, 2, 3, 4 (the upper bound is exclusive). The sum is 1 + 2 + 3 + 4 = 10.",
+  },
+  endQ2: {
+    id: "ci-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why is it usually a *good* idea for `iterator()` to return a fresh `Iterator` each time it's called?",
+    options: [
+      { text: "Because the JVM caches iterators automatically", correct: false, feedback: "There's no such caching. The reason is about correctness, not performance." },
+      { text: "So that two callers (or two nested loops) can iterate independently without interfering", correct: true, feedback: "Correct — sharing one iterator across calls would mean a second for-each picked up where the first left off, which violates the principle of least surprise." },
+      { text: "Because `Iterator` is not serialisable", correct: false, feedback: "Serialisation has nothing to do with iteration freshness." },
+      { text: "Because Java requires it", correct: false, feedback: "The contract doesn't strictly require freshness, but most reasonable implementations provide it. Singleton iterators are a known anti-pattern." },
+    ],
+    explanation: "Standard collections return a new iterator each time, allowing nested loops, lookahead, and parallel walks to behave sensibly. Returning the same instance creates surprising shared state — generally bad practice.",
+    hint: "Think about what would happen with two nested for-each loops over the same object.",
+  },
+  endQ3: {
+    id: "ci-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the class declaration to make `MyList` for-each compatible:",
+    code: "class MyList ___ Iterable<String> { /* ... */ }",
+    correctAnswers: ["implements"],
+    caseSensitive: true,
+    explanation: "`Iterable` is an interface, so a class connects to it via `implements`. Once present, the class must define an `iterator()` method returning `Iterator<String>`.",
+  },
+  endQ4: {
+    id: "ci-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Inside a custom iterator's `next()` method, what should happen if the cursor is already past the end?",
+    options: [
+      { text: "Return `null`", correct: false, feedback: "Returning `null` is ambiguous (a real element could be `null`) and violates the `Iterator` contract." },
+      { text: "Throw `NoSuchElementException`", correct: true, feedback: "Correct — the contract demands `NoSuchElementException` when there are no more elements. Standard library code relies on that." },
+      { text: "Return the last element again", correct: false, feedback: "That would silently double-count the final element." },
+      { text: "Loop back to the first element", correct: false, feedback: "Iterators are single-pass. Reset behaviour is not part of the contract — that would be a *cyclic iterator*, which is its own design." },
+    ],
+    explanation: "`Iterator.next()` is contractually required to throw `NoSuchElementException` when the iterator is exhausted. The for-each loop relies on `hasNext()` to avoid that, but defensive `next()` implementations still throw to catch misuse.",
+    hint: "Look back at lesson 2 — there's a specific named exception for 'nothing left'.",
+  },
+};
+
+You've used the for-each loop on Java's built-in collections. You've seen that under the hood it's powered by `Iterator<T>`. Now we close the loop (pun intended): you'll write your own class that supports for-each, by implementing **`Iterable<T>`**.
+
+This is one of those Java topics that *feels* heavyweight until you see how short the code actually is. Once you've written one custom iterable, you'll see the pattern everywhere — and you'll understand why returning an `Iterable` from a method is a common, polite API.
+
+## What does `Iterable<T>` require?
+
+Just one method:
+
+```java
+public interface Iterable<T> {
+    Iterator<T> iterator();
+    // (plus default methods forEach and spliterator)
+}
+```
+
+That's it. Implement that single method, and your class becomes for-each compatible. The compiler doesn't care *how* you produce the iterator — it just needs one to ask `hasNext()` and `next()` on.
+
+## A first custom iterable: a Range
+
+A classic learning example is a "range" — a lightweight stand-in for `1..n`. Java doesn't have a built-in range type for `int`s (well, `IntStream.rangeClosed` exists, but that's a stream, not a collection). Let's build one.
+
+```java
+import java.util.*;
+
+class Range implements Iterable<Integer> {
+    private final int start;   // inclusive
+    private final int end;     // exclusive
+
+    Range(int start, int end) {
+        this.start = start;
+        this.end = end;
+    }
+
+    @Override
+    public Iterator<Integer> iterator() {
+        return new Iterator<Integer>() {
+            int n = start;
+            public boolean hasNext() { return n < end; }
+            public Integer next() {
+                if (!hasNext()) throw new NoSuchElementException();
+                return n++;
+            }
+        };
+    }
+}
+```
+
+Three things to notice:
+
+1. `Range` doesn't store any data. It generates numbers *on demand* inside the iterator. That makes it cheap — no array allocated, no list filled.
+2. The iterator is an **anonymous inner class**. It captures `start` and `end` via the enclosing `Range` instance. The cursor variable `n` lives inside the iterator only.
+3. `next()` defends itself with `NoSuchElementException` even though `hasNext()` should prevent the case. Defence in depth is good practice.
+
+Now `Range` works in a for-each loop:
+
+```java
+for (int n : new Range(1, 6)) {
+    System.out.println(n);
+}
+// 1
+// 2
+// 3
+// 4
+// 5
+```
+
+<Note>An anonymous inner class is one written inline at the point you instantiate it: `new Iterator<Integer>() { ... }`. Inside, you can refer to the enclosing class's fields. This is the most common way to return a small one-off iterator.</Note>
+
+You *could* instead write a named `RangeIterator` class and have `Range.iterator()` return `new RangeIterator(start, end)`. Both forms are correct; for an iterator used in only one place, the anonymous form keeps the cursor logic next to the iterable that produces it.
+
+## A second example: a tree walked depth-first
+
+Consider a small binary tree and an iterable that visits every node in depth-first order. We'll keep an explicit stack inside the iterator.
+
+```java
+import java.util.*;
+
+class Tree implements Iterable<String> {
+    String value;
+    Tree left, right;
+    Tree(String value, Tree left, Tree right) {
+        this.value = value; this.left = left; this.right = right;
+    }
+
+    @Override
+    public Iterator<String> iterator() {
+        Deque<Tree> stack = new ArrayDeque<>();
+        stack.push(this);
+        return new Iterator<String>() {
+            public boolean hasNext() { return !stack.isEmpty(); }
+            public String next() {
+                if (stack.isEmpty()) throw new NoSuchElementException();
+                Tree t = stack.pop();
+                if (t.right != null) stack.push(t.right);
+                if (t.left  != null) stack.push(t.left);
+                return t.value;
+            }
+        };
+    }
+}
+```
+
+Usage:
+
+```java
+Tree root = new Tree("a",
+    new Tree("b", new Tree("d", null, null), null),
+    new Tree("c", null, null));
+
+for (String v : root) {
+    System.out.println(v);
+}
+// a, b, d, c
+```
+
+The for-each loop has no idea it's walking a tree. From its perspective, it just calls `hasNext()` and `next()` until done. **That decoupling is the whole point of `Iterable`** — your data structure can be whatever you want, and consumers see a uniform interface.
+
+## A third example: a paginated result wrapper
+
+`Iterable` shines when an underlying source isn't a single in-memory list. Imagine a paginated API that returns 50 records per page. We can hide the paging behind an iterable so the caller writes a normal `for` loop:
+
+```java
+class PagedResults implements Iterable<String> {
+    private final int totalPages;
+    PagedResults(int totalPages) { this.totalPages = totalPages; }
+
+    private List<String> fetchPage(int page) {
+        // pretend this calls a server
+        return List.of("page" + page + "-itemA", "page" + page + "-itemB");
+    }
+
+    @Override
+    public Iterator<String> iterator() {
+        return new Iterator<String>() {
+            int page = 0;
+            Iterator<String> current = fetchPage(0).iterator();
+            public boolean hasNext() {
+                while (!current.hasNext() && page + 1 < totalPages) {
+                    page++;
+                    current = fetchPage(page).iterator();
+                }
+                return current.hasNext();
+            }
+            public String next() {
+                if (!hasNext()) throw new NoSuchElementException();
+                return current.next();
+            }
+        };
+    }
+}
+```
+
+The caller writes a normal `for (String item : new PagedResults(3))` loop and is never aware that pages are fetched lazily — a real pattern in many database and HTTP client libraries.
+
+<Note>The iterator only fetches the next page when its current page is exhausted. That's *lazy iteration*: work happens as values are demanded, not up front, which can save enormous memory when the full data set wouldn't fit at once.</Note>
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+The starter implements a tiny `Range`-like class directly on `Main`. Click **Run** and you should see:
+
+```
+1
+2
+3
+4
+5
+```
+
+The TODO is already filled in: `for (int n : range) System.out.println(n);`. Try changing `new Main(5)` to `new Main(10)` to confirm your `Iterable` scales up. Try iterating it twice, back-to-back, to convince yourself a fresh iterator is created each time.
+
+## Should `iterator()` return a fresh iterator?
+
+By convention: **yes**. Standard collections do, and code in the wild assumes it. If you cache one iterator and return the same instance every time, two nested for-each loops or two consumers will share the same cursor and break in confusing ways. The cost of allocating a tiny anonymous iterator on each call is negligible in almost every case — pay it.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Confusing `Iterable` and `Iterator`** — Implement `Iterable<T>` on your *class*. Implement `Iterator<T>` on the *cursor*. The class returns the cursor from `iterator()`. Mixing them up is the single most common mistake here.
+- **Returning the same iterator every call** — Cache the *data*, not the iterator. Each call to `iterator()` should return a fresh cursor at position zero, just like the standard collections.
+- **Forgetting to throw `NoSuchElementException`** — A `next()` that returns `null` (or quietly returns garbage) violates the contract and breaks defensive callers. Always throw when exhausted.
+- **Mutating the source mid-iteration** — Just like in lesson 3, your custom iterable should fail fast if its underlying data changes. The simplest defence is to snapshot a copy of the data when `iterator()` is called.
+- **Implementing more than you need** — You don't have to implement `size()`, `add()`, or `remove()`. `Iterable<T>` is one method. If you don't *need* the full `Collection` API, don't claim to provide it.
+- **Forgetting `<T>` everywhere** — `Iterable<Integer>`, `Iterator<Integer>`. Drop the type parameter and you'll iterate `Object`s and lose type safety on the for-each loop variable.
+
+## Recap
+
+`Iterable<T>` is the smallest possible promise: "you can ask me for an iterator." Once you make that promise, the entire ecosystem of for-each loops, `forEach` lambdas, and stream constructors works on your class — for free. This is interface-driven design at its most elegant.
+
+- Implement **`Iterable<T>`** by providing a single method, `iterator()`
+- Return a fresh **`Iterator<T>`** on each call — usually as an anonymous inner class
+- Inside the iterator, define `hasNext()` and `next()`, and have `next()` throw `NoSuchElementException` when exhausted
+- Custom iterables can be **lazy** — they generate values on demand without ever building a full list
+- Your callers don't need to know what's behind the iterable; they just write `for (T x : yourThing)`
+
+**Up next:** Streams — A First Look — a glimpse at the modern, declarative way to process collections.
+
+<Exercise>
+The starter defines a tiny range-style iterable directly on `Main`. The class implements `Iterable<Integer>` and returns an anonymous `Iterator<Integer>` that counts from 1 to `max`. Use a for-each loop to print each number, one per line.
+
+```java
+import java.util.*;
+
+public class Main implements Iterable<Integer> {
+    private final int max;
+    public Main(int max) { this.max = max; }
+
+    @Override
+    public Iterator<Integer> iterator() {
+        return new Iterator<Integer>() {
+            int n = 1;
+            public boolean hasNext() { return n <= max; }
+            public Integer next() { return n++; }
+        };
+    }
+
+    public static void main(String[] args) {
+        Main range = new Main(5);
+        // TODO: iterate range with a for-each loop, printing each number
+        for (int n : range) System.out.println(n);
+    }
+}
+```
+
+**What the tests check:**
+- Numbers 1 through 5 are printed, each on its own line
+- The iteration uses a for-each loop (not an explicit iterator)
+- `Main` implements `Iterable<Integer>` — proof that for-each works on your own classes
+
+<Note>Hint: as a stretch, try iterating `range` twice in a row. You should see `1..5` printed *twice*, because each for-each loop calls `iterator()` and gets a fresh cursor.</Note>
+</Exercise>

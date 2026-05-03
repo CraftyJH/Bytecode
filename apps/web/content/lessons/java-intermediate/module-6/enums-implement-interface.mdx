@@ -1,0 +1,340 @@
+export const meta = {
+  title: "Enums Implementing Interfaces",
+  duration: 12,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "eii-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Can a Java enum implement multiple interfaces at the same time?",
+    options: [
+      { text: "No — enums can implement at most one interface.", correct: false, feedback: "There is no such limit. Enums follow the same rules as ordinary classes for `implements`." },
+      { text: "Yes — separate interfaces with commas, exactly like a class.", correct: true, feedback: "Correct — `enum X implements A, B, C { ... }` is perfectly legal." },
+      { text: "Only if every interface has a default method for every constant.", correct: false, feedback: "Default methods are convenient but not required. The enum simply needs to satisfy each interface's contract." },
+      { text: "Only when the enum has no constructor.", correct: false, feedback: "Constructors and interfaces are unrelated concerns." },
+    ],
+    explanation: "Enums *cannot* extend a class (they implicitly extend `java.lang.Enum`), but they can implement as many interfaces as you like, comma-separated.",
+    hint: "Think about how a regular class declares multiple interface implementations.",
+  },
+  endQ1: {
+    id: "eii-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    interface Greetable { String greet(); }
+
+    enum Lang implements Greetable {
+        ENGLISH { public String greet() { return "Hello"; } },
+        FRENCH  { public String greet() { return "Bonjour"; } };
+    }
+
+    static void say(Greetable g) {
+        System.out.println(g.greet());
+    }
+
+    public static void main(String[] args) {
+        say(Lang.FRENCH);
+    }
+}`,
+    expectedOutput: "Bonjour",
+    explanation: "`Lang.FRENCH` is a `Greetable` because `Lang` implements that interface, so it can be passed to `say`. `g.greet()` then dispatches to the body declared on `FRENCH`, which returns `\"Bonjour\"`.",
+  },
+  endQ2: {
+    id: "eii-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why is implementing an interface useful for an enum, beyond what abstract methods alone would give you?",
+    options: [
+      { text: "It lets the enum take part in APIs that accept the interface type.", correct: true, feedback: "Correct — once `Lang implements Greetable`, every method, collection, or framework that takes a `Greetable` will accept your enum constants." },
+      { text: "It removes the need for the enum to declare any methods of its own.", correct: false, feedback: "The enum still has to provide implementations of the interface methods, either centrally or per-constant." },
+      { text: "It allows the enum to extend another class as well.", correct: false, feedback: "Enums implicitly extend `java.lang.Enum` and cannot extend any other class. Interfaces are the only extension point." },
+      { text: "It makes `==` comparisons stricter.", correct: false, feedback: "`==` semantics are unchanged; the enum is still a singleton-per-constant." },
+    ],
+    explanation: "The point of implementing an interface is to plug the enum into existing code that knows nothing about it. Whether it is `Comparable`, `Runnable`, or your own `Greetable`, the enum becomes a drop-in citizen of that API.",
+    hint: "What can you do with a `Greetable` reference, and could you do it without the interface?",
+  },
+  endQ3: {
+    id: "eii-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the declaration so the enum `Lang` promises to fulfil the `Greetable` interface:",
+    code: "enum Lang ___ Greetable { ... }",
+    correctAnswers: ["implements"],
+    caseSensitive: true,
+    explanation: "Just like a regular class, an enum uses the `implements` keyword followed by the interface name (or a comma-separated list of interfaces).",
+  },
+  endQ4: {
+    id: "eii-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "If every constant of `Lang` would return the same greeting, what is the cleanest way to satisfy `Greetable`?",
+    options: [
+      { text: "Make `greet()` `abstract` and copy the same body into every constant.", correct: false, feedback: "That works, but it is repetitive and easy to get wrong if the string ever needs to change." },
+      { text: "Implement `greet()` once as a normal concrete method on the enum.", correct: true, feedback: "Correct — when the behavior is shared, a single concrete method is simpler, more readable, and easier to maintain." },
+      { text: "Use a per-constant body for the first constant only and let the rest inherit.", correct: false, feedback: "Per-constant bodies do not inherit from each other; every constant uses either its own body or the enum's concrete method." },
+      { text: "Skip the interface and rely on duck typing.", correct: false, feedback: "Java is statically typed — there is no duck typing. The enum must explicitly implement the interface to be passable as `Greetable`." },
+    ],
+    explanation: "A central concrete implementation is the right tool when the behavior is shared. Per-constant bodies shine when the behavior genuinely differs.",
+    hint: "Think about whether the work each constant does is the same or different.",
+  },
+};
+
+So far in this module, every method on our enums has been declared inside the enum itself. That makes the enums useful, but isolated: they cannot fit into a function that already accepts some other type. The fix is the same one we use everywhere else in object-oriented Java — declare an interface, and have the enum **implement** it. Suddenly the enum becomes a citizen of any API that speaks that interface.
+
+This lesson covers the syntax, the two main patterns for satisfying the contract (centrally vs. per-constant), and a few of the standard interfaces that enums implement implicitly so you can rely on them out of the box.
+
+## The syntax is exactly what you would guess
+
+```java
+interface Greetable {
+    String greet();
+}
+
+enum Lang implements Greetable {
+    ENGLISH { public String greet() { return "Hello"; } },
+    SPANISH { public String greet() { return "Hola"; } },
+    FRENCH  { public String greet() { return "Bonjour"; } };
+}
+```
+
+`enum Lang implements Greetable` is the same `implements` keyword you use on a regular class. Each constant supplies a `greet()` body, just like in the previous lesson on abstract methods. The interface declares no body for `greet()`, so the enum body must — either via per-constant overrides as shown, or via a single concrete method shared by all constants.
+
+<Note>An enum cannot `extends` another class. It implicitly extends `java.lang.Enum`, and Java has no multiple inheritance for classes. Interfaces are the only extension axis for enums — but you can implement as many as you need.</Note>
+
+## Two ways to satisfy the contract
+
+Once you have `enum Lang implements Greetable`, you must provide a body for `greet()`. There are two clean ways to do that.
+
+### Pattern A — per-constant bodies
+
+Each constant overrides the method individually. Use this when the behavior really does differ per constant:
+
+```java
+enum Lang implements Greetable {
+    ENGLISH { public String greet() { return "Hello"; } },
+    SPANISH { public String greet() { return "Hola"; } },
+    FRENCH  { public String greet() { return "Bonjour"; } };
+}
+```
+
+This is identical to the abstract-method pattern from lesson 3 — except the abstract method comes from an external interface instead of being declared inside the enum.
+
+### Pattern B — single concrete implementation
+
+If every constant would do the same thing, write one regular method:
+
+```java
+enum Lang implements Greetable {
+    ENGLISH("Hello"), SPANISH("Hola"), FRENCH("Bonjour");
+
+    private final String word;
+    Lang(String word) { this.word = word; }
+
+    @Override
+    public String greet() {
+        return word;
+    }
+}
+```
+
+The data lives in a `private final` field (lesson 2 territory), and a single `greet()` returns it. There is no duplication and the language list is easy to extend.
+
+The right choice is dictated by whether the behavior is uniform. If `greet()` boils down to "return the stored word," Pattern B wins. If `greet()` does something genuinely different per constant — different formatting, different side effects — Pattern A wins.
+
+## Why interfaces matter for enums
+
+The reason to bother is **interoperability**. Once `Lang implements Greetable`, every API that accepts a `Greetable` accepts a `Lang` constant, and the API does not need to know anything about enums:
+
+```java
+static void say(Greetable g) {
+    System.out.println(g.greet());
+}
+
+say(Lang.FRENCH);                   // Bonjour
+
+List<Greetable> all = new ArrayList<>(Arrays.asList(Lang.values()));
+all.forEach(g -> System.out.println(g.greet()));
+```
+
+The `say` function knows nothing about `Lang`. Tomorrow you can add a `Robot implements Greetable` class with a totally different greeting strategy, and the same function works without changes. This is the same "code to an interface" payoff that any other implementing class provides.
+
+## Built-in interfaces every enum already implements
+
+Even without writing `implements` yourself, every enum already satisfies two interfaces from the standard library:
+
+- **`Comparable<E>`** — through `java.lang.Enum`, every constant compares to others of the same type by `ordinal()`. That means you can sort, use them as keys in `TreeMap`, or call `Collections.min`/`max` for free.
+- **`Serializable`** — enums serialize cleanly without any extra effort, and deserialization preserves the singleton invariant.
+
+```java
+List<Lang> langs = new ArrayList<>(Arrays.asList(Lang.SPANISH, Lang.ENGLISH, Lang.FRENCH));
+Collections.sort(langs);                                   // uses natural order
+System.out.println(langs);                                 // [ENGLISH, SPANISH, FRENCH]
+```
+
+<Note>The natural order is **declaration order**, not alphabetical. If you want a different ordering, supply a `Comparator` to `sort` or `TreeMap`. Avoid relying on natural order for business meaning, for the same reason you avoid relying on `ordinal()`.</Note>
+
+## A more substantial example: a validator pipeline
+
+Suppose your application validates user input. Define a tiny interface and an enum of named rules:
+
+```java
+interface Validator {
+    boolean isValid(String input);
+}
+
+enum Rule implements Validator {
+    NON_EMPTY {
+        public boolean isValid(String input) {
+            return input != null && !input.isEmpty();
+        }
+    },
+    EMAIL {
+        public boolean isValid(String input) {
+            return input != null && input.contains("@");
+        }
+    };
+}
+
+static boolean checkAll(String input, List<Validator> rules) {
+    for (Validator r : rules) {
+        if (!r.isValid(input)) return false;
+    }
+    return true;
+}
+```
+
+The pipeline does not need to know about enums — it just consumes `Validator`s. Tomorrow you can add a non-enum `RegexRule implements Validator` and pass it to the same `checkAll`.
+
+## Implementing multiple interfaces
+
+Enums can implement as many interfaces as needed, separated by commas — exactly like a class:
+
+```java
+interface HasCode { int code(); }
+interface Greetable { String greet(); }
+
+enum Lang implements Greetable, HasCode {
+    ENGLISH("Hello", 1),
+    SPANISH("Hola",  2),
+    FRENCH ("Bonjour", 3);
+
+    private final String word;
+    private final int code;
+    Lang(String word, int code) {
+        this.word = word;
+        this.code = code;
+    }
+
+    public String greet() { return word; }
+    public int code()     { return code; }
+}
+```
+
+`Lang.SPANISH` is now a `Greetable`, a `HasCode`, *and* a `Comparable<Lang>`. Each role is independent and can be exercised in different parts of the system.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Run the starter code. Each language constant supplies its own `greet` body, and the loop prints them all:
+
+```
+ENGLISH: Hello
+SPANISH: Hola
+FRENCH: Bonjour
+```
+
+Notice that `Lang implements Greetable` makes the body's identity explicit — every constant *is* a `Greetable`, so it can be passed anywhere a `Greetable` is expected.
+
+## Refactoring drill: from per-constant bodies to a shared implementation
+
+Look at the starter code. The three greetings are just three different strings — there is no real per-constant *logic*. A common refactor is to lift the data into a field and replace the bodies with a single concrete method:
+
+```java
+enum Lang implements Greetable {
+    ENGLISH("Hello"),
+    SPANISH("Hola"),
+    FRENCH ("Bonjour");
+
+    private final String word;
+    Lang(String word) { this.word = word; }
+
+    @Override
+    public String greet() { return word; }
+}
+```
+
+Identical behavior, less code, and adding a new language is a single line. This is a small but real example of the rule of thumb from lesson 3: prefer per-constant bodies when the *logic* differs, prefer a shared method when only the *data* differs.
+
+## A real-world analogy: USB devices
+
+A USB port is an interface — a strict, published contract about pins and protocols. A keyboard, a mouse, and a flash drive all *implement* that interface in their own way, but the laptop only knows about USB. An enum implementing an interface is the same idea: the enum constants are like a fixed catalogue of devices, all of which speak the standard protocol so the rest of the program can treat them uniformly.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Trying to `extends` another class.** Enums implicitly extend `java.lang.Enum` and cannot extend anything else. Use an interface to share behavior across enums and other classes.
+- **Forgetting `public` on the interface methods.** Interface methods are `public` by definition. The compiler rejects any implementation that is less accessible. Always write `public` explicitly on the override.
+- **Using per-constant bodies when the behavior is uniform.** It compiles, but it duplicates code. If every constant returns its stored field, write a single concrete method instead.
+- **Relying on the natural ordering for business meaning.** Enums implement `Comparable` via `ordinal()`. If you reorder constants, your sorted output changes. Provide an explicit `Comparator` for any ordering with real meaning.
+- **Assuming you cannot mix abstract and concrete methods.** You absolutely can. Implement the interface centrally for shared work and add per-constant bodies for the parts that genuinely differ.
+
+## Recap
+
+Implementing an interface promotes an enum from a self-contained catalogue into a first-class participant in your application's APIs.
+
+- Use `enum X implements I { ... }`, optionally with a comma-separated list of interfaces.
+- Provide method bodies either **per constant** (when the logic differs) or **once on the enum** (when only the data differs).
+- Every enum already implements `Comparable<E>` and `Serializable` for free.
+- Implementing an interface lets enum constants flow through code that knows nothing about enums — pure decoupling.
+- An enum cannot `extends` another class, but interfaces give it all the polymorphism it needs.
+
+**Up next:** EnumSet and EnumMap — two specialized, blazing-fast collection types that exploit the closed nature of enums for huge performance wins.
+
+<Exercise>
+Run the program. Each language constant has its own `greet` body, and the loop prints the constant name followed by its greeting:
+
+```
+ENGLISH: Hello
+SPANISH: Hola
+FRENCH: Bonjour
+```
+
+```java
+public class Main {
+    interface Greetable { String greet(); }
+
+    enum Lang implements Greetable {
+        ENGLISH { public String greet() { return "Hello"; } },
+        SPANISH { public String greet() { return "Hola"; } },
+        FRENCH  { public String greet() { return "Bonjour"; } };
+    }
+
+    public static void main(String[] args) {
+        for (Lang l : Lang.values()) {
+            System.out.println(l + ": " + l.greet());
+        }
+    }
+}
+```
+
+**What the program should do:**
+- Declare a `Greetable` interface with a single abstract `greet()` method.
+- Have `Lang` implement `Greetable` and supply per-constant bodies.
+- Iterate `Lang.values()` and print `NAME: greeting` for each constant.
+- Demonstrate that every constant now also satisfies the `Greetable` type.
+
+<Note>Hint: try refactoring `Lang` to store the greeting in a `private final String` field and implementing `greet()` once as a concrete method. The output should be identical, with less repetition.</Note>
+</Exercise>

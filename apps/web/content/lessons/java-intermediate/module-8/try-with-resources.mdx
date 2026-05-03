@@ -1,0 +1,267 @@
+export const meta = {
+  title: "try-with-resources",
+  duration: 12,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "twr-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does <code>try-with-resources</code> guarantee about the resources declared in its parens?",
+    options: [
+      { text: "They are <code>flush()</code>ed but not <code>close()</code>d.", correct: false, feedback: "close() is guaranteed; close() implementations typically flush as part of closing." },
+      { text: "Their <code>close()</code> method is called when the try block exits, even on exception.", correct: true },
+      { text: "They are read-only inside the block.", correct: false, feedback: "Resources can be used freely inside the block — there's no read-only restriction." },
+      { text: "They cannot throw exceptions.", correct: false, feedback: "Resources can throw on use or on close. The language handles both gracefully." },
+    ],
+    explanation: "try-with-resources is syntactic sugar for try/finally with close(). It also handles the awkward 'both throw' case by suppressing one and reporting the other.",
+  },
+  endQ1: {
+    id: "twr-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    static class Res implements AutoCloseable {
+        final String name;
+        Res(String n) { name = n; System.out.println("open " + name); }
+        public void close() { System.out.println("close " + name); }
+    }
+    public static void main(String[] args) {
+        try (Res a = new Res("A"); Res b = new Res("B")) {
+            System.out.println("body");
+        }
+    }
+}`,
+    expectedOutput: "open A\nopen B\nbody\nclose B\nclose A",
+    explanation: "Resources are opened in declaration order (A then B), the body runs, and resources are closed in REVERSE order (B then A). This ensures dependent resources are torn down correctly.",
+  },
+  endQ2: {
+    id: "twr-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To use a class as a resource in <code>try-with-resources</code>, it must implement <code>java.lang.___</code>.",
+    correctAnswers: ["AutoCloseable", "autocloseable"],
+    caseSensitive: false,
+    explanation: "AutoCloseable defines the single method close() throws Exception. java.io.Closeable is a more specific subtype that throws IOException.",
+  },
+  endQ3: {
+    id: "twr-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "If both the try body AND a resource's <code>close()</code> throw, which exception does the caller see?",
+    options: [
+      { text: "Only the body's exception. The close exception is silently dropped.", correct: false, feedback: "Java doesn't drop the close exception — it attaches it." },
+      { text: "Only the close exception. The body's exception is silently dropped.", correct: false, feedback: "The body's exception is the primary one; it must reach the caller." },
+      { text: "The body's exception, with the close exception attached as a suppressed exception.", correct: true },
+      { text: "A new combined exception that wraps both.", correct: false, feedback: "Java doesn't synthesize a new wrapper; it attaches via Throwable.addSuppressed." },
+    ],
+    explanation: "The primary exception (from the body) reaches the caller. The close-time exception is added via addSuppressed and visible in the stack trace under 'Suppressed:' — accessible programmatically with Throwable.getSuppressed.",
+  },
+  endQ4: {
+    id: "twr-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which statement about try-with-resources in Java 9+ is correct?",
+    options: [
+      { text: "You can use a final or effectively-final variable declared outside the try.", correct: true },
+      { text: "You can omit the variable name entirely.", correct: false, feedback: "Even in Java 9+, the syntax requires either a declaration or a variable reference — not nothing." },
+      { text: "Resources don't need to implement AutoCloseable anymore.", correct: false, feedback: "AutoCloseable is still required regardless of Java version." },
+      { text: "Multiple resources are no longer supported.", correct: false, feedback: "Multiple resources have been supported since Java 7; that hasn't changed." },
+    ],
+    explanation: "Java 9 relaxed the rule that try-with-resources must declare its resources. Now you can pre-declare an effectively-final variable and reference it: try (existingResource) { ... }.",
+  },
+};
+
+Once you start working with files, streams, and connections, you'll meet a recurring chore: every resource you open must be closed, in a `finally` block, even (especially) on exceptions. Get it wrong and you leak file handles, sockets, and database connections — bugs that are invisible until the system runs out of them.
+
+Java 7 introduced **try-with-resources** to make this safe by default.
+
+## The pattern it replaces
+
+Before Java 7, you wrote this:
+
+```java
+BufferedReader r = null;
+try {
+    r = Files.newBufferedReader(p);
+    System.out.println(r.readLine());
+} finally {
+    if (r != null) {
+        try { r.close(); } catch (IOException ignored) { }
+    }
+}
+```
+
+Six lines of boilerplate to safely read one line. And if both the body and `close()` throw, the close exception silently swallows the original.
+
+## The new form
+
+```java
+try (BufferedReader r = Files.newBufferedReader(p)) {
+    System.out.println(r.readLine());
+}
+```
+
+Resources declared in the parentheses are auto-closed when the try block exits — even on exception. The block reads top-to-bottom: open, use, done. The compiler generates the equivalent finally + close code for you, including the suppressed-exception handling.
+
+To work as a resource, a class must implement **`java.lang.AutoCloseable`** (or its IOException-throwing subtype `java.io.Closeable`). All the standard JDK readers, writers, streams, channels, and connection types do.
+
+<Note>The variable in the parens is implicitly <code>final</code>. You cannot reassign it inside the body — the compiler enforces this so the close() call hits the same object you opened.</Note>
+
+## Multiple resources
+
+You can declare more than one resource, separated by semicolons:
+
+```java
+try (
+    BufferedReader r = Files.newBufferedReader(in);
+    BufferedWriter w = Files.newBufferedWriter(out)
+) {
+    String line;
+    while ((line = r.readLine()) != null) {
+        w.write(line.toUpperCase());
+        w.newLine();
+    }
+}
+```
+
+Resources are **closed in reverse order** of declaration, so dependent resources tear down correctly. (If `w` somehow depended on `r`, you'd want `w` closed first.)
+
+## Suppressed exceptions
+
+Here's the subtle case the new syntax handles for you. What if the body throws *and* `close()` throws? You can't return both — but throwing only one would lose information. Java's solution: the body's exception wins (the caller sees it), and the close-time exception is attached as a **suppressed** exception, visible in the stack trace and via `Throwable.getSuppressed()`:
+
+```
+Exception in thread "main" java.lang.RuntimeException: body failed
+    at Main.main(Main.java:10)
+    Suppressed: java.io.IOException: close failed
+        at Main$Res.close(Main.java:5)
+        ...
+```
+
+Suppression preserves the diagnostic value of both exceptions without forcing the caller to handle two at once.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run**. You should see:
+
+```
+1: line 1
+2: line 2
+3: line 3
+done — reader auto-closed
+```
+
+The starter writes three lines, opens a `BufferedReader` in a try-with-resources block, prints them with line numbers, and demonstrates that no manual close is needed.
+
+## Java 9 enhancement: pre-existing variables
+
+Originally, try-with-resources required you to declare each resource inside the parens. Java 9 relaxed this — if you have a final or effectively-final variable that already implements `AutoCloseable`, you can use it directly:
+
+```java
+BufferedReader r = Files.newBufferedReader(p);
+// ... maybe pass r to a helper, configure it ...
+try (r) {                   // Java 9+: just reference the existing variable
+    String line = r.readLine();
+    System.out.println(line);
+}
+```
+
+Useful when a resource is created elsewhere but you want this method to own its lifetime.
+
+## Writing your own AutoCloseable
+
+It's a single method:
+
+```java
+class Latch implements AutoCloseable {
+    private final String name;
+    public Latch(String name) {
+        this.name = name;
+        System.out.println("acquire " + name);
+    }
+    @Override
+    public void close() {
+        System.out.println("release " + name);
+    }
+}
+
+try (Latch outer = new Latch("outer"); Latch inner = new Latch("inner")) {
+    // do work
+}
+// prints: acquire outer / acquire inner / release inner / release outer
+```
+
+Implementing `AutoCloseable` is how you make any "open / use / close" pattern safe for callers — locks, transactions, GUI windows, instrumentation spans, anything.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Reaching for try/finally instead of try-with-resources** — old habits and old code, but the new form is shorter, safer, and better at exceptions. Use it whenever the resource implements AutoCloseable.
+- **Reassigning a resource inside the try** — the compiler refuses; resources are implicitly final. Restructure rather than fight it.
+- **Silently swallowing close() exceptions in legacy code** — the old hand-written pattern often did this. Suppressed exceptions in try-with-resources retain the information.
+- **Forgetting that order matters for closing** — resources close in reverse declaration order. If A creates B, declare A first, then B; closing B first is what you want.
+- **Wrapping a Stream from `Files.list` or `Files.lines` without try-with-resources** — these own OS handles. Skipping the try-with-resources leaks them.
+
+## Recap
+
+try-with-resources is a small piece of syntax that solves a class of bug (resource leaks, lost exceptions) that used to plague every Java codebase. Once you have the muscle memory, you'll never write a manual close again.
+
+- Resources go in the parentheses of `try (...)`. They must implement `AutoCloseable`.
+- Multiple resources are allowed, separated by `;`. Closed in reverse order.
+- Body exceptions are primary; close exceptions are added as suppressed (visible in stack traces).
+- Java 9+ lets you reference an effectively-final existing variable as a resource.
+- Implement `AutoCloseable` on your own classes to make any open/use/close pattern compositional.
+
+**Up next:** Streaming file lines with `Files.lines` — the lazy, scalable cousin of `readAllLines`.
+
+<Exercise>
+Use try-with-resources to open a `BufferedReader` for `/tmp/twr.txt` and print each line numbered. Confirm the reader is auto-closed.
+
+```java
+import java.nio.file.*;
+import java.io.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/twr.txt");
+        Files.writeString(p, "line 1\nline 2\nline 3\n");
+
+        // TODO: open a BufferedReader inside try-with-resources, print each line numbered
+        try (BufferedReader r = Files.newBufferedReader(p)) {
+            String line;
+            int n = 1;
+            while ((line = r.readLine()) != null) {
+                System.out.println(n + ": " + line);
+                n++;
+            }
+        }
+        System.out.println("done — reader auto-closed");
+    }
+}
+```
+
+The program should:
+- Write three lines to the file
+- Open a `BufferedReader` in a try-with-resources block
+- Print each line prefixed with its 1-based line number
+- Print `done — reader auto-closed` after the block exits
+
+<Note>Hint: <code>BufferedReader.readLine()</code> returns <code>null</code> when it hits the end of the file. That's the signal to stop the loop.</Note>
+</Exercise>

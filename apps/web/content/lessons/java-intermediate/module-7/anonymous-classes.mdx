@@ -1,0 +1,297 @@
+export const meta = {
+  title: "Anonymous Classes",
+  duration: 12,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ac-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which of the following is true about anonymous classes?",
+    options: [
+      { text: "They can extend a class AND implement multiple interfaces in one declaration.", correct: false, feedback: "An anonymous class can target exactly one type — either a class to extend or a single interface to implement, not both and not multiple." },
+      { text: "They are declared and instantiated in a single expression.", correct: true, feedback: "Correct — `new Runnable() { public void run() { ... } }` defines a class and creates an instance of it at the same time." },
+      { text: "They can have a named constructor.", correct: false, feedback: "Anonymous classes have no name, so they cannot have a constructor — but they can use instance initializer blocks for setup logic." },
+      { text: "They are equivalent to lambdas in every way.", correct: false, feedback: "Anonymous classes and lambdas behave differently in some important ways, including how `this` binds. We'll cover this in the next lesson." },
+    ],
+    explanation: "An anonymous class is shorthand for declaring a single-use subclass or interface implementation directly inside an expression. It saves you from writing a named class for a one-off use.",
+    hint: "Think about the syntax: `new SomeType() { ... }` — what's happening on each side of the braces?",
+  },
+  endQ1: {
+    id: "ac-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    interface Greeting {
+        String say(String name);
+    }
+
+    public static void main(String[] args) {
+        Greeting formal = new Greeting() {
+            public String say(String name) {
+                return "Good day, " + name + ".";
+            }
+        };
+        System.out.println(formal.say("Ada"));
+    }
+}`,
+    expectedOutput: "Good day, Ada.",
+    explanation: "The anonymous class implements `Greeting` and overrides `say`. The instance is stored in `formal`, and calling `formal.say(\"Ada\")` dispatches to the anonymous override.",
+  },
+  endQ2: {
+    id: "ac-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Inside an anonymous class, what does the keyword `this` refer to?",
+    options: [
+      { text: "The enclosing outer class instance.", correct: false, feedback: "That's the behavior of `this` inside a lambda. Inside an anonymous class, `this` refers to the anonymous instance itself." },
+      { text: "The instance of the anonymous class itself.", correct: true, feedback: "Correct — like any class, an anonymous class has its own `this`. To reach the enclosing instance, you must write `OuterClass.this`." },
+      { text: "Always `null`.", correct: false, feedback: "`this` is never `null` inside an instance method." },
+      { text: "The supertype's static context.", correct: false, feedback: "`this` always refers to an instance, not to a class." },
+    ],
+    explanation: "Anonymous classes have their own identity, so `this` references the anonymous instance. This is the most prominent behavioral difference from lambdas, where `this` refers to the enclosing class instance.",
+  },
+  endQ3: {
+    id: "ac-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the line so that it creates a `Runnable` whose `run` method prints `tick`:",
+    code: `Runnable r = new ___() {
+    public void run() { System.out.println("tick"); }
+};`,
+    correctAnswers: ["Runnable"],
+    caseSensitive: true,
+    explanation: "After `new`, you write the type the anonymous class targets — here, the interface `Runnable`. The body in braces provides the implementation of `run()`.",
+  },
+  endQ4: {
+    id: "ac-end-4",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = new ArrayList<>(Arrays.asList(3, 1, 4, 1, 5, 9, 2, 6));
+        nums.sort(new Comparator<Integer>() {
+            public int compare(Integer a, Integer b) {
+                return b - a;   // descending
+            }
+        });
+        System.out.println(nums);
+    }
+}`,
+    expectedOutput: "[9, 6, 5, 4, 3, 2, 1, 1]",
+    explanation: "The anonymous `Comparator` returns `b - a`, which sorts in descending order. Note: subtracting integers like this is fine for small numbers, but `Integer.compare(b, a)` would be safer against overflow.",
+  },
+};
+
+An **anonymous class** declares and instantiates a class in a single expression. There's no separate `class Foo { ... }` declaration — you write `new Type() { ... body ... }` and the compiler quietly creates a new (unnamed) class that extends `Type` (if it's a class) or implements `Type` (if it's an interface), then constructs an instance of it on the spot.
+
+Anonymous classes were the standard tool in pre-Java 8 codebases for any callback or one-off subclass: button click listeners, comparators, threads, you name it. Lambdas have replaced many of these uses, but anonymous classes are still essential when you need things lambdas can't express.
+
+## Anatomy of an anonymous class
+
+```java
+Runnable r = new Runnable() {
+    @Override
+    public void run() {
+        System.out.println("anonymous task");
+    }
+};
+r.run();
+```
+
+What's happening here:
+
+1. `new Runnable()` looks like a constructor call, but `Runnable` is an interface — interfaces have no constructor. Java reads this as "I'm about to define an anonymous class implementing `Runnable`."
+2. The braces `{ ... }` enclose the class body. Whatever methods you write inside override or implement methods of `Runnable`.
+3. The `r` variable holds an instance of that nameless class. Behind the scenes the class file is named something like `Main$1.class`.
+
+## Real-world analogy: a sticky note
+
+Imagine you scribble a quick reminder on a sticky note, slap it on a colleague's monitor, and walk away. You didn't name the note, file it, or catalog it — it exists for one purpose and then gets thrown away. Anonymous classes are sticky notes of code: tiny, single-purpose, and unnamed because nobody else will ever refer to them.
+
+## When you must use an anonymous class
+
+Two scenarios force the issue:
+
+1. **You need to override more than one method** of an interface or extend a class with multiple methods.
+2. **You need to extend a (non-functional) class**, not implement an interface.
+
+Lambdas can't do either of those. For example, if you want to subclass `java.util.TimerTask` and override its `run` method, an anonymous class is the natural fit:
+
+```java
+import java.util.Timer;
+import java.util.TimerTask;
+
+Timer timer = new Timer();
+timer.schedule(new TimerTask() {
+    @Override
+    public void run() {
+        System.out.println("timer fired");
+    }
+}, 1000);
+```
+
+`TimerTask` is an abstract *class*, not a functional interface, so you can't replace this with a lambda.
+
+## Capturing local variables
+
+Like local classes, anonymous classes can capture **effectively final** local variables of the enclosing method:
+
+```java
+static Runnable greeter(String name) {
+    return new Runnable() {
+        public void run() {
+            System.out.println("Hi, " + name);
+        }
+    };
+}
+```
+
+Each call to `greeter` produces a new anonymous instance with its own captured `name`. If you tried to reassign `name` after the anonymous class was defined, the compiler would refuse — the same effectively-final rule that applies to local classes and lambdas.
+
+<Note>Anonymous classes have no constructor of their own — they have no name, so there's nothing to put after `class`. To run setup code, use an instance initializer block: `{ ... }` directly inside the class body.</Note>
+
+## A second example: a Swing-style listener
+
+Even if you've never used Swing, you've probably seen this pattern in older Java tutorials. It's a textbook anonymous class:
+
+```java
+button.addActionListener(new ActionListener() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        System.out.println("clicked at " + e.getWhen());
+    }
+});
+```
+
+The `ActionListener` is single-use, has only one method (`actionPerformed`), and is wired directly into the `addActionListener` call. Today this would typically be a lambda, but the pattern still appears in legacy code and in cases where you want to override more than one method.
+
+## What does `this` mean inside?
+
+Inside an anonymous class, `this` refers to the **anonymous instance itself**, just like any other class. The enclosing instance is reachable via `OuterClass.this`:
+
+```java
+public class Main {
+    String name = "outer";
+
+    Runnable demo() {
+        return new Runnable() {
+            String name = "anonymous";
+            public void run() {
+                System.out.println(name);          // "anonymous"
+                System.out.println(this.name);     // "anonymous"
+                System.out.println(Main.this.name); // "outer"
+            }
+        };
+    }
+}
+```
+
+This behavior is the most important difference between anonymous classes and lambdas — and the topic of the next lesson.
+
+## Anonymous classes for instant subclassing
+
+You can also subclass a concrete class on the fly. This is sometimes useful for ad-hoc test doubles or one-off variants:
+
+```java
+java.util.HashMap<String, Integer> chatty = new java.util.HashMap<String, Integer>() {
+    @Override
+    public Integer put(String key, Integer value) {
+        System.out.println("putting " + key + "=" + value);
+        return super.put(key, value);
+    }
+};
+chatty.put("a", 1);
+chatty.put("b", 2);
+```
+
+The anonymous class extends `HashMap` and overrides `put` to log every call. You'd rarely do this in production (composition is usually cleaner), but it's a handy debugging trick.
+
+<Note>Anonymous classes that capture an enclosing instance share the same memory-leak risk as inner classes. If you store one in a long-lived structure, the outer object stays alive too. Be especially careful with listeners and callbacks that you forget to deregister.</Note>
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+The starter code defines a `Comparator<String>` as an anonymous class that compares strings by length, then sorts a list of words with it. Run it and you should see:
+
+```
+[fig, apple, banana, elderberry]
+```
+
+The sort is stable and ascending by length: `fig` (3) before `apple` (5) before `banana` (6) before `elderberry` (10). Try changing the comparator to descending — return `Integer.compare(b.length(), a.length())` — and rerun.
+
+## When to prefer a named class instead
+
+Anonymous classes are great for short, single-use snippets, but they have downsides:
+
+- **No reuse.** Each anonymous class is a new class, even if the body is identical to one you wrote earlier.
+- **Awkward names in stack traces.** Compiled anonymous classes appear as `Main$1`, `Main$2`, etc., which makes debugging harder.
+- **No constructor.** If you need significant initialization logic, a named local or top-level class reads better.
+
+If you find yourself copy-pasting the same anonymous class body, promote it to a named class.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Putting a semicolon in the wrong place.** The expression `new Runnable() { ... }` evaluates to a value, so when you assign it (or pass it to a method), the closing brace is followed by `;` or `)`. Beginners often forget the semicolon at the end of the assignment.
+- **Trying to define a constructor.** Anonymous classes have no name, so `MyClass() { ... }` won't compile inside the body. If you need initialization, use an instance initializer block: `{ /* setup code */ }` placed directly inside the class body.
+- **Implementing more than one interface.** The syntax `new Foo() { ... }` allows exactly one supertype — either a class or one interface. If you need a class that satisfies several interfaces at once, write a named local or top-level class.
+- **Confusing `this` with the enclosing instance.** Inside an anonymous class, `this` is the anonymous instance. To touch the outer object's fields when names collide, use `OuterClass.this.field`. This trips up developers transitioning from lambdas, where `this` means the enclosing instance.
+- **Storing anonymous instances in long-lived collections.** Like inner classes, anonymous classes that capture the enclosing instance keep it from being garbage collected. Always deregister listeners and callbacks when you're done with them.
+
+## Recap
+
+Anonymous classes let you create a one-off implementation of an interface or a one-off subclass of a class, all in a single expression. They're the spiritual ancestor of lambdas and are still indispensable when lambdas can't do the job.
+
+- An **anonymous class** is declared and instantiated in a single `new Type() { ... }` expression
+- It can extend exactly one class **or** implement exactly one interface — never both, never more
+- It can capture **effectively final** locals and access the enclosing instance's fields
+- Inside, `this` refers to the **anonymous instance**, not the enclosing one (use `OuterClass.this` for that)
+- It has no name, so no explicit constructor — use an instance initializer block for setup
+- Lambdas have replaced most simple uses, but anonymous classes are still required for multi-method overrides, class extension, and a few subtle `this` behaviors
+
+**Up next:** Lambdas vs Anonymous Classes — when you can switch, when you can't, and what changes when you do.
+
+<Exercise>
+The starter program sorts a list of words by length using an anonymous `Comparator<String>`. Run it and confirm the output is `[fig, apple, banana, elderberry]`. Then experiment: change the body of `compare` to sort by reverse alphabetical order using `b.compareTo(a)`. Verify that the test fails (since the expected output is by length) and then put the original implementation back.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Comparator<String> byLength = new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                return Integer.compare(a.length(), b.length());
+            }
+        };
+        List<String> words = new ArrayList<>(
+            Arrays.asList("banana", "fig", "elderberry", "apple"));
+        words.sort(byLength);
+        System.out.println(words);
+    }
+}
+```
+
+**What the tests check:**
+- The program prints `[fig, apple, banana, elderberry]`
+- `byLength` is created as an anonymous class implementing `Comparator<String>`
+- The comparison uses `Integer.compare` rather than direct subtraction (safer against overflow)
+
+<Note>Notice we use `Integer.compare(a.length(), b.length())` instead of `a.length() - b.length()`. The subtraction form is fine for non-negative lengths, but for very large or negative values it can overflow. `Integer.compare` is the safe idiom.</Note>
+</Exercise>

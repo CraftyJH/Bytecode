@@ -1,0 +1,340 @@
+export const meta = {
+  title: "Lambdas vs Anonymous Classes",
+  duration: 12,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "lva-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which of these CANNOT be replaced by a lambda?",
+    options: [
+      { text: "An anonymous `Runnable` whose `run` method prints a string.", correct: false, feedback: "`Runnable` is a functional interface — exactly one abstract method. A lambda fits perfectly." },
+      { text: "An anonymous `Comparator<String>` that compares by length.", correct: false, feedback: "`Comparator` is a functional interface (its other methods are `default`). A lambda works." },
+      { text: "An anonymous subclass of `TimerTask` that overrides `run`.", correct: true, feedback: "Correct — `TimerTask` is an abstract *class*, not a functional interface. Lambdas can only implement single-abstract-method interfaces." },
+      { text: "An anonymous `Callable<Integer>` that returns 42.", correct: false, feedback: "`Callable` is a functional interface, so a lambda like `() -> 42` is fine." },
+    ],
+    explanation: "Lambdas can only target functional interfaces — interfaces with exactly one abstract method. They cannot extend a class. To override `TimerTask.run`, you still need an anonymous (or named) class.",
+    hint: "Lambdas always implement *interfaces*. They never extend classes.",
+  },
+  endQ1: {
+    id: "lva-end-1",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `public class Main {
+    String name = "outer";
+
+    void demo() {
+        Runnable anon = new Runnable() {
+            String name = "anon";
+            public void run() { System.out.println(name); }
+        };
+        Runnable lam = () -> System.out.println(name);
+        anon.run();
+        lam.run();
+    }
+
+    public static void main(String[] args) {
+        new Main().demo();
+    }
+}`,
+    expectedOutput: "anon\nouter",
+    explanation: "Inside the anonymous class, `this` refers to the anonymous instance, so `name` resolves to its own field (`anon`). Inside the lambda, `this` refers to the enclosing `Main` instance, so `name` resolves to `Main.name` (`outer`).",
+  },
+  endQ2: {
+    id: "lva-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Inside a lambda body, what does the keyword `this` refer to?",
+    options: [
+      { text: "The lambda object itself.", correct: false, feedback: "Lambdas don't have their own `this`. That's a key behavioral difference from anonymous classes." },
+      { text: "The instance of the enclosing class.", correct: true, feedback: "Correct — lambdas inherit the surrounding scope's `this`. If the lambda is created inside an instance method of `Foo`, `this` inside the lambda is the `Foo` instance." },
+      { text: "Always `null`.", correct: false, feedback: "`this` in a lambda is whatever `this` would be in the enclosing scope." },
+      { text: "The functional interface's class object.", correct: false, feedback: "Class objects are accessed through `.class`, not `this`." },
+    ],
+    explanation: "A lambda is not a separate class — it does not introduce a new `this` binding. The `this` you see inside a lambda is the same one you'd see immediately outside it.",
+  },
+  endQ3: {
+    id: "lva-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Convert the anonymous class to a lambda. Fill in the body of the lambda.",
+    code: `// Anonymous class:
+// Runnable r = new Runnable() {
+//     public void run() { System.out.println("hi"); }
+// };
+
+// Lambda:
+Runnable r = () -> ___;`,
+    correctAnswers: [`System.out.println("hi")`],
+    caseSensitive: true,
+    explanation: "A lambda for a `Runnable` takes no parameters and returns nothing, so the body is just the statement that the original `run()` performed.",
+  },
+  endQ4: {
+    id: "lva-end-4",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Function<Integer, Integer> doubler = n -> n * 2;
+        Function<Integer, Integer> tripler = n -> n * 3;
+        System.out.println(doubler.apply(5));
+        System.out.println(tripler.apply(5));
+        System.out.println(doubler.andThen(tripler).apply(5));
+    }
+}`,
+    expectedOutput: "10\n15\n30",
+    explanation: "`doubler.apply(5)` is `10`. `tripler.apply(5)` is `15`. `andThen` chains them: first double `5` to `10`, then triple `10` to `30`.",
+  },
+};
+
+Lambdas (introduced in Java 8) and anonymous classes look like solutions to the same problem — express a small bit of behavior inline. But under the hood, they are different. The compiler treats them differently, the runtime allocates them differently, and several subtle semantics — especially the meaning of `this` — diverge.
+
+This lesson clarifies when you can swap an anonymous class for a lambda, when you cannot, and what changes when you do.
+
+## The simple cases — they are interchangeable
+
+Whenever an anonymous class implements a **functional interface** — an interface with exactly one abstract method — you can replace it with a lambda:
+
+```java
+// Anonymous class
+Runnable a = new Runnable() {
+    public void run() { System.out.println("hi"); }
+};
+
+// Lambda — same behavior, much shorter
+Runnable b = () -> System.out.println("hi");
+```
+
+The lambda form expresses only what matters: the parameter list `()`, the arrow `->`, and the body. The compiler infers the interface (`Runnable`) from context and the method to implement (`run`) from the interface having exactly one abstract method.
+
+A few more examples of functional interfaces from the standard library:
+
+- `Runnable` — `void run()`
+- `Callable<V>` — `V call()`
+- `Comparator<T>` — `int compare(T a, T b)`
+- `java.util.function.Function<T, R>` — `R apply(T t)`
+- `java.util.function.Predicate<T>` — `boolean test(T t)`
+
+Each of these can be expressed as a lambda whenever you would have used an anonymous class.
+
+## Side-by-side: a Comparator
+
+Sorting strings by length, two ways:
+
+```java
+// Anonymous class
+words.sort(new Comparator<String>() {
+    public int compare(String a, String b) {
+        return Integer.compare(a.length(), b.length());
+    }
+});
+
+// Lambda
+words.sort((a, b) -> Integer.compare(a.length(), b.length()));
+```
+
+The lambda is six lines shorter and reads almost like English. The compiler generates a far smaller class file too — lambdas share their backing class via `invokedynamic`, so a hot loop full of identical lambdas doesn't bloat your application.
+
+<Note>The lambda form does not generate a brand new class file the way an anonymous class does. The JVM uses a mechanism called `invokedynamic` plus `LambdaMetafactory` to create the implementation lazily at runtime, often reusing the same class for repeated lambdas with identical shape.</Note>
+
+## When lambdas do NOT work
+
+Four situations force you to keep using an anonymous (or named) class:
+
+### 1. The target type is a class, not an interface
+
+```java
+// Anonymous class extending TimerTask (an abstract class)
+new Timer().schedule(new TimerTask() {
+    @Override public void run() { System.out.println("tick"); }
+}, 1000);
+```
+
+Lambdas can only target **interfaces**. There is no lambda equivalent to extending a class.
+
+### 2. The interface has multiple abstract methods
+
+```java
+interface ReadWrite {
+    String read();
+    void write(String s);
+}
+```
+
+A lambda implements exactly one abstract method, so it can't satisfy `ReadWrite`. You'd need an anonymous class (or a named class).
+
+### 3. You want to override a method that has a default implementation
+
+If you want a `Comparator<String>` whose `equals` you've overridden, a lambda only fills in `compare`. To customize `equals` you need an anonymous class.
+
+### 4. You need state across calls
+
+Lambdas don't naturally carry their own instance fields — they capture variables, but those must be effectively final. If your callback needs mutable state, a (local or anonymous) class is the right tool:
+
+```java
+Runnable counter = new Runnable() {
+    int n = 0;
+    public void run() { System.out.println(++n); }
+};
+counter.run();   // 1
+counter.run();   // 2
+```
+
+A lambda would need to wrap the counter in something mutable (a one-element array or an `AtomicInteger`), which reads more awkwardly.
+
+## The big behavioral difference: `this`
+
+This is the trap that catches developers converting code from anonymous classes to lambdas.
+
+**Anonymous classes** introduce a new `this` — `this` inside refers to the anonymous instance.
+
+**Lambdas** do **not** introduce a new `this` — `this` inside refers to whatever `this` would be in the enclosing scope.
+
+```java
+public class Main {
+    String tag = "Main";
+
+    void run() {
+        Runnable anon = new Runnable() {
+            String tag = "anon";
+            public void run() {
+                System.out.println(this.tag);   // "anon"
+            }
+        };
+        Runnable lam = () -> {
+            // No `this.tag` — lambda has no fields
+            System.out.println(this.tag);       // "Main"
+        };
+        anon.run();
+        lam.run();
+    }
+
+    public static void main(String[] args) {
+        new Main().run();
+    }
+}
+```
+
+If you mechanically convert an anonymous class to a lambda and the body uses `this`, the meaning silently changes. This is most painful in old GUI or callback code that calls `this.someMethod()` expecting it to dispatch to the listener subclass.
+
+## Capturing variables
+
+Both forms can capture **effectively final** local variables and the enclosing instance's fields:
+
+```java
+String prefix = ">>> ";
+Runnable a = new Runnable() {
+    public void run() { System.out.println(prefix + "anon"); }
+};
+Runnable b = () -> System.out.println(prefix + "lam");
+```
+
+The capture rules are identical. The difference is only in `this`, the syntax, and what the JVM produces under the hood.
+
+## A second example: a Predicate filter
+
+```java
+import java.util.function.Predicate;
+
+Predicate<String> longA = new Predicate<String>() {
+    public boolean test(String s) { return s.length() > 5; }
+};
+Predicate<String> longB = s -> s.length() > 5;
+System.out.println(longA.test("elderberry"));   // true
+System.out.println(longB.test("fig"));          // false
+```
+
+Both forms produce equivalent behavior; the lambda is shorter and produces leaner bytecode.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+The starter program defines two `Runnable`s — one anonymous, one lambda — both printing different strings. It then sorts a list of words by length using a lambda `Comparator`. Run it and you should see:
+
+```
+anon
+lambda
+[fig, apple, banana, elderberry]
+```
+
+Try converting the lambda comparator back into an anonymous class. Confirm the output is unchanged.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Mechanically converting `this`.** Inside an anonymous class, `this.method()` calls a method on the anonymous instance. Move the body into a lambda and `this` now refers to the enclosing class instance — completely different behavior, but the compiler won't warn you.
+- **Trying to `extend` with a lambda.** Lambdas implement interfaces only. If your code needs to extend an abstract class, you cannot use a lambda — anonymous or named class is required.
+- **Targeting a non-functional interface.** A lambda can only implement an interface with exactly one abstract method. Adding a second abstract method to an interface silently makes existing lambda usages illegal — that's why standard-library functional interfaces are typically annotated `@FunctionalInterface` to prevent this drift.
+- **Adding instance state to a lambda.** Lambdas can't declare instance fields the way anonymous classes can. If you need a counter across calls, either use an anonymous class or capture an `AtomicInteger`.
+- **Assuming lambdas allocate a new object every time.** They often don't. The JVM is free to cache stateless lambdas, so two `() -> 42` lambdas may even be the same object. Don't write code that depends on object identity.
+
+## Recap
+
+Lambdas are the modern default for inline behavior in Java, but anonymous classes still play a role. Knowing the boundary between them — and especially the `this` distinction — keeps your code clean and bug-free.
+
+- A **lambda** can replace an anonymous class only if the target is a **functional interface** (single abstract method)
+- Lambdas **cannot** extend a class, implement multi-method interfaces, or carry their own instance fields
+- Inside a lambda, `this` refers to the **enclosing class instance**; inside an anonymous class, `this` refers to the **anonymous instance**
+- Both lambdas and anonymous classes capture **effectively final** local variables
+- Lambdas are typically smaller in bytecode and may be cached by the JVM via `invokedynamic`
+- For one-off, single-method behavior, prefer a lambda; for richer needs, fall back to an anonymous or named class
+
+**Up next:** Module 8 — File I/O Basics. We'll start working with the file system using the modern `Path` and `Files` APIs.
+
+<Exercise>
+Run the starter program. It demonstrates the anonymous-class vs lambda equivalence with two `Runnable`s, then sorts a list of words by length using a lambda `Comparator`. The expected output is:
+
+```
+anon
+lambda
+[fig, apple, banana, elderberry]
+```
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Anonymous class
+        Runnable r1 = new Runnable() {
+            public void run() { System.out.println("anon"); }
+        };
+        // Lambda — same job, much shorter
+        Runnable r2 = () -> System.out.println("lambda");
+
+        r1.run();
+        r2.run();
+
+        List<String> words = new ArrayList<>(
+            Arrays.asList("banana", "fig", "elderberry", "apple"));
+        // TODO: sort by length using a lambda Comparator
+        words.sort((a, b) -> Integer.compare(a.length(), b.length()));
+        System.out.println(words);
+    }
+}
+```
+
+**What the tests check:**
+- The first line printed is `anon` (from the anonymous class)
+- The second line is `lambda` (from the lambda)
+- The list is sorted ascending by length: `[fig, apple, banana, elderberry]`
+- The comparator is implemented as a lambda, not an anonymous class
+
+<Note>Try replacing the lambda comparator with `words.sort(Comparator.comparingInt(String::length));`. The method-reference form is even shorter and is often the most idiomatic way to sort by a derived key.</Note>
+</Exercise>

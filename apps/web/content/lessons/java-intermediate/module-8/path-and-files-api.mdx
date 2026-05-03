@@ -1,0 +1,224 @@
+export const meta = {
+  title: "The Path and Files API",
+  duration: 12,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "pfa-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which class is the modern, recommended way to represent a filesystem location in Java?",
+    options: [
+      { text: "<code>java.io.File</code>", correct: false, feedback: "File is the legacy class from Java 1.0. Use Path for new code." },
+      { text: "<code>java.nio.file.Path</code>", correct: true },
+      { text: "<code>java.lang.String</code>", correct: false, feedback: "A String can hold a path-like value, but it has none of the helper methods (resolve, getParent, etc.)." },
+      { text: "<code>java.net.URL</code>", correct: false, feedback: "URL describes a network resource, not a local filesystem location." },
+    ],
+    explanation: "Since Java 7, the NIO.2 API (java.nio.file) replaces the legacy File class. Path is immutable, OS-aware, and pairs cleanly with the Files utility class.",
+  },
+  endQ1: {
+    id: "pfa-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.nio.file.*;
+public class Main {
+    public static void main(String[] args) {
+        Path p = Paths.get("/tmp/notes/today.md");
+        System.out.println(p.getFileName());
+        System.out.println(p.getParent());
+        System.out.println(p.isAbsolute());
+    }
+}`,
+    expectedOutput: "today.md\n/tmp/notes\ntrue",
+    explanation: "getFileName() returns the last segment, getParent() returns the directory above, and isAbsolute() reports whether the path starts from the root.",
+  },
+  endQ2: {
+    id: "pfa-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To combine the directory <code>base</code> with the relative path <code>\"docs/readme.md\"</code> into a single Path, call <code>base.___(\"docs/readme.md\")</code>.",
+    correctAnswers: ["resolve"],
+    caseSensitive: true,
+    explanation: "Path.resolve appends a relative path onto an existing one. If the argument is itself absolute, resolve returns it unchanged.",
+  },
+  endQ3: {
+    id: "pfa-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What does <code>Paths.get(\"a/b/../c\").normalize()</code> produce?",
+    options: [
+      { text: "<code>a/b/../c</code> — unchanged.", correct: false, feedback: "normalize() actively rewrites the path to remove redundant elements." },
+      { text: "<code>a/c</code>", correct: true },
+      { text: "<code>/a/c</code>", correct: false, feedback: "normalize doesn't add a leading slash; it only removes redundant '..' and '.' segments." },
+      { text: "It throws <code>InvalidPathException</code>.", correct: false, feedback: "The path is syntactically valid; normalize just simplifies it." },
+    ],
+    explanation: "normalize collapses each '..' against the segment before it. So a/b/../c becomes a/c. It does NOT touch the filesystem — purely textual.",
+    hint: "Think of '..' as 'one step back from where I just was'.",
+  },
+  endQ4: {
+    id: "pfa-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which statement about <code>Path</code> is correct?",
+    options: [
+      { text: "Paths are mutable — you can change their segments after creation.", correct: false, feedback: "Path is immutable. Methods like resolve return a new Path instead of modifying the receiver." },
+      { text: "Path is immutable; methods that 'modify' it return a new Path.", correct: true },
+      { text: "A Path can only point to files that exist on disk.", correct: false, feedback: "A Path is a textual location. The file may or may not exist; check with Files.exists." },
+      { text: "Path requires an open file handle.", correct: false, feedback: "Path holds no I/O resources at all. It's just a typed wrapper around a textual path." },
+    ],
+    explanation: "Path's immutability makes it safe to share between threads and to use as a Map key. It carries no I/O state — that's what the Files utility class is for.",
+  },
+};
+
+The legacy `java.io.File` class has been the standard way to talk about files in Java for over twenty years. It works, but it has quirks: methods that return `boolean` instead of throwing on failure, no native support for symbolic links, and an inability to read file metadata atomically. Java 7 introduced the NIO.2 API (`java.nio.file`) to fix all of that.
+
+The new API revolves around two types: **`Path`** describes a location, and **`Files`** is a utility class with a static method for every operation you might want to perform on that location.
+
+## Path — an OS-aware location
+
+A `Path` represents a sequence of name elements separated by the platform's directory separator. It might be absolute (`/etc/hosts`, `C:\Windows\System32`) or relative (`docs/readme.md`).
+
+```java
+import java.nio.file.*;
+
+Path p = Paths.get("/tmp/notes/today.md");
+// Java 11+: Path.of("/tmp/notes/today.md")
+
+System.out.println(p);              // /tmp/notes/today.md
+System.out.println(p.getFileName()); // today.md
+System.out.println(p.getParent());   // /tmp/notes
+System.out.println(p.getRoot());     // /
+System.out.println(p.getNameCount()); // 3
+System.out.println(p.getName(0));    // tmp
+```
+
+Important properties:
+- **Immutable** — every "modifying" method returns a new `Path`.
+- **Platform-aware** — on Windows you'd use `\` separators; on Linux/macOS, `/`. The API handles this for you.
+- **Just text** — creating a `Path` does not check whether the file exists or open any handle. It's purely a typed wrapper around a string.
+
+<Note>If you have an old <code>File</code>, call <code>file.toPath()</code> to get a Path. Going the other way, <code>path.toFile()</code> hands you back a File. Bridging is cheap and lossless.</Note>
+
+## Combining paths: resolve and relativize
+
+You almost never want to do `new Path(parent + "/" + child)` by hand — the API has built-in helpers that handle separators and absolute paths correctly.
+
+```java
+Path base = Paths.get("/tmp");
+Path full = base.resolve("notes/today.md");
+System.out.println(full);   // /tmp/notes/today.md
+
+// resolve respects absolute arguments
+Path other = base.resolve("/etc/hosts");
+System.out.println(other);  // /etc/hosts  (absolute argument wins)
+
+// The reverse: from one path, what's the relative way to another?
+Path rel = base.relativize(full);
+System.out.println(rel);    // notes/today.md
+```
+
+`resolve` is the most common Path operation in real code. Use it whenever you assemble a path from a known base and a user-supplied or computed sub-path.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run**. You should see:
+
+```
+Path: /tmp/example.txt
+Filename: example.txt
+Parent: /tmp
+Absolute: true
+Resolved: /tmp/notes/today.md
+```
+
+The starter creates a Path, prints metadata about it, and then uses `resolve` to attach a sub-path.
+
+## Files — the static utility class
+
+`Path` describes a location; `Files` does things with it. Some examples you'll use repeatedly in this module:
+
+```java
+Files.exists(p);            // true / false
+Files.isDirectory(p);       // true if p points to a directory
+Files.isRegularFile(p);     // true if p points to an ordinary file
+Files.size(p);              // file size in bytes
+Files.readString(p);        // entire file as a String (Java 11+)
+Files.readAllLines(p);      // List<String> — one entry per line
+Files.writeString(p, text); // write/overwrite file content
+```
+
+You'll meet many more in the lessons that follow. The pattern is always the same: pick a verb, pass a `Path`, get a result.
+
+## Normalising and comparing paths
+
+Two paths can refer to the same file but look textually different (`/tmp/foo` vs `/tmp/./foo` vs `/tmp/bar/../foo`). Use `normalize()` to clean these up:
+
+```java
+Path messy = Paths.get("/tmp/./bar/../foo");
+System.out.println(messy.normalize());  // /tmp/foo
+```
+
+`normalize()` is purely textual — it does not consult the filesystem. To resolve symbolic links and discover the *canonical* path, use `Files.readSymbolicLink` or `path.toRealPath()` (which does touch the disk and may throw `IOException`).
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Concatenating with `+` instead of `resolve`** — `parent + "/" + child` works only on Unix-like systems and breaks if `child` is already absolute. Always use `resolve`.
+- **Assuming a Path means the file exists** — creating a `Path` is just text manipulation. Always check with `Files.exists` before reading or writing if the file's existence matters.
+- **Forgetting that Path is immutable** — `p.resolve("x")` does not modify `p`; it returns a new Path. Assign the result to a variable.
+- **Using legacy `File` in new code** — apart from interop with old APIs, there's almost no reason to reach for `java.io.File` today. Path + Files is more powerful and less error-prone.
+
+## Recap
+
+The NIO.2 API gives Java a clean, modern way to talk about and manipulate filesystem locations. Once you internalise the Path/Files split, every other file-related lesson in this module reads as obvious applications of the same pattern.
+
+- **`Path`** is an immutable, typed location. Build it with `Paths.get(...)` or `Path.of(...)`.
+- Useful Path methods: `getFileName`, `getParent`, `getRoot`, `isAbsolute`, `resolve`, `relativize`, `normalize`.
+- **`Files`** is the static utility class — every read, write, list, copy, or delete starts with `Files.something(path)`.
+- Path objects don't touch the filesystem on their own. You must call a `Files` method (or `Files.exists`) to interact with disk.
+
+**Up next:** Reading text files — turn a Path into a String or a List<String> with one method call.
+
+<Exercise>
+Create a `Path` for `/tmp/example.txt` and print its filename, parent, and whether it's absolute. Then use `resolve` to derive `/tmp/notes/today.md` from `/tmp`.
+
+```java
+import java.nio.file.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/example.txt");
+        System.out.println("Path: " + p);
+        System.out.println("Filename: " + p.getFileName());
+        System.out.println("Parent: " + p.getParent());
+        System.out.println("Absolute: " + p.isAbsolute());
+
+        Path resolved = Paths.get("/tmp").resolve("notes/today.md");
+        System.out.println("Resolved: " + resolved);
+    }
+}
+```
+
+The program should print:
+- The path itself
+- Its filename, parent directory, and whether it's absolute
+- A resolved path combining `/tmp` with `notes/today.md`
+
+<Note>Hint: every method on `Path` returns either a `Path` or some metadata (like a String or boolean). It never opens a file or throws `IOException`.</Note>
+</Exercise>

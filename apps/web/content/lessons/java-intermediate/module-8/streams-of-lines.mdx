@@ -1,0 +1,280 @@
+export const meta = {
+  title: "Streaming File Lines with Files.lines",
+  duration: 14,
+  order: 6,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "sol-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What's the key advantage of <code>Files.lines(path)</code> over <code>Files.readAllLines(path)</code>?",
+    options: [
+      { text: "Files.lines is faster for small files.", correct: false, feedback: "For small files, the speed difference is negligible — sometimes readAllLines is even slightly faster." },
+      { text: "Files.lines reads lazily, one line at a time, so it works on files that don't fit in memory.", correct: true },
+      { text: "Files.lines automatically parses CSV.", correct: false, feedback: "Neither method does any parsing — they just split on line terminators." },
+      { text: "Files.lines requires no try-with-resources.", correct: false, feedback: "It does require try-with-resources, because the underlying file handle must be closed." },
+    ],
+    explanation: "Files.lines is lazy — it doesn't read anything until you start consuming the stream. That means it scales to files of any size, processed line-by-line.",
+  },
+  endQ1: {
+    id: "sol-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.nio.file.*;
+import java.util.stream.*;
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/lines-q.txt");
+        Files.writeString(p, "apple\nbanana\ncherry\ndate\n");
+        long count;
+        try (Stream<String> s = Files.lines(p)) {
+            count = s.filter(l -> l.length() > 5).count();
+        }
+        System.out.println(count);
+    }
+}`,
+    expectedOutput: "2",
+    explanation: "Length > 5 matches \"banana\" (6) and \"cherry\" (6). \"apple\" (5) and \"date\" (4) are filtered out. count returns 2.",
+  },
+  endQ2: {
+    id: "sol-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "<code>Files.lines(p)</code> returns a <code>Stream&lt;String&gt;</code>. To release the underlying file handle, wrap the call in <code>___-with-resources</code>.",
+    correctAnswers: ["try"],
+    caseSensitive: false,
+    explanation: "Without try-with-resources, the file handle leaks. Streams returned by Files.lines, Files.list, and Files.walk all need this treatment.",
+  },
+  endQ3: {
+    id: "sol-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What happens if you call a stream operation like <code>count()</code> twice on the same <code>Files.lines</code> stream?",
+    options: [
+      { text: "It returns the count twice as fast (cached).", correct: false, feedback: "Streams are not cached — they're a one-shot pipeline." },
+      { text: "It throws <code>IllegalStateException</code>: stream has already been operated upon.", correct: true },
+      { text: "It silently returns 0 the second time.", correct: false, feedback: "The behavior is to throw, not silently fail." },
+      { text: "It re-reads the file from the start.", correct: false, feedback: "Streams don't auto-rewind. To re-read, open a new stream." },
+    ],
+    explanation: "Java streams are single-pass: any terminal operation (count, collect, forEach, etc.) consumes the stream. Use it once and discard, or open a fresh Files.lines for each pass.",
+  },
+  endQ4: {
+    id: "sol-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which is the correct way to count lines containing the word \"ERROR\" in a 5 GB log file?",
+    options: [
+      { text: "<code>Files.readAllLines(p).stream().filter(l -> l.contains(\"ERROR\")).count();</code>", correct: false, feedback: "readAllLines loads the whole file into memory — likely OutOfMemoryError on 5 GB." },
+      { text: "<code>try (Stream&lt;String&gt; s = Files.lines(p)) { s.filter(l -> l.contains(\"ERROR\")).count(); }</code>", correct: true },
+      { text: "<code>Files.readString(p).contains(\"ERROR\");</code>", correct: false, feedback: "readString also loads everything into memory; and it would tell you only whether ERROR appears anywhere, not the count." },
+      { text: "<code>Files.size(p) / 100;</code>", correct: false, feedback: "File size says nothing about line content." },
+    ],
+    explanation: "Files.lines streams lazily — memory use stays roughly constant regardless of file size. Always wrap in try-with-resources because the underlying handle is real.",
+  },
+};
+
+You've already met three ways to read a text file: `readString`, `readAllLines`, and `BufferedReader`. They share a problem — the first two load the whole file into memory, the third requires a verbose `while` loop.
+
+`Files.lines(path)` is the modern alternative: it returns a **`Stream<String>`** that produces one line per element, lazily, on demand. Combined with the Stream API, it lets you express common file-processing tasks in a single, readable expression — and it scales to files larger than RAM.
+
+## The basic pattern
+
+```java
+import java.nio.file.*;
+import java.util.stream.*;
+
+Path log = Paths.get("/tmp/server.log");
+try (Stream<String> lines = Files.lines(log)) {
+    long errors = lines
+        .filter(l -> l.startsWith("ERROR"))
+        .count();
+    System.out.println("Errors: " + errors);
+}
+```
+
+The pipeline above reads `server.log` line by line, keeps only lines starting with "ERROR", and counts them. At any moment only one line is in memory — the file could be 5 GB and this code would still work.
+
+The try-with-resources wrap is mandatory: `Files.lines` opens an OS-level file handle, and the returned `Stream` owns it until closed.
+
+<Note><code>Files.lines</code> defaults to UTF-8. Pass a <code>Charset</code> as the second argument to override.</Note>
+
+## Streams are single-pass
+
+Each `Stream` can be consumed exactly once. After a terminal operation (`count`, `collect`, `forEach`, etc.) the stream is finished — calling another terminal op throws `IllegalStateException`.
+
+```java
+try (Stream<String> s = Files.lines(p)) {
+    long c = s.count();             // ✓ consumes the stream
+    long c2 = s.count();            // ✗ IllegalStateException
+}
+```
+
+If you need two passes, open the file twice — each `Files.lines` returns a fresh stream:
+
+```java
+long total;
+long errors;
+try (Stream<String> s = Files.lines(p)) { total = s.count(); }
+try (Stream<String> s = Files.lines(p)) {
+    errors = s.filter(l -> l.startsWith("ERROR")).count();
+}
+```
+
+This re-reads the file, which costs disk time but uses constant memory.
+
+## Common pipelines
+
+The Stream API gives you a vocabulary of building blocks. Here are five patterns you'll reuse constantly.
+
+### 1. Count matching lines
+
+```java
+try (Stream<String> s = Files.lines(p)) {
+    long n = s.filter(l -> l.contains("WARN")).count();
+}
+```
+
+### 2. Collect matching lines into a List
+
+```java
+import java.util.*;
+
+List<String> errors;
+try (Stream<String> s = Files.lines(p)) {
+    errors = s.filter(l -> l.startsWith("ERROR")).collect(Collectors.toList());
+}
+// Or in Java 16+: .toList()
+```
+
+### 3. Transform and print
+
+```java
+try (Stream<String> s = Files.lines(p)) {
+    s.map(String::toUpperCase).forEach(System.out::println);
+}
+```
+
+### 4. Skip a header, parse the rest
+
+```java
+try (Stream<String> s = Files.lines(csv)) {
+    s.skip(1)                                       // drop CSV header
+     .map(line -> line.split(","))
+     .forEach(cols -> System.out.println(cols[0])); // print first column
+}
+```
+
+### 5. Find the first match (short-circuit)
+
+```java
+try (Stream<String> s = Files.lines(p)) {
+    Optional<String> first = s.filter(l -> l.contains("FATAL")).findFirst();
+    first.ifPresent(System.out::println);
+}
+```
+
+`findFirst` is lazy: as soon as a match is seen, the stream stops reading the file. On a multi-GB file you might process only the first few KB.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run**. You should see:
+
+```
+Error lines: 2
+INFO: started
+INFO: finished
+```
+
+The starter writes a five-line log file, then opens it twice — once to count ERROR lines and once to print INFO lines. Each open is wrapped in its own try-with-resources block.
+
+## When NOT to use Files.lines
+
+Streams have overhead. For small files where you'll process every line, the simpler form often reads better:
+
+```java
+for (String line : Files.readAllLines(p)) { ... }
+```
+
+Reach for `Files.lines` when:
+
+- The file is large (or could be large in the future).
+- You want a chain of operations: filter, map, collect, group, sort.
+- You only need part of the file (early-exit with `findFirst`, `limit`, `anyMatch`).
+
+For tiny config files or simple line-by-line processing where every line is read, `readAllLines` plus a for-each loop is just as good.
+
+## Close-time errors are real
+
+If the file handle has trouble closing, the close exception is attached as suppressed to whatever exception the body produced. If the body succeeded, the close exception propagates normally. This is the same suppressed-exception machinery you saw in the previous lesson — you don't need to think about it most of the time, but it's there if you need to debug a strange "I/O error after the work succeeded" trace.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Skipping try-with-resources** — every `Files.lines` call opens a real file handle. Without try-with-resources, the handle leaks until garbage collection (sometimes never).
+- **Reusing a stream after a terminal op** — the second op throws. Open a fresh stream for each pass.
+- **Reaching for `Files.lines` when `readAllLines` would do** — if you're going to materialise everything anyway, the simpler API is clearer.
+- **Forgetting that Files.lines is lazy** — adding `forEach(System.out::println)` is what triggers the actual reading. A pipeline with no terminal operation does nothing.
+- **Throwing inside the lambda without thinking about partial state** — if your filter or map throws on line 100 of a 1 million-line file, lines 1–99 are processed and 101+ are not. Make sure that's acceptable for your use case.
+
+## Recap
+
+`Files.lines` is the right tool for any file-processing task that fits the pattern "read a file, do X to each line, produce a result". The Stream API turns those tasks from imperative loops into declarative pipelines.
+
+- **`Files.lines(path)`** returns a `Stream<String>` — lazy, line-by-line, scales to huge files.
+- **Always wrap in try-with-resources.** The stream owns a file handle.
+- Each stream is single-pass — open the file again to re-read.
+- Common patterns: `filter` + `count`, `filter` + `collect`, `map` + `forEach`, `skip` + `map`, `findFirst`.
+- Stream operations are lazy until a terminal op (`count`, `collect`, `forEach`, `findFirst`, etc.) triggers consumption.
+
+**Up next:** This is the final lesson of the Java Intermediate track. Take the Module 8 Capstone (when available) or move on to Java Advanced for lambdas, streams in depth, concurrency, and JVM internals.
+
+<Exercise>
+Open `/tmp/log.txt` twice — first to count ERROR lines, then to print the INFO lines. Use `Files.lines` and try-with-resources for both.
+
+```java
+import java.nio.file.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/log.txt");
+        Files.writeString(p, "INFO: started\nWARN: slow query\nERROR: timeout\nINFO: finished\nERROR: crash\n");
+
+        // TODO: count ERROR lines using Files.lines + filter + count
+        long errorCount;
+        try (Stream<String> lines = Files.lines(p)) {
+            errorCount = lines.filter(l -> l.startsWith("ERROR")).count();
+        }
+        System.out.println("Error lines: " + errorCount);
+
+        // TODO: print only INFO lines
+        try (Stream<String> lines = Files.lines(p)) {
+            lines.filter(l -> l.startsWith("INFO")).forEach(System.out::println);
+        }
+    }
+}
+```
+
+The program should:
+- Write a five-line log file with mixed INFO / WARN / ERROR levels
+- Use one `Files.lines` block to count ERROR lines
+- Use a second `Files.lines` block to print just the INFO lines
+
+<Note>Hint: each <code>Files.lines</code> call opens a fresh file handle. You need a separate try-with-resources block for each pass; you cannot consume the same Stream twice.</Note>
+</Exercise>

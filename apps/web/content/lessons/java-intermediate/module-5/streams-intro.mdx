@@ -1,0 +1,320 @@
+export const meta = {
+  title: "Streams — A First Look",
+  duration: 14,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "si-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which best describes the relationship between a stream and the collection it came from?",
+    options: [
+      { text: "A stream is a copy of the collection", correct: false, feedback: "A stream doesn't copy data. It is a *view* that produces values on demand from the source." },
+      { text: "A stream is a pipeline for processing elements lazily; it does not store them", correct: true, feedback: "Correct — streams describe a sequence of operations. The work happens only when a terminal operation runs, and intermediate stages don't materialise full intermediate collections." },
+      { text: "A stream is a subclass of `List`", correct: false, feedback: "`Stream` is its own interface in `java.util.stream`; it has nothing to do with the `List` hierarchy." },
+      { text: "A stream replaces the original collection in memory", correct: false, feedback: "The source collection is unchanged. Streams are non-mutating by design." },
+    ],
+    explanation: "A stream is a *recipe* for processing elements: a chain of operations applied as values flow through. Nothing happens until you ask for a result, and no intermediate list is built between stages.",
+    hint: "Two key words: lazy and pipeline.",
+  },
+  endQ1: {
+    id: "si-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> xs = Arrays.asList(1, 2, 3, 4, 5);
+        int total = xs.stream()
+            .filter(n -> n > 2)
+            .mapToInt(n -> n * 2)
+            .sum();
+        System.out.println(total);
+    }
+}`,
+    expectedOutput: "24",
+    explanation: "Filter keeps 3, 4, 5. `mapToInt(n -> n * 2)` produces 6, 8, 10. `sum()` adds them: 6 + 8 + 10 = 24.",
+  },
+  endQ2: {
+    id: "si-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which method causes a stream pipeline to actually run?",
+    options: [
+      { text: "`filter`", correct: false, feedback: "`filter` is *intermediate* — it builds the next stage but doesn't execute the pipeline." },
+      { text: "`map`", correct: false, feedback: "`map` is also intermediate. By itself, it does nothing." },
+      { text: "`collect(Collectors.toList())`", correct: true, feedback: "Correct — `collect` is a *terminal* operation. It triggers the whole pipeline and produces a result." },
+      { text: "`stream()`", correct: false, feedback: "`stream()` only builds the source — it doesn't process anything." },
+    ],
+    explanation: "Stream operations split into intermediate (lazy, return another `Stream`) and terminal (eager, return a value or side effect). `filter`, `map`, `mapToInt` are intermediate; `sum`, `count`, `collect`, `forEach`, `findFirst` are terminal.",
+    hint: "Look for the operation that produces a final value, not another stream.",
+  },
+  endQ3: {
+    id: "si-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the intermediate operation that converts a `Stream<Integer>` into an `IntStream` of `n * n`:",
+    code: "nums.stream().___(n -> n * n).sum();",
+    correctAnswers: ["mapToInt"],
+    caseSensitive: true,
+    explanation: "`mapToInt` is the bridge from a generic `Stream<Integer>` (which has no `sum()`) to a primitive `IntStream` (which does). The lambda specifies how to turn each element into an `int`.",
+  },
+  endQ4: {
+    id: "si-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What happens if you try to use the same stream twice?",
+    options: [
+      { text: "Nothing — streams can be reused", correct: false, feedback: "Streams are explicitly single-use." },
+      { text: "An `IllegalStateException` is thrown on the second use", correct: true, feedback: "Correct — once a terminal operation runs, the stream is closed. Calling another operation throws `IllegalStateException` with a message like 'stream has already been operated upon or closed'." },
+      { text: "The second use silently returns no elements", correct: false, feedback: "It throws — Java doesn't fail silently here." },
+      { text: "It works but skips already-seen elements", correct: false, feedback: "Streams aren't iterators with state — they're not designed to be resumed at all." },
+    ],
+    explanation: "A stream is consumed exactly once. After a terminal operation, the underlying source can be re-streamed (`list.stream()` again), but the original `Stream` reference is dead.",
+    hint: "It's the same idea as a one-shot pipe: once you run something through, the pipe is done.",
+  },
+};
+
+For most of this module, you've worked with collections by writing explicit loops — for-each, classic `for`, or hand-rolled iterators. Java has another way to express the same kind of work, one that reads more like a description and less like a procedure: **streams**.
+
+This lesson is a deliberate first taste, not a deep dive. The full mechanics of streams (parallelism, custom collectors, `flatMap`, `reduce`, ...) are reserved for the Java Advanced track. Here we'll cover just enough that you recognise the syntax in real code and have an intuition for when streams are the right tool.
+
+## What is a stream?
+
+A `java.util.stream.Stream<T>` is **a description of a computation over a sequence of elements**. It is not a collection, not an iterator, and not a copy of your data. It's a recipe — a chain of operations that will be applied to each element as values flow through.
+
+Three properties to fix in your head:
+
+1. **Lazy** — Intermediate operations (`filter`, `map`, ...) don't run until a terminal operation (`collect`, `sum`, `count`, ...) demands a result.
+2. **Single-use** — Once you've run a terminal operation, the stream is consumed. You can't iterate it again.
+3. **Declarative** — You say *what* should happen ("keep evens, double them, sum"), not *how* to drive an index from 0 to n.
+
+```java
+List<Integer> nums = List.of(1, 2, 3, 4, 5);
+int total = nums.stream()           // Stream<Integer>
+    .filter(n -> n % 2 == 0)        // 2, 4
+    .mapToInt(n -> n * n)           // IntStream of 4, 16
+    .sum();                         // 20
+System.out.println(total);
+```
+
+Compare with the equivalent loop:
+
+```java
+int total = 0;
+for (int n : nums) {
+    if (n % 2 == 0) total += n * n;
+}
+```
+
+Both produce 20. The stream version reads as three named steps. The loop version is one anonymous block. For some teams and problems, the stream is clearer; for others, the loop is. There is no single right answer — but knowing both gives you a choice.
+
+## Building a stream
+
+The most common starting points:
+
+```java
+List<String> xs = ...;
+xs.stream()                          // from a Collection
+xs.parallelStream()                  // parallel version (advanced; rarely needed)
+
+Stream.of("a", "b", "c")             // from a fixed list of values
+Arrays.stream(new int[]{1, 2, 3})    // from an array
+IntStream.range(0, 10)               // primitive int stream — 0..9
+```
+
+`stream()` is a default method on `Collection`, so every `List`, `Set`, and `Queue` you've met has it. Maps don't directly, but `map.entrySet().stream()` does.
+
+## Intermediate operations
+
+Intermediate operations transform the stream and return another stream. The most common ones:
+
+```java
+.filter(predicate)        // keep only elements matching the predicate
+.map(function)            // transform each element to something else
+.mapToInt(toIntFn)        // transform each to a primitive int (returns IntStream)
+.distinct()               // drop duplicates
+.sorted()                 // natural order (or pass a Comparator)
+.limit(n)                 // keep only the first n elements
+.skip(n)                  // skip the first n elements
+```
+
+These are the building blocks of stream pipelines. Each one returns a new `Stream` so you can chain. None of them actually does any work yet — they just record the intent.
+
+<Note>`.map()` returns a `Stream<R>` for whatever type `R` the function produces. `.mapToInt()` returns an `IntStream` — a primitive specialisation that adds methods like `sum()`, `min()`, `max()`, and `average()` that the generic `Stream` doesn't have.</Note>
+
+## Terminal operations
+
+Terminal operations *execute* the pipeline and produce a result (or a side effect). After a terminal operation, the stream is closed.
+
+```java
+.sum() / .count() / .average()       // (numeric streams)
+.min(comp) / .max(comp)              // returns Optional<T>
+.collect(Collectors.toList())        // gather into a List
+.collect(Collectors.toSet())         // gather into a Set
+.forEach(action)                     // run action on each element (side-effecting)
+.findFirst()                         // returns Optional<T>
+.anyMatch(predicate)                 // true if any element matches
+.allMatch(predicate)                 // true only if every element matches
+```
+
+A pipeline always reads as: **source → intermediate steps → terminal**. If you forget the terminal, the pipeline literally does nothing — the laziness means there's no driver to start it.
+
+```java
+nums.stream().filter(n -> n > 0);    // does nothing! no terminal
+```
+
+## Two complete examples
+
+**Square the evens, sum them:**
+
+```java
+int sumOfEvenSquares = List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).stream()
+    .filter(n -> n % 2 == 0)
+    .mapToInt(n -> n * n)
+    .sum();                           // 4 + 16 + 36 + 64 + 100 = 220
+```
+
+**Collect uppercase non-empty names:**
+
+```java
+import java.util.stream.Collectors;
+
+List<String> names = List.of("alice", "", "bob", "  ", "carol");
+List<String> cleaned = names.stream()
+    .filter(s -> !s.isBlank())
+    .map(String::toUpperCase)
+    .collect(Collectors.toList());
+// [ALICE, BOB, CAROL]
+```
+
+`String::toUpperCase` is a *method reference* — equivalent to writing `s -> s.toUpperCase()`. Streams are usually paired with lambdas and method references; the brevity is half the point.
+
+<Note>Since Java 16, `.toList()` on a `Stream` is a shorter alternative to `.collect(Collectors.toList())`. The result is *unmodifiable*, which is a small but meaningful behavioural difference. If your code targets older Java or you need a mutable list, stick with the `Collectors.toList()` form.</Note>
+
+## Single-use: a gotcha
+
+Streams are not collections — they cannot be re-walked.
+
+```java
+Stream<Integer> s = List.of(1, 2, 3).stream();
+s.count();   // 3
+s.count();   // BANG — IllegalStateException: stream has already been operated upon or closed
+```
+
+If you need two passes, either start two streams from the source (`list.stream()` twice) or collect once into a `List` and process the list twice.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run** on the starter. The TODOs are already filled in: one pipeline sums the squares of the even numbers, the other collects the odd numbers into a list. You should see:
+
+```
+result: 220
+odds: [1, 3, 5, 7, 9]
+```
+
+Try changing `n -> n % 2 == 0` to `n -> n > 5` and predict the new sum before running.
+
+## Streams vs explicit loops — when to pick which?
+
+There is no universal rule, but rough guidance:
+
+- **Streams shine** for *transformations*: filter, map, reduce, collect into another shape. The pipeline reads as the data flow.
+- **Loops shine** when you need *complex stateful logic* across iterations, or when *early termination* with side effects is awkward in a stream form.
+- **Streams hide control flow**, which is great when there's no control flow worth seeing, and bad when there is.
+- **Streams are almost always slower** than the equivalent for loop on small inputs, because of the lambda allocation and pipeline overhead. The difference is usually negligible — but if you're in a hot loop, measure.
+
+If your data manipulation reads naturally as "do this, then this, then this," a stream is a great fit. If it reads as "go through carefully and decide each step," stick with a loop.
+
+## A quick comparison
+
+```java
+// Loop version
+List<String> result = new ArrayList<>();
+for (String s : input) {
+    if (s.length() > 3) {
+        result.add(s.toUpperCase());
+    }
+}
+
+// Stream version
+List<String> result = input.stream()
+    .filter(s -> s.length() > 3)
+    .map(String::toUpperCase)
+    .collect(Collectors.toList());
+```
+
+Same output. Different style. Pick the one your team finds easier to read.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting the terminal operation** — `xs.stream().filter(...)` by itself runs no code at all. Streams are lazy. If nothing happens, check that you ended with `collect`, `sum`, `count`, `forEach`, or another terminal.
+- **Re-using a stream** — Streams are single-shot. After one terminal call, calling another method throws `IllegalStateException`. Re-create the stream from the source if you need a second pass.
+- **Mutating the source from inside `forEach`** — Side-effecting `forEach` lambdas that mutate the source list usually trigger `ConcurrentModificationException` on the next iteration, just like in a regular loop. Use `collect` to build a new collection instead.
+- **Confusing `map` with `mapToInt`** — `map` returns `Stream<T>`. `mapToInt` returns `IntStream`. Only the latter has `.sum()`. If your IDE complains "cannot find sum()", you probably wanted `mapToInt`.
+- **Calling `.collect(Collectors.toList())` when `.toList()` is available** — Java 16+ has the shorter form. The result is unmodifiable, though, so check whether your callers need to mutate the list.
+- **Treating streams as collections** — A stream has no `size()`, no `get(i)`, no random access. If you find yourself wanting those, you want a `List`, not a stream.
+
+## Recap
+
+Streams are Java's declarative, lazy way to express collection processing. They don't replace loops — they offer an alternative that often reads more clearly for transformation-heavy work. This lesson scratches the surface. The Java Advanced track covers grouping, partitioning, custom collectors, parallel streams, and more.
+
+- A **stream** is a lazy pipeline: nothing runs until a terminal operation
+- **Intermediate operations** (`filter`, `map`, `mapToInt`, ...) return another stream
+- **Terminal operations** (`sum`, `count`, `collect`, `forEach`, ...) trigger execution and produce a result
+- Streams are **single-use** — re-stream the source if you need another pass
+- Streams shine for transformation pipelines; loops shine for complex stateful walks
+- `mapToInt`/`mapToLong`/`mapToDouble` give you primitive specialisations with `sum`, `average`, etc.
+
+**Up next:** This lesson concludes the Iterators and for-each module. The next module dives into Enums — type-safe constants with surprising depth.
+
+<Exercise>
+Use streams to (1) sum the squares of the even numbers in `nums` and (2) collect all odd numbers into a `List<Integer>`. The starter shows one valid solution; experiment by changing the predicates or the mapping function.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+        // TODO: use a stream to sum the squares of the even numbers
+        int result = nums.stream()
+            .filter(n -> n % 2 == 0)
+            .mapToInt(n -> n * n)
+            .sum();
+        System.out.println("result: " + result);
+
+        // TODO: collect odd numbers into a List<Integer>
+        List<Integer> odds = nums.stream()
+            .filter(n -> n % 2 != 0)
+            .collect(Collectors.toList());
+        System.out.println("odds: " + odds);
+    }
+}
+```
+
+**What the tests check:**
+- The first line is exactly `result: 220` (sum of 4 + 16 + 36 + 64 + 100)
+- The second line is exactly `odds: [1, 3, 5, 7, 9]`
+- Both computations use a stream pipeline (not an explicit loop)
+
+<Note>Hint: `mapToInt` is the bridge from a `Stream<Integer>` to an `IntStream`. Without it, there is no `.sum()` available — `Stream<Integer>` has no built-in arithmetic.</Note>
+</Exercise>

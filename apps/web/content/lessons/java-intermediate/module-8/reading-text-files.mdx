@@ -1,0 +1,219 @@
+export const meta = {
+  title: "Reading Text Files",
+  duration: 12,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "rtf-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which call returns the entire contents of a UTF-8 text file as a single String (Java 11+)?",
+    options: [
+      { text: "<code>Files.read(path)</code>", correct: false, feedback: "There is no Files.read method that returns a String." },
+      { text: "<code>Files.readString(path)</code>", correct: true },
+      { text: "<code>path.read()</code>", correct: false, feedback: "Path has no I/O methods. Reading is always done via the Files utility class." },
+      { text: "<code>new String(path)</code>", correct: false, feedback: "String has no constructor that takes a Path." },
+    ],
+    explanation: "Files.readString(path) was added in Java 11. It decodes the file's bytes as UTF-8 by default and returns the result as a String.",
+  },
+  endQ1: {
+    id: "rtf-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.nio.file.*;
+import java.util.*;
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/sample.txt");
+        Files.writeString(p, "first\\nsecond\\nthird\\n");
+        List<String> lines = Files.readAllLines(p);
+        System.out.println(lines.size());
+        System.out.println(lines.get(1));
+    }
+}`,
+    expectedOutput: "3\nsecond",
+    explanation: "writeString creates a 3-line file. readAllLines splits on the newline character and returns [\"first\", \"second\", \"third\"]. Size is 3 and index 1 is \"second\".",
+  },
+  endQ2: {
+    id: "rtf-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To read every byte of a binary file into a <code>byte[]</code>, call <code>Files.___(path)</code>.",
+    correctAnswers: ["readAllBytes", "readallbytes"],
+    caseSensitive: false,
+    explanation: "Files.readAllBytes(path) loads the file fully into a byte array. Use it for small binary files; for large ones, use a stream to avoid running out of memory.",
+  },
+  endQ3: {
+    id: "rtf-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which character encoding does <code>Files.readString</code> use by default?",
+    options: [
+      { text: "ASCII", correct: false, feedback: "ASCII supports only the first 128 characters; Java's default is broader." },
+      { text: "UTF-8", correct: true },
+      { text: "ISO-8859-1 (Latin-1)", correct: false, feedback: "That used to be common on the JVM but Files.readString picks UTF-8." },
+      { text: "The platform default encoding (locale-dependent).", correct: false, feedback: "Earlier APIs did this and caused bugs across platforms; the NIO.2 string methods deliberately picked UTF-8." },
+    ],
+    explanation: "Files.readString uses UTF-8 unless you pass an explicit Charset as the second argument. Always specifying UTF-8 (or another known charset) protects you from platform-default surprises.",
+  },
+  endQ4: {
+    id: "rtf-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why might <code>Files.readString</code> be a poor choice for processing a 10 GB log file?",
+    options: [
+      { text: "It is too slow.", correct: false, feedback: "Speed isn't the main issue — memory is." },
+      { text: "It loads the entire file into memory as a single String.", correct: true },
+      { text: "It can only read text in ASCII.", correct: false, feedback: "It handles full Unicode via UTF-8." },
+      { text: "It locks the file for other processes.", correct: false, feedback: "Files.readString opens, reads, and closes the file quickly — it doesn't hold a long-lived lock." },
+    ],
+    explanation: "readString needs RAM proportional to the file size, plus extra space for character decoding. For huge files, use Files.lines (covered later) to stream line-by-line lazily.",
+    hint: "How big a String can fit in your heap?",
+  },
+};
+
+Reading a text file is one of those operations that should be a one-liner — and with NIO.2 it finally is. This lesson covers the three calls you'll reach for ninety percent of the time.
+
+## The two main reads
+
+```java
+import java.nio.file.*;
+import java.util.*;
+
+Path p = Paths.get("/tmp/poem.txt");
+
+// 1) Read everything into one String (Java 11+)
+String all = Files.readString(p);
+
+// 2) Read line-by-line into a List
+List<String> lines = Files.readAllLines(p);
+```
+
+Both methods open the file, read it fully, and close it before returning — you do not need to manage resources or worry about closing anything. The catch: both load the entire file into memory.
+
+`readString` returns the file as one String, including any line terminators. `readAllLines` splits on Unix (`\n`), Windows (`\r\n`), or Mac (`\r`) line endings — the result list contains lines *without* the terminators.
+
+<Note>Both methods throw <code>IOException</code> (a checked exception) if the file doesn't exist, can't be read, or contains invalid bytes for the chosen charset. Either declare <code>throws IOException</code> on your method or wrap the call in try-catch.</Note>
+
+## Encoding matters
+
+`Files.readString` and `Files.readAllLines` default to **UTF-8**. That's almost always what you want — UTF-8 is the dominant text encoding on the modern web. But if you're reading a file that was written in a different encoding, pass a `Charset`:
+
+```java
+import java.nio.charset.*;
+
+String latin = Files.readString(p, StandardCharsets.ISO_8859_1);
+```
+
+Mismatching the charset doesn't crash — it silently produces garbled text (mojibake). When you see strange characters appearing in your strings, encoding is the first thing to suspect.
+
+## Reading binary data
+
+For non-text files (images, PDFs, compiled bytecode) use `Files.readAllBytes`:
+
+```java
+byte[] bytes = Files.readAllBytes(Paths.get("/tmp/photo.jpg"));
+System.out.println("Loaded " + bytes.length + " bytes");
+```
+
+There's no encoding step — you get the raw bytes from disk.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run**. You should see:
+
+```
+--- All ---
+Roses are red
+Violets are blue
+Java is solid
+Kotlin is too
+Lines: 4
+First: Roses are red
+```
+
+The starter writes a four-line poem, then demonstrates both `readString` (whole file as one String) and `readAllLines` (List of lines, terminators stripped).
+
+## When NOT to use these methods
+
+`readString`, `readAllLines`, and `readAllBytes` all fully materialise the file in memory. That's perfect for small files (configs, small CSVs, short logs) but problematic for anything that might exceed your heap.
+
+For files that are large or might grow unboundedly, prefer either:
+
+- **`Files.lines(path)`** — returns a `Stream<String>` that reads lazily, line by line. Covered in a later lesson.
+- **`Files.newBufferedReader(path)`** — a `BufferedReader` you drive with `readLine()` in a loop. Covered alongside try-with-resources.
+
+A handy rule of thumb: if the file might exceed roughly 100 MB, don't `readString` it. Stream it instead.
+
+## Buffering is automatic
+
+You may have noticed there's no `BufferedReader` in any of these examples. That's deliberate — `Files.readString` and `Files.readAllLines` already read in large chunks under the hood. You only need to think about buffering when you go to the lower-level `BufferedReader`/`InputStreamReader` API directly.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting to declare `throws IOException`** — every read method is checked. The compiler will refuse to let you ignore the possibility of failure.
+- **Using `readString` on huge files** — easy to do, hard to debug when your program suddenly OOMs in production. If a file's size is bounded by user input, assume it can be large.
+- **Trusting the default encoding** — Java's older APIs (like `new FileReader(file)`) used the platform default charset, which led to "works on my machine" bugs. NIO.2 string methods use UTF-8 by default; older code may not.
+- **Not handling missing files** — `NoSuchFileException` (a subclass of IOException) is thrown when the file doesn't exist. Catch it explicitly if your program needs to give a friendlier error.
+
+## Recap
+
+Reading a text file in modern Java should be one line of code. The NIO.2 API lives up to that promise — once you know the three calls, almost every "load this file" task reduces to a one-liner.
+
+- **`Files.readString(path)`** — entire file as one String (Java 11+).
+- **`Files.readAllLines(path)`** — file as a `List<String>` of terminator-free lines.
+- **`Files.readAllBytes(path)`** — entire file as a `byte[]`, for binary content.
+- All three default to UTF-8 (where applicable). Pass a `Charset` to override.
+- All three load the whole file into memory; for large files use `Files.lines` or a `BufferedReader`.
+
+**Up next:** Writing text files — the symmetric operation, with one trap to watch out for around append vs overwrite.
+
+<Exercise>
+Write the four-line poem to `/tmp/poem.txt`, then read it back twice — once as a single String and once as a List of lines.
+
+```java
+import java.nio.file.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/poem.txt");
+        Files.writeString(p, "Roses are red\nViolets are blue\nJava is solid\nKotlin is too\n");
+
+        // TODO: read the whole file as a single String with Files.readString
+        String content = Files.readString(p);
+        System.out.println("--- All ---");
+        System.out.print(content);
+
+        // TODO: read line-by-line with Files.readAllLines
+        List<String> lines = Files.readAllLines(p);
+        System.out.println("Lines: " + lines.size());
+        System.out.println("First: " + lines.get(0));
+    }
+}
+```
+
+The program should:
+- Write the poem to `/tmp/poem.txt`
+- Print `--- All ---` followed by the entire file contents
+- Print the line count and the first line
+
+<Note>Hint: <code>Files.readString</code> includes the trailing newline of the last line; that's why <code>System.out.print</code> (not <code>println</code>) is used to avoid an extra blank line.</Note>
+</Exercise>

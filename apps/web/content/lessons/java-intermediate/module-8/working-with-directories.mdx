@@ -1,0 +1,266 @@
+export const meta = {
+  title: "Working with Directories",
+  duration: 12,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "wwd-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What's the difference between <code>Files.createDirectory</code> and <code>Files.createDirectories</code>?",
+    options: [
+      { text: "There is no difference — they're aliases.", correct: false, feedback: "They look similar but behave differently." },
+      { text: "<code>createDirectory</code> creates one directory; <code>createDirectories</code> also creates any missing parents.", correct: true },
+      { text: "<code>createDirectory</code> is for files; <code>createDirectories</code> is for folders.", correct: false, feedback: "Both create directories. The plural form just creates more of them when needed." },
+      { text: "<code>createDirectories</code> is faster.", correct: false, feedback: "Performance is comparable; the difference is whether parents are auto-created." },
+    ],
+    explanation: "Compare with `mkdir` vs `mkdir -p` in shell. createDirectory fails if any parent is missing; createDirectories quietly fills them in.",
+  },
+  endQ1: {
+    id: "wwd-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.nio.file.*;
+import java.util.*;
+import java.util.stream.*;
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path d = Paths.get("/tmp/wwd-demo");
+        Files.createDirectories(d);
+        Files.writeString(d.resolve("c.txt"), "");
+        Files.writeString(d.resolve("a.txt"), "");
+        Files.writeString(d.resolve("b.txt"), "");
+        List<String> names = new ArrayList<>();
+        try (Stream<Path> s = Files.list(d)) {
+            s.map(p -> p.getFileName().toString()).sorted().forEach(names::add);
+        }
+        System.out.println(names);
+    }
+}`,
+    expectedOutput: "[a.txt, b.txt, c.txt]",
+    explanation: "Files.list returns directory entries in arbitrary order. Calling sorted() on the stream gives alphabetical order: a, b, c.",
+  },
+  endQ2: {
+    id: "wwd-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "<code>Files.list(dir)</code> returns a <code>Stream&lt;Path&gt;</code>. Because the underlying directory handle must be released, you should always wrap the call in <code>___-with-resources</code>.",
+    correctAnswers: ["try"],
+    caseSensitive: false,
+    explanation: "try-with-resources auto-closes the stream when the block exits. Without it, the directory handle leaks until garbage collection — a real problem on long-running programs.",
+  },
+  endQ3: {
+    id: "wwd-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What does <code>Files.walk(dir)</code> do that <code>Files.list(dir)</code> does not?",
+    options: [
+      { text: "<code>walk</code> filters hidden files automatically.", correct: false, feedback: "Neither method filters hidden files — that's up to you." },
+      { text: "<code>walk</code> recursively descends into subdirectories; <code>list</code> only returns immediate children.", correct: true },
+      { text: "<code>walk</code> sorts the results alphabetically.", correct: false, feedback: "Order is not guaranteed for either; sort the stream yourself if you need it." },
+      { text: "<code>walk</code> opens each file for reading.", correct: false, feedback: "Both methods only return paths — they don't open file content." },
+    ],
+    explanation: "Files.walk produces a depth-first tree walk and yields every file and directory it finds, at any depth. Use it for 'process every file under this root' tasks.",
+  },
+  endQ4: {
+    id: "wwd-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why does <code>Files.delete(dir)</code> often fail on directories?",
+    options: [
+      { text: "Java forbids deleting directories.", correct: false, feedback: "Java allows deleting directories — just not non-empty ones." },
+      { text: "It throws <code>DirectoryNotEmptyException</code> if the directory contains anything.", correct: true },
+      { text: "It needs administrator privileges.", correct: false, feedback: "User-owned directories don't require special privileges to delete." },
+      { text: "It only works on Windows.", correct: false, feedback: "Files.delete works on every supported OS." },
+    ],
+    explanation: "To delete a non-empty directory, walk it first (Files.walk) and delete entries depth-first. There's no built-in 'rm -rf' equivalent, but the pattern is short.",
+    hint: "Compare with shell `rmdir` (refuses non-empty) vs `rm -rf` (recursive).",
+  },
+};
+
+A directory is just a special kind of `Path` that holds other paths. The same `Files` utility class that reads and writes files also creates, lists, and deletes directories. This lesson covers the four operations you'll use most often.
+
+## Creating directories
+
+```java
+import java.nio.file.*;
+
+Path single = Paths.get("/tmp/scratch");
+Files.createDirectory(single);
+// Creates /tmp/scratch — fails if /tmp doesn't exist or scratch already does
+
+Path nested = Paths.get("/tmp/projects/2026/q1");
+Files.createDirectories(nested);
+// Creates /tmp/projects, /tmp/projects/2026, and /tmp/projects/2026/q1 as needed
+```
+
+The plural form (`createDirectories`) is the one you almost always want when programmatically generating output paths — it's a safe no-op if the directory already exists, and it doesn't fail just because an intermediate folder hasn't been made.
+
+`createDirectory` is the strict version. Use it when you specifically want the call to fail if a parent is missing — that can catch typos in your path construction.
+
+<Note>Both methods throw <code>FileAlreadyExistsException</code> if the leaf already exists as a regular file (rather than a directory). This is rare but real — guard against it if you're operating on user-supplied paths.</Note>
+
+## Listing directory contents
+
+`Files.list(dir)` returns a `Stream<Path>` of the directory's immediate children:
+
+```java
+import java.util.stream.*;
+
+Path dir = Paths.get("/tmp");
+try (Stream<Path> entries = Files.list(dir)) {
+    entries
+        .filter(Files::isRegularFile)
+        .map(p -> p.getFileName().toString())
+        .sorted()
+        .forEach(System.out::println);
+}
+```
+
+Two important details:
+
+1. **Always use try-with-resources.** `Files.list` opens an OS-level directory handle. The Stream must be closed to release it. We'll cover try-with-resources properly in the next lesson — for now, copy the pattern.
+2. **Order is not guaranteed.** Filesystems can return entries in arbitrary order. If you need alphabetical order, call `.sorted()` in the stream pipeline.
+
+`Files.list` does not descend into subdirectories — it returns only direct children. For recursive traversal, use `Files.walk`:
+
+```java
+try (Stream<Path> tree = Files.walk(Paths.get("/tmp/projects"))) {
+    tree.filter(Files::isRegularFile).forEach(System.out::println);
+}
+```
+
+`Files.walk` yields every file and folder under the root, depth-first. By default it follows symbolic links — pass `FileVisitOption.NOFOLLOW_LINKS` if you want to avoid loops.
+
+## Inspecting paths
+
+Common predicates on `Files`:
+
+```java
+Files.exists(p);            // true if the file exists
+Files.notExists(p);          // !exists, but with stronger semantics under errors
+Files.isRegularFile(p);     // true if it's an ordinary file (not a directory)
+Files.isDirectory(p);       // true if it's a directory
+Files.isReadable(p);        // we have read permission
+Files.isWritable(p);        // we have write permission
+Files.size(p);              // size in bytes (throws if missing)
+```
+
+Note that `exists` and `notExists` are not strict negations: under permission errors or I/O failures, both can return `false`. If you need to distinguish "the file isn't there" from "I can't tell", catch the relevant `IOException` from a stronger call like `Files.size`.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run**. You should see:
+
+```
+Files: [a.txt, b.txt, c.txt]
+Exists: true
+```
+
+The starter creates a directory under `/tmp/`, drops three files into it, then lists the directory and sorts the filenames alphabetically.
+
+## Deleting
+
+```java
+Files.delete(p);          // throws if p doesn't exist
+Files.deleteIfExists(p);  // returns boolean — true if deleted, false if missing
+```
+
+Both refuse to delete non-empty directories — they throw `DirectoryNotEmptyException`. There is no built-in recursive delete in `Files`, but the pattern is short:
+
+```java
+try (Stream<Path> tree = Files.walk(root)) {
+    tree.sorted(Comparator.reverseOrder())  // children before parents
+        .forEach(p -> {
+            try { Files.delete(p); }
+            catch (IOException e) { throw new UncheckedIOException(e); }
+        });
+}
+```
+
+Sorting in reverse order ensures children are deleted before their parents — `Files.walk` returns parents before children by default.
+
+## Moving and copying
+
+```java
+Files.move(source, target);                              // basic rename/move
+Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+
+Files.copy(source, target);
+Files.copy(source, target, StandardCopyOption.COPY_ATTRIBUTES);
+```
+
+`Files.move` with `ATOMIC_MOVE` is especially useful for the "write to temp file, then rename" pattern that gives you atomic config updates. On most filesystems it boils down to a single rename system call.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting try-with-resources around `Files.list`/`Files.walk`** — the returned Stream owns an OS handle that must be released. Leaking handles eventually causes "too many open files" errors.
+- **Assuming directory listings are sorted** — they are not. Sort the stream yourself if order matters to you.
+- **Calling `Files.delete` on a non-empty directory** — throws `DirectoryNotEmptyException`. Walk and delete depth-first.
+- **Mixing `createDirectory` with paths that have missing parents** — fails. Use `createDirectories` unless you specifically want the strict behavior.
+
+## Recap
+
+Directories use the same `Files` utility class as files — the API is consistent across the whole NIO.2 surface.
+
+- **`Files.createDirectory(p)`** / **`Files.createDirectories(p)`** — single vs. parents-too.
+- **`Files.list(dir)`** — `Stream<Path>` of immediate children. Always close it.
+- **`Files.walk(dir)`** — `Stream<Path>` for the whole subtree, depth-first.
+- **`Files.delete(p)`** / **`Files.deleteIfExists(p)`** — refuses non-empty directories; walk for recursive delete.
+- **`Files.move(...)`** / **`Files.copy(...)`** — with optional `StandardCopyOption.ATOMIC_MOVE` and `REPLACE_EXISTING`.
+- Predicates like `isDirectory`, `isRegularFile`, and `exists` give you the type and presence checks you need.
+
+**Up next:** try-with-resources — the language feature that makes file handles, streams, and other closeable resources safe by default.
+
+<Exercise>
+Create `/tmp/sample-dir`, write three small files into it, then list the directory and print sorted filenames.
+
+```java
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path dir = Paths.get("/tmp/sample-dir");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("a.txt"), "alpha");
+        Files.writeString(dir.resolve("b.txt"), "beta");
+        Files.writeString(dir.resolve("c.txt"), "gamma");
+
+        // TODO: list the directory, collect filenames, sorted
+        List<String> names = new ArrayList<>();
+        try (Stream<Path> stream = Files.list(dir)) {
+            stream.map(p -> p.getFileName().toString()).sorted().forEach(names::add);
+        }
+        System.out.println("Files: " + names);
+        System.out.println("Exists: " + Files.exists(dir));
+    }
+}
+```
+
+The program should:
+- Create the directory (no-op if it exists)
+- Write three files inside it
+- List the directory, collect filenames, sort alphabetically, and print
+
+<Note>Hint: <code>Files.list</code> returns paths, not strings. Map to <code>p.getFileName().toString()</code> before sorting.</Note>
+</Exercise>

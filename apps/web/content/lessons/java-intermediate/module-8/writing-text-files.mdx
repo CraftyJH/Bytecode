@@ -1,0 +1,237 @@
+export const meta = {
+  title: "Writing Text Files",
+  duration: 12,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "wtf-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does <code>Files.writeString(p, \"hello\")</code> do if <code>p</code> already points to a file with content?",
+    options: [
+      { text: "Appends \"hello\" to the existing content.", correct: false, feedback: "Appending requires explicitly passing StandardOpenOption.APPEND." },
+      { text: "Truncates the file and writes \"hello\" from the start.", correct: true },
+      { text: "Throws an exception because the file exists.", correct: false, feedback: "That requires StandardOpenOption.CREATE_NEW." },
+      { text: "Renames the existing file to a backup and creates a new one.", correct: false, feedback: "Java doesn't auto-create backups for you." },
+    ],
+    explanation: "Default options are CREATE + WRITE + TRUNCATE_EXISTING. Pass APPEND if you want to keep the existing content.",
+  },
+  endQ1: {
+    id: "wtf-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.nio.file.*;
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/q.txt");
+        Files.writeString(p, "abc");
+        Files.writeString(p, "xy", StandardOpenOption.APPEND);
+        System.out.println(Files.readString(p));
+        System.out.println(Files.size(p));
+    }
+}`,
+    expectedOutput: "abcxy\n5",
+    explanation: "First write creates the file with \"abc\". Second write appends \"xy\" — final content is \"abcxy\" (5 bytes for these ASCII characters).",
+  },
+  endQ2: {
+    id: "wtf-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To append to an existing file instead of overwriting it, pass <code>StandardOpenOption.___</code> as an extra argument to <code>Files.writeString</code>.",
+    correctAnswers: ["APPEND", "append"],
+    caseSensitive: false,
+    explanation: "StandardOpenOption.APPEND tells the underlying writer to seek to the end of the file before writing. Without it, the default behavior truncates.",
+  },
+  endQ3: {
+    id: "wtf-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which option causes <code>Files.writeString</code> to <strong>fail</strong> if the file already exists?",
+    options: [
+      { text: "<code>StandardOpenOption.WRITE</code>", correct: false, feedback: "WRITE just enables writing; it doesn't gate on existence." },
+      { text: "<code>StandardOpenOption.TRUNCATE_EXISTING</code>", correct: false, feedback: "TRUNCATE_EXISTING wipes the existing file's content but does not fail if it exists — that's the default." },
+      { text: "<code>StandardOpenOption.CREATE_NEW</code>", correct: true },
+      { text: "<code>StandardOpenOption.READ</code>", correct: false, feedback: "READ is for input, not output — and writeString is a write call." },
+    ],
+    explanation: "CREATE_NEW means 'fail with FileAlreadyExistsException if the file is already there'. Use it when you want to be sure your write isn't clobbering existing data.",
+  },
+  endQ4: {
+    id: "wtf-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What's the difference between <code>Files.write(p, lines)</code> (where <code>lines</code> is a <code>List&lt;String&gt;</code>) and <code>Files.writeString(p, content)</code>?",
+    options: [
+      { text: "There is no difference — they're aliases.", correct: false, feedback: "They have different signatures and behaviors." },
+      { text: "<code>Files.write</code> writes each list element as its own line, adding line separators between them.", correct: true },
+      { text: "<code>Files.write</code> only handles binary data.", correct: false, feedback: "There's an overload that takes byte[] for binary, but the List<String> version is text." },
+      { text: "<code>Files.writeString</code> requires a Charset argument; <code>Files.write</code> does not.", correct: false, feedback: "Both default to UTF-8; both accept an optional Charset." },
+    ],
+    explanation: "Files.write(path, lines) is convenient when you already have a List<String> — it writes them with system line separators inserted automatically. writeString gives you full control over the exact bytes.",
+  },
+};
+
+Writing text to a file is symmetric to reading it: one method call, no resource management, one important option to know about. This lesson covers `writeString`, `write`, and the open options that change their behavior.
+
+## The two main writes
+
+```java
+import java.nio.file.*;
+import java.util.*;
+
+Path p = Paths.get("/tmp/notes.txt");
+
+// 1) Write a single String (Java 11+) — overwrites by default
+Files.writeString(p, "Hello, world!\nSecond line.\n");
+
+// 2) Write a List<String>, one entry per line, with auto separators
+List<String> lines = List.of("alpha", "beta", "gamma");
+Files.write(p, lines);
+```
+
+Both methods open the file, write the content, and close it. Both default to UTF-8. Both throw `IOException` (a checked exception) on failure.
+
+The choice is just convenience: if you already have a String, use `writeString`. If you already have a `List<String>`, use `write` and let it handle the separators. Either is fine.
+
+<Note>The directory containing the file must already exist. If <code>/tmp/some-dir/notes.txt</code> is the target but <code>/tmp/some-dir</code> doesn't exist, the call throws <code>NoSuchFileException</code>. Use <code>Files.createDirectories</code> to ensure the parent exists first.</Note>
+
+## Default behavior: TRUNCATE then WRITE
+
+By default, `writeString` and `write` follow these rules:
+
+1. If the file does not exist, **create** it.
+2. If the file does exist, **truncate** it (set its size to zero).
+3. Write the new content from the start.
+
+So calling `writeString(p, "x")` on an existing 1 GB file leaves you with a file containing exactly the byte `x`. There is no warning, no backup. This is usually what you want — but be aware of it before you write production code.
+
+## Append mode
+
+To add to a file instead of overwriting it, pass `StandardOpenOption.APPEND`:
+
+```java
+Files.writeString(p, "first call\n");
+Files.writeString(p, "second call\n", StandardOpenOption.APPEND);
+Files.writeString(p, "third call\n",  StandardOpenOption.APPEND);
+// File now contains all three lines, in order.
+```
+
+Append mode is what you want for log files, diary-style writes, and any case where each call should add to history rather than replace it.
+
+## Fail-if-exists: CREATE_NEW
+
+Sometimes you want to be sure you don't accidentally overwrite an existing file:
+
+```java
+try {
+    Files.writeString(p, "fresh content",
+        StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+} catch (FileAlreadyExistsException e) {
+    System.err.println("Refusing to overwrite: " + p);
+}
+```
+
+`CREATE_NEW` says "create the file only if it doesn't exist; otherwise throw". This is the safest option for tools that generate output and shouldn't clobber prior runs.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run**. You should see:
+
+```
+Wrote: 14 bytes
+After append: 19 bytes
+Lines: [one, two, three, four]
+```
+
+The starter creates a 14-byte file (`one\ntwo\nthree\n` is 3+1+3+1+5+1 = 14 ASCII bytes), appends `four\n` (5 more bytes for 19 total), and reads it back as a list to verify all four lines arrived in order.
+
+## Standard open options at a glance
+
+| Option | Effect |
+| --- | --- |
+| `CREATE` | Create the file if it doesn't exist. (Default for write methods.) |
+| `CREATE_NEW` | Create the file; fail if it exists. |
+| `TRUNCATE_EXISTING` | Wipe the file's contents on open. (Default for write methods.) |
+| `APPEND` | Position the writer at the end before writing. |
+| `WRITE` | Open for writing. (Implicit for write methods.) |
+| `READ` | Open for reading. |
+| `DELETE_ON_CLOSE` | Best-effort delete the file when the channel closes. |
+
+You can combine compatible options. `CREATE_NEW + APPEND` is contradictory and will throw at runtime; `CREATE + APPEND` makes sense ("create if missing, append otherwise").
+
+## Atomicity caveats
+
+Neither `writeString` nor `write` guarantees atomic writes. If your program is killed midway, you can end up with a partially written file. For applications where this matters (config files, save games), the standard pattern is:
+
+1. Write the new content to a temporary file.
+2. `Files.move(tempPath, finalPath, StandardCopyOption.ATOMIC_MOVE)`.
+
+`Files.move` with `ATOMIC_MOVE` performs a single-step rename on most filesystems. Either the new content is fully there, or the old content is — never an incomplete file.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Accidental overwrites** — calling `writeString` on a file you didn't realise existed silently destroys it. If you're not sure, check `Files.exists` first or use `CREATE_NEW`.
+- **Forgetting to create parent directories** — the file's containing directory must exist. `Files.createDirectories(p.getParent())` is a one-line fix.
+- **Mixing append and truncate** — passing both `APPEND` and `TRUNCATE_EXISTING` is contradictory and throws at runtime.
+- **Assuming atomic writes** — partial writes can leave a corrupt file if your process dies. For critical writes, use the temp-file + atomic-move pattern.
+- **Charset surprises on read** — if you write with one charset and read with another, the result is mojibake. UTF-8 everywhere unless you have a strong reason otherwise.
+
+## Recap
+
+Writing text in modern Java is a single line, with one mental model: by default writes truncate. Anything else — appending, refusing-to-overwrite, atomic writes — is opt-in via `StandardOpenOption`.
+
+- **`Files.writeString(path, content)`** — write a String, defaulting to UTF-8 and TRUNCATE_EXISTING.
+- **`Files.write(path, lines)`** — write a `List<String>` with line separators between entries.
+- Pass `StandardOpenOption.APPEND` to add to an existing file.
+- Pass `StandardOpenOption.CREATE_NEW` to refuse to overwrite.
+- Parent directories must exist; use `Files.createDirectories` to ensure them.
+
+**Up next:** Working with directories — listing, creating, and deleting them with the same Files-as-utility pattern.
+
+<Exercise>
+Write the lines `one`, `two`, `three` to `/tmp/numbers.txt`, then append `four`. Verify by reading back both the file size and the resulting list of lines.
+
+```java
+import java.nio.file.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/numbers.txt");
+        // TODO: write three lines: one, two, three (each ending with \n)
+        Files.writeString(p, "one\ntwo\nthree\n");
+        System.out.println("Wrote: " + Files.size(p) + " bytes");
+
+        // TODO: append "four\n" using StandardOpenOption.APPEND
+        Files.writeString(p, "four\n", StandardOpenOption.APPEND);
+        System.out.println("After append: " + Files.size(p) + " bytes");
+
+        List<String> all = Files.readAllLines(p);
+        System.out.println("Lines: " + all);
+    }
+}
+```
+
+The program should print:
+- The byte count after the initial three-line write
+- The byte count after appending the fourth line
+- A list of all four line contents (terminators stripped by `readAllLines`)
+
+<Note>Hint: each ASCII character is one byte; a literal `\n` in a Java string is one byte (the newline character, decimal value 10).</Note>
+</Exercise>

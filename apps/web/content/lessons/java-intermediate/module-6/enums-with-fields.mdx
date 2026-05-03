@@ -235,34 +235,6 @@ Total: 41 cents
 
 This pattern — store data in `private final` fields, expose it through small accessor methods, and let `values()` drive a `for` loop — comes up constantly in real Java code.
 
-## Multiple constructor parameters
-
-Constructors can take any number of parameters, and you can even overload them. Most enums stick to one constructor for simplicity:
-
-```java
-enum Currency {
-    USD("United States Dollar", "$"),
-    EUR("Euro",                 "EUR"),
-    JPY("Japanese Yen",         "Yen");
-
-    private final String fullName;
-    private final String symbol;
-
-    Currency(String fullName, String symbol) {
-        this.fullName = fullName;
-        this.symbol = symbol;
-    }
-
-    public String label() {
-        return fullName + " (" + symbol + ")";
-    }
-}
-```
-
-Each constant supplies *exactly* the arguments declared by the constructor, so the compiler catches typos immediately.
-
-<Note>If you forget an argument — say you write `EUR("Euro")` for a two-arg constructor — the error is reported at the constant, not somewhere distant. That is far easier to fix than a runtime mismatch from parallel arrays.</Note>
-
 ## Overriding `toString()`
 
 The default `toString()` returns `name()`, which is great for debugging but ugly in user-facing strings. Override it to produce something nicer — `name()` is still available if you ever need the raw identifier:
@@ -275,6 +247,8 @@ public String toString() {
 // PENNY  -> "Penny"
 // NICKEL -> "Nickel"
 ```
+
+<Note>If you forget an argument in any constant — say `EUR("Euro")` for a two-arg constructor — the error is reported at that constant, not somewhere distant. That is far easier to fix than a runtime mismatch from parallel arrays.</Note>
 
 ## End-of-lesson quiz
 
