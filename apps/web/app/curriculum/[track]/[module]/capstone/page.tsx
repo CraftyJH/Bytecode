@@ -5,6 +5,7 @@ import { CapstonePanel } from "@/components/capstone/CapstonePanel";
 import { Pill } from "@/components/ui/Pill";
 import { Clock, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { hasFullAccess } from "@/lib/access";
 
 interface Props {
   params: Promise<{ track: string; module: string }>;
@@ -20,18 +21,9 @@ export default async function CapstonePage({ params }: Props) {
   const capstone = getCapstoneForModule(trackSlug, moduleSlug);
   if (!capstone) notFound();
 
-  // TODO (Sprint 5): replace with real entitlement check via subscriptions table.
-  let isPremium = false;
-  if (
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
-  ) {
-    try {
-      const supabase = await createClient();
-      const { data } = await supabase.auth.getUser();
-      isPremium = !!data.user;
-    } catch { /* continue as free */ }
-  }
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  const isPremium = hasFullAccess(data.user);
 
   return (
     <div className="flex min-h-screen flex-col" style={{ paddingTop: "56px" }}>

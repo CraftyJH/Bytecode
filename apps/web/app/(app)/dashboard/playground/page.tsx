@@ -2,18 +2,15 @@ import { createClient } from "@/lib/supabase/server";
 import { PlaygroundEditor } from "@/components/playground/PlaygroundEditor";
 import { Button } from "@/components/ui/Button";
 import { Lock } from "lucide-react";
+import { hasFullAccess } from "@/lib/access";
 
 export const metadata = { title: "Playground — Bytecode" };
-
-function isPremium(user: { user_metadata?: Record<string, unknown> } | null): boolean {
-  return user?.user_metadata?.plan === "premium" || user?.user_metadata?.is_premium === true;
-}
 
 export default async function PlaygroundPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!isPremium(user)) {
+  if (!hasFullAccess(user)) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="mb-8">
