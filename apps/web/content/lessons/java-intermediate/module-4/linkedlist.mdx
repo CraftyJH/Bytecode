@@ -1,0 +1,310 @@
+export const meta = {
+  title: "LinkedList and When to Use It",
+  duration: 12,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ll-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is the time complexity of adding an element to the front of a LinkedList?",
+    options: [
+      { text: "O(n) — all elements must shift right.", correct: false, feedback: "Shifting is what happens in an ArrayList. A LinkedList doesn't store elements in a contiguous array — it adjusts pointers." },
+      { text: "O(1) — only the head pointer and one node are updated.", correct: true, feedback: "Correct! `addFirst()` just creates a new node and updates the head pointer. No elements move." },
+      { text: "O(log n) — the list must stay sorted.", correct: false, feedback: "LinkedList makes no sorting guarantees. O(log n) is for tree-based structures." },
+      { text: "O(n) — the list must be traversed to find the insertion point.", correct: false, feedback: "Adding to the front doesn't require traversal — the head reference gives O(1) access to the first node." },
+    ],
+    explanation: "A doubly-linked list stores a direct reference to both the head and tail nodes. Adding or removing at either end only updates a few pointers — no copying, no traversal needed.",
+  },
+  endQ1: {
+    id: "ll-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Deque<Integer> stack = new LinkedList<>();
+        stack.push(1);
+        stack.push(2);
+        stack.push(3);
+        System.out.println(stack.pop());
+        System.out.println(stack.peek());
+    }
+}`,
+    expectedOutput: "3\n2",
+    explanation: "`push` prepends to the front (LIFO). After three pushes the deque is [3, 2, 1]. `pop()` removes and returns the front element (3). `peek()` looks at the new front without removing it (2).",
+  },
+  endQ2: {
+    id: "ll-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which scenario is a good fit for LinkedList over ArrayList?",
+    options: [
+      { text: "You need fast random access by index in a large list.", correct: false, feedback: "Random access by index is O(n) in a LinkedList — you must walk the chain from the head. Use ArrayList for O(1) random access." },
+      { text: "You are building a bounded queue that frequently adds to one end and removes from the other.", correct: true, feedback: "Correct! LinkedList's O(1) head/tail operations make it ideal for queue-like patterns." },
+      { text: "You want the smallest possible memory footprint per element.", correct: false, feedback: "Each LinkedList node stores the element plus two extra references (next and previous), roughly tripling the memory of an int. ArrayList's array has much less overhead." },
+      { text: "You need to sort the list frequently.", correct: false, feedback: "Sorting either structure is O(n log n). Sorting a LinkedList is actually slower in practice due to poor cache locality." },
+    ],
+    explanation: "LinkedList excels when you predominantly add/remove at the head or tail and almost never access elements by index. The classic example is a FIFO task queue or a browser history stack.",
+  },
+  endQ3: {
+    id: "ll-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To retrieve but NOT remove the head element of a Queue without throwing an exception, call:",
+    code: "String head = queue.___();",
+    correctAnswers: ["peek"],
+    caseSensitive: true,
+    explanation: "`peek()` returns the head element or `null` if empty — it never throws. `element()` also returns the head but throws `NoSuchElementException` on an empty queue. `poll()` removes the head.",
+  },
+  endQ4: {
+    id: "ll-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> log = new LinkedList<>();
+        for (int i = 0; i < 100_000; i++) log.add("entry" + i);
+
+        long sum = 0;
+        for (int i = 0; i < log.size(); i++) {
+            sum += log.get(i).length();   // bug here
+        }
+        System.out.println(sum);
+    }
+}`,
+    buggyLine: 8,
+    issue: "Calling get(i) on a LinkedList in a for-index loop is O(n) per call, making the loop O(n²)",
+    explanation: "`LinkedList.get(i)` must walk from the head each time — it's O(n). With 100 000 elements this loop performs roughly 5 billion steps. Fix it by using a for-each loop (`for (String s : log)`), which uses the iterator and walks the chain once — O(n) total.",
+  },
+};
+
+`LinkedList` implements both `List` and `Deque`. That dual role makes it uniquely powerful — and uniquely misused. In this lesson you'll learn exactly what's inside a linked list, when those O(1) head/tail operations justify its extra memory overhead, and when to prefer `ArrayList` or `ArrayDeque` instead.
+
+## How a doubly-linked list works
+
+Instead of a contiguous array, a `LinkedList` is a chain of **nodes**. Each node holds three things: the element itself, a reference to the **next** node, and a reference to the **previous** node:
+
+```
+null ← [prev|"home"|next] ↔ [prev|"about"|next] ↔ [prev|"contact"|next] → null
+        ↑                                                  ↑
+       head                                               tail
+```
+
+The `LinkedList` object itself holds direct references to the head and tail nodes. Because of this:
+
+- **Adding or removing at either end** is O(1): just update the head or tail pointer and fix two neighbour pointers.
+- **Accessing by index** is O(n): you must walk the chain from the nearest end to reach position `i`.
+
+Think of it like a physical chain of paperclips. Attaching one to either end is instant; finding the 47th clip requires counting along.
+
+## Core linked-list operations
+
+```java
+import java.util.*;
+
+public class LinkedListOps {
+    public static void main(String[] args) {
+        LinkedList<String> list = new LinkedList<>();
+
+        // End operations — O(1)
+        list.addLast("a");    // append to tail
+        list.addLast("b");
+        list.addLast("c");
+        System.out.println(list);           // [a, b, c]
+
+        // Head operations — O(1)
+        list.addFirst("z");
+        System.out.println(list);           // [z, a, b, c]
+        System.out.println(list.removeFirst()); // z — O(1)
+
+        // Index access — O(n) ← avoid in loops!
+        System.out.println(list.get(2));    // c
+    }
+}
+```
+
+## The Deque interface — stack and queue in one
+
+`LinkedList` implements `Deque` (Double-Ended Queue), which extends `Queue`. This single interface covers **three** classic data structures:
+
+| Pattern | Methods to use | Analogy |
+|---------|---------------|---------|
+| **Stack (LIFO)** | `push(e)` / `pop()` / `peek()` | Stack of plates |
+| **Queue (FIFO)** | `offer(e)` / `poll()` / `peek()` | Checkout line |
+| **Deque** | `addFirst/Last`, `removeFirst/Last`, `peekFirst/Last` | Both ends of a pipe |
+
+```java
+import java.util.*;
+
+public class DequeDemo {
+    public static void main(String[] args) {
+        // As a Stack (LIFO) — used for undo/redo, recursion simulation
+        Deque<String> stack = new LinkedList<>();
+        stack.push("action1");  // addFirst
+        stack.push("action2");
+        stack.push("action3");
+        System.out.println("Undo: " + stack.pop());   // action3 (LIFO)
+
+        // As a Queue (FIFO) — used for task queues, BFS
+        Queue<String> queue = new LinkedList<>();
+        queue.offer("task1");
+        queue.offer("task2");
+        queue.offer("task3");
+        System.out.println("Process: " + queue.poll()); // task1 (FIFO)
+    }
+}
+```
+
+<Note>Prefer `ArrayDeque` over `LinkedList` when you only need stack or queue behaviour. `ArrayDeque` is backed by a resizable circular array, which has better cache performance (memory-contiguous) and no per-node allocation overhead. Use `LinkedList` when you need both `List` and `Deque` behaviour, or when you're inserting/removing in the **middle** via an iterator.</Note>
+
+## Queue interface: the FIFO contract
+
+`Queue` defines two pairs of methods that do the same logical thing but differ in their failure behaviour:
+
+| Operation | Throws exception | Returns null / false |
+|-----------|-----------------|---------------------|
+| Insert | `add(e)` | `offer(e)` |
+| Remove head | `remove()` | `poll()` |
+| Inspect head | `element()` | `peek()` |
+
+Prefer the null-returning variants (`offer`, `poll`, `peek`) in production code — they let you check the return value rather than wrapping calls in try/catch:
+
+```java
+Queue<String> jobs = new LinkedList<>();
+jobs.offer("compile");
+jobs.offer("test");
+jobs.offer("deploy");
+
+String job;
+while ((job = jobs.poll()) != null) {
+    System.out.println("Running: " + job);
+}
+// Running: compile
+// Running: test
+// Running: deploy
+```
+
+## Memory overhead: the case against LinkedList for large data
+
+Each node in a `LinkedList` allocates a separate heap object with two reference pointers (16–32 bytes of overhead per node on a typical 64-bit JVM). For an `int`, you also pay boxing cost since Java collections can't hold primitives directly.
+
+An `ArrayList<Integer>` holding 1 million integers uses roughly 4–8 MB (array of references to boxed ints). A `LinkedList<Integer>` for the same data uses roughly 32–48 MB — four to eight times more — due to per-node allocation.
+
+Beyond raw memory, linked nodes are scattered across the heap. CPUs rely on spatial locality (cache lines) to go fast. Walking a linked list generates many cache misses; iterating over an array almost never does. This is why even sequential iteration over a large `LinkedList` is slower in practice than over an `ArrayList`.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## When NOT to use LinkedList
+
+- **Random access by index** — `get(i)` is O(n). A hot loop like `for (int i = 0; i < list.size(); i++) list.get(i)` is O(n²) on a `LinkedList`. Use a for-each iterator instead, or switch to `ArrayList`.
+- **You only need stack/queue** — `ArrayDeque` is faster and uses less memory for pure stack or queue patterns.
+- **Memory is a concern** — per-node overhead can be 3–8× the memory of the equivalent `ArrayList`.
+- **You're sorting frequently** — `Collections.sort()` on a `LinkedList` copies it to an array, sorts, and copies back. It works, but ArrayList sort is meaningfully faster.
+
+## When LinkedList is a good choice
+
+- **Frequent insertions/deletions at the front** — O(1) `addFirst`/`removeFirst` vs O(n) shifts in `ArrayList`.
+- **Queue or Deque semantics with moderate-size data** — when cache locality matters less than code clarity and you need the full `List` API alongside `Deque`.
+- **You're removing elements in the middle while iterating** — `LinkedList`'s iterator `remove()` is O(1) (just pointer rewiring); `ArrayList`'s is O(n) (element shift).
+
+## Try it
+
+```java
+import java.util.*;
+
+public class Demo {
+    public static void main(String[] args) {
+        // Browser history — new pages pushed to front, "back" pops from front
+        Deque<String> history = new LinkedList<>();
+        history.push("https://example.com");
+        history.push("https://docs.java.com");
+        history.push("https://stackoverflow.com");
+
+        System.out.println("Current: " + history.peek());  // stackoverflow
+        history.pop();   // navigate back
+        System.out.println("After back: " + history.peek()); // docs.java.com
+
+        // Print-job FIFO queue
+        Queue<String> printQueue = new LinkedList<>();
+        printQueue.offer("invoice.pdf");
+        printQueue.offer("report.pdf");
+        printQueue.offer("photo.jpg");
+
+        while (!printQueue.isEmpty()) {
+            System.out.println("Printing: " + printQueue.poll());
+        }
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling `get(i)` inside a for-index loop on a LinkedList** — this turns O(n) iteration into O(n²). Always use a for-each or iterator to traverse a `LinkedList`.
+- **Using LinkedList for a pure stack** — `ArrayDeque` is faster for push/pop-only usage. Use `LinkedList` only when you also need `List` methods.
+- **Confusing `push`/`pop` with `offer`/`poll`** — `push` and `pop` operate on the *front* (stack/LIFO); `offer` adds to the *tail* and `poll` removes from the *front* (queue/FIFO). Mixing them produces confusing behaviour.
+- **Calling `remove()` or `element()` on an empty queue** — these throw `NoSuchElementException`. Use `poll()` and `peek()` if the queue may be empty, and check for `null`.
+- **Ignoring memory overhead** — linked lists consume far more memory per element than arrays. For collections with millions of elements, the difference matters.
+
+## Recap
+
+`LinkedList` is a doubly-linked list that implements both `List` and `Deque`. Its O(1) head/tail operations make it a natural fit for queues, stacks, and scenarios where you frequently add or remove at the ends. It pays for this flexibility with O(n) index access and higher per-element memory overhead.
+
+- Each node holds **element + prev + next pointers** — no contiguous array
+- **O(1)** for add/remove at head or tail; **O(n)** for index access and middle operations
+- Implements **`Deque`** — supports stack (`push`/`pop`) and queue (`offer`/`poll`) patterns
+- Prefer **`ArrayDeque`** for pure stack/queue; prefer **`ArrayList`** for random access
+- Avoid index-based loops on `LinkedList` — they degrade to O(n²)
+
+**Up next:** HashSet and TreeSet — eliminating duplicates and understanding how hashing gives O(1) membership tests.
+
+<Exercise>
+Simulate a browser history stack and a task queue using `LinkedList`.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Deque<String> history = new LinkedList<>();
+        // TODO: push "home", then "about", then "contact" onto the front
+        System.out.println("Current page: " + history.peek());
+        System.out.println("History: " + history);
+        history.pop();
+        System.out.println("After back: " + history.peek());
+
+        Queue<String> tasks = new LinkedList<>();
+        // TODO: offer "task1", "task2", "task3"
+        System.out.println("Next task: " + tasks.poll());
+        System.out.println("Remaining: " + tasks.size());
+    }
+}
+```
+
+**What the tests check:**
+- After three pushes, `peek()` returns `"contact"`
+- `history` prints as `[contact, about, home]`
+- After `pop()`, `peek()` returns `"about"`
+- `tasks.poll()` returns `"task1"`
+- `tasks.size()` is `2` after the poll
+
+<Note>Hint: `push(e)` adds to the front of a Deque; `offer(e)` adds to the tail of a Queue. Keep the two metaphors separate — one is LIFO, the other FIFO.</Note>
+</Exercise>

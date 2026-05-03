@@ -1,0 +1,355 @@
+export const meta = {
+  title: "HashSet and TreeSet",
+  duration: 14,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "hts-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "A HashSet guarantees which of the following?",
+    options: [
+      { text: "Elements are stored in sorted order.", correct: false, feedback: "Sorted order is a TreeSet guarantee. HashSet uses hash buckets, which produce an unpredictable order." },
+      { text: "No two equal elements are ever stored.", correct: true, feedback: "Correct! `add()` calls `equals()` to check for an existing equal element. Duplicates are silently rejected." },
+      { text: "Iteration always happens in insertion order.", correct: false, feedback: "Insertion order is preserved by LinkedHashSet, not HashSet." },
+      { text: "get(i) is O(1).", correct: false, feedback: "Set has no `get(i)` method — it doesn't support index access at all." },
+    ],
+    explanation: "A `Set` by contract stores no duplicates. `HashSet` enforces this by checking `hashCode()` first (to find the bucket) and then `equals()` (to confirm identity). The iteration order is unspecified — it depends on hash values.",
+  },
+  endQ1: {
+    id: "hts-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        TreeSet<Integer> ts = new TreeSet<>(Arrays.asList(5, 2, 8, 1, 3));
+        System.out.println(ts.first());
+        System.out.println(ts.last());
+        System.out.println(ts.floor(4));
+        System.out.println(ts.ceiling(4));
+    }
+}`,
+    expectedOutput: "1\n8\n3\n5",
+    explanation: "`TreeSet` keeps elements in natural sorted order. `first()` = 1, `last()` = 8. `floor(4)` = largest element ≤ 4 = 3. `ceiling(4)` = smallest element ≥ 4 = 5.",
+  },
+  endQ2: {
+    id: "hts-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "You add a custom `Point` class to a HashSet. What two methods must Point implement for the Set to work correctly?",
+    options: [
+      { text: "toString() and compareTo()", correct: false, feedback: "`compareTo` is needed for TreeSet/Comparable, not HashSet. `toString` is only for display." },
+      { text: "equals() and hashCode()", correct: true, feedback: "Correct! HashSet uses `hashCode()` to locate the right bucket and `equals()` to check for duplicate objects within that bucket. Both must be consistent." },
+      { text: "equals() and compareTo()", correct: false, feedback: "`compareTo` is the Comparable method for ordering. HashSet doesn't use ordering — it uses hashing." },
+      { text: "hashCode() only", correct: false, feedback: "Two objects can have the same hash code (collision) without being equal. `equals()` is needed to resolve collisions." },
+    ],
+    explanation: "The Java contract requires: if `a.equals(b)` then `a.hashCode() == b.hashCode()`. HashSet relies on both — `hashCode` to quickly locate a bucket, `equals` to confirm the element isn't already there. Breaking this contract causes silent data loss (duplicates that sneak in).",
+  },
+  endQ3: {
+    id: "hts-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To compute the union of two sets a and b in-place (modifying a), call:",
+    code: "a.___(b);",
+    correctAnswers: ["addAll"],
+    caseSensitive: true,
+    explanation: "`a.addAll(b)` adds every element of `b` into `a`. Since `a` is a Set, duplicates are automatically ignored. For intersection use `retainAll`; for difference use `removeAll`.",
+  },
+  endQ4: {
+    id: "hts-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Set<String> fruits = new HashSet<>();
+        fruits.add("apple");
+        fruits.add("banana");
+        fruits.add("cherry");
+        for (int i = 0; i < fruits.size(); i++) {
+            System.out.println(fruits.get(i));  // bug here
+        }
+    }
+}`,
+    buggyLine: 9,
+    issue: "Set has no get(i) method — it doesn't support index access",
+    explanation: "`Set` doesn't implement `List`, so there is no `get(int index)` method. To iterate, use a for-each loop: `for (String f : fruits)`, or convert to a `List` first if you need index access.",
+  },
+};
+
+Lists allow duplicates. Sometimes you don't want that — you want a collection that automatically rejects repeated elements and answers membership questions instantly. That's what **Set** is for, and `HashSet` and `TreeSet` are its two most important implementations.
+
+## The Set contract
+
+A `Set<E>` stores at most one copy of each element. Calling `add(e)` on a set that already contains an equal element is a no-op — the method returns `false` and the set is unchanged:
+
+```java
+Set<String> set = new HashSet<>();
+System.out.println(set.add("hello")); // true  — added
+System.out.println(set.add("world")); // true  — added
+System.out.println(set.add("hello")); // false — already there
+System.out.println(set.size());       // 2
+```
+
+The equality check uses `equals()`. For the `HashSet` specifically it also uses `hashCode()` to narrow down where to look before calling `equals()`.
+
+## HashSet: hash-table internals
+
+A `HashSet<E>` is backed by a `HashMap<E, Object>` under the hood. When you add an element, the following happens:
+
+1. Java calls `element.hashCode()` to compute a hash value.
+2. The hash is mapped to a **bucket index** in the internal array.
+3. The bucket holds a list (or tree, since Java 8) of elements with the same bucket index.
+4. Java walks that short list calling `equals()` to check for a match.
+5. If none is found, the element is added.
+
+Because step 3 usually contains zero or one element (when the hash function is good), the average time for `add`, `remove`, and `contains` is **O(1)**.
+
+```
+hashCode("apple") → bucket 3  → ["apple"]
+hashCode("pear")  → bucket 7  → ["pear"]
+hashCode("plum")  → bucket 3  → ["apple", "plum"]  ← collision, two items in one bucket
+```
+
+<Note>Hash collisions degrade performance but are unavoidable. Java's `HashSet` default load factor is **0.75**: when 75% of buckets are occupied, the table is doubled and all elements are rehashed. This keeps the average bucket length short. You rarely need to tune this.</Note>
+
+## What HashSet requires: equals and hashCode
+
+For any class you put in a `HashSet`, Java's contract demands:
+
+> If `a.equals(b)` is `true`, then `a.hashCode() == b.hashCode()`.
+
+If you break this contract (e.g., two equal objects with different hash codes), they end up in different buckets and the Set stores both — a silent bug:
+
+```java
+class BadPoint {
+    int x, y;
+    BadPoint(int x, int y) { this.x = x; this.y = y; }
+
+    @Override public boolean equals(Object o) {
+        if (!(o instanceof BadPoint p)) return false;
+        return x == p.x && y == p.y;
+    }
+    // hashCode() not overridden → uses identity hash — WRONG!
+}
+
+Set<BadPoint> set = new HashSet<>();
+set.add(new BadPoint(1, 2));
+set.add(new BadPoint(1, 2));  // equals() returns true, but different hash!
+System.out.println(set.size()); // 2 — BUG: should be 1
+```
+
+The fix: always override **both** `equals` and `hashCode` together. Modern IDEs and Java records generate them automatically.
+
+## TreeSet: sorted, O(log n)
+
+`TreeSet<E>` stores elements in a **red-black tree** — a self-balancing binary search tree. This gives:
+
+- **O(log n)** for `add`, `remove`, `contains` (tree traversal)
+- Elements always emerge **in sorted order** (natural ordering via `Comparable`, or a custom `Comparator`)
+- No duplicates, just like `HashSet`
+
+```java
+Set<String> sorted = new TreeSet<>();
+sorted.add("cherry");
+sorted.add("apple");
+sorted.add("banana");
+sorted.add("apple");     // duplicate — ignored
+System.out.println(sorted); // [apple, banana, cherry] — always sorted!
+```
+
+Elements must implement `Comparable` (like `String`, `Integer`, etc.), or you must supply a `Comparator` at construction time:
+
+```java
+// Case-insensitive sort
+TreeSet<String> ci = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+ci.add("Banana");
+ci.add("apple");
+ci.add("CHERRY");
+System.out.println(ci);   // [apple, Banana, CHERRY]
+```
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## NavigableSet API
+
+`TreeSet` implements `NavigableSet`, which exposes powerful range and nearest-neighbour queries:
+
+| Method | Returns |
+|--------|---------|
+| `first()` | Lowest element |
+| `last()` | Highest element |
+| `floor(e)` | Largest element ≤ e |
+| `ceiling(e)` | Smallest element ≥ e |
+| `lower(e)` | Largest element strictly < e |
+| `higher(e)` | Smallest element strictly > e |
+| `headSet(e)` | View of elements strictly < e |
+| `tailSet(e)` | View of elements ≥ e |
+| `subSet(from, to)` | View of elements in [from, to) |
+
+```java
+import java.util.*;
+
+public class NavigableDemo {
+    public static void main(String[] args) {
+        TreeSet<Integer> temps = new TreeSet<>(Arrays.asList(18, 22, 25, 30, 35, 40));
+
+        System.out.println("Comfortable range: " + temps.subSet(20, 30));   // [22, 25]
+        System.out.println("Too hot (≥30):      " + temps.tailSet(30));     // [30, 35, 40]
+        System.out.println("Closest to 28:      " + temps.floor(28));       // 25
+        System.out.println("Closest above 28:   " + temps.ceiling(28));     // 30
+        System.out.println("Descending:         " + temps.descendingSet()); // [40, 35, 30, 25, 22, 18]
+    }
+}
+```
+
+<Note>Like `subList` on `ArrayList`, the views returned by `headSet`, `tailSet`, and `subSet` are **live** — modifications through the view affect the original TreeSet, and vice versa. Use `new TreeSet<>(ts.headSet(e))` to get an independent copy.</Note>
+
+## Set operations: union, intersection, difference
+
+Sets map naturally to mathematical set algebra. Java's `Collection` bulk methods provide all three:
+
+```java
+import java.util.*;
+
+public class SetOps {
+    public static void main(String[] args) {
+        Set<String> java    = new HashSet<>(Arrays.asList("OOP", "generics", "streams", "lambdas"));
+        Set<String> kotlin  = new HashSet<>(Arrays.asList("generics", "coroutines", "lambdas", "DSL"));
+
+        // Union (don't mutate originals — copy first)
+        Set<String> union = new HashSet<>(java);
+        union.addAll(kotlin);
+        System.out.println("Union:        " + new TreeSet<>(union));
+        // [DSL, OOP, coroutines, generics, lambdas, streams]
+
+        // Intersection
+        Set<String> intersection = new HashSet<>(java);
+        intersection.retainAll(kotlin);
+        System.out.println("Intersection: " + new TreeSet<>(intersection));
+        // [generics, lambdas]
+
+        // Difference (features Java has but Kotlin doesn't)
+        Set<String> diff = new HashSet<>(java);
+        diff.removeAll(kotlin);
+        System.out.println("Only in Java: " + new TreeSet<>(diff));
+        // [OOP, streams]
+    }
+}
+```
+
+## LinkedHashSet: insertion-order Set
+
+If you need a set that preserves insertion order (but not sorted order), use `LinkedHashSet`. It wraps a `HashSet` with a doubly-linked list tracking insertion sequence:
+
+```java
+Set<String> ordered = new LinkedHashSet<>();
+ordered.add("banana");
+ordered.add("apple");
+ordered.add("cherry");
+ordered.add("apple");   // duplicate — ignored
+System.out.println(ordered);   // [banana, apple, cherry] — insertion order
+```
+
+Summary: `HashSet` = fastest, no order. `LinkedHashSet` = fast, insertion order. `TreeSet` = sorted, O(log n).
+
+## Try it
+
+```java
+import java.util.*;
+
+public class Demo {
+    public static void main(String[] args) {
+        // Remove duplicates from a list while keeping original order
+        List<String> raw = Arrays.asList("red", "green", "blue", "red", "yellow", "blue");
+        Set<String> unique = new LinkedHashSet<>(raw);
+        System.out.println("Unique: " + unique); // [red, green, blue, yellow]
+
+        // Is a word a common English word?
+        Set<String> stopWords = new HashSet<>(Arrays.asList("the", "a", "an", "is", "are"));
+        System.out.println("'the' is stop: " + stopWords.contains("the")); // true
+        System.out.println("'java' is stop: " + stopWords.contains("java")); // false
+
+        // All cities visited between 'D' and 'P' (sorted)
+        TreeSet<String> cities = new TreeSet<>(Arrays.asList(
+            "Paris", "Lagos", "Delhi", "Cairo", "Oslo", "Nairobi"
+        ));
+        System.out.println("D–P range: " + cities.subSet("D", "Q"));
+        // [Delhi, Lagos, Nairobi, Oslo, Paris]
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Putting objects with only `equals()` overridden into a HashSet** — without a matching `hashCode()`, two equal objects can land in different buckets and both get stored. Always override both together, or use `@Override` on both and let your IDE verify you haven't missed one.
+- **Relying on HashSet iteration order** — `HashSet` makes no ordering guarantees. Code that happens to produce sorted output may break when you upgrade the JDK or add more elements. Use `TreeSet` if you need order.
+- **Using `for (int i = 0; i < set.size(); i++) set.get(i)` on a Set** — `Set` has no `get(int)` method. Iterate with for-each or an `Iterator`.
+- **Mutating an element that's already in a HashSet** — if you change a field that `hashCode()` uses after adding the object, it will be in the wrong bucket. The set still "contains" it according to the field, but `contains()` will return `false` because it checks the wrong bucket.
+- **Forgetting that `headSet`, `tailSet`, `subSet` are views** — clearing the view clears the original. Copy with `new TreeSet<>()` when you want independence.
+
+## Recap
+
+`HashSet` and `TreeSet` are the go-to implementations for duplicate-free collections. The right choice depends on whether you care about order.
+
+- **`HashSet`** uses hash buckets: O(1) average `add`/`remove`/`contains`, unpredictable iteration order
+- **`TreeSet`** uses a red-black tree: O(log n) operations, always sorted, supports range queries via `NavigableSet`
+- **`LinkedHashSet`** is the middle ground: O(1) operations, iteration in insertion order
+- Custom classes in a `HashSet` must implement **both** `equals()` and `hashCode()` consistently
+- Set algebra: `addAll` = union, `retainAll` = intersection, `removeAll` = difference
+
+**Up next:** HashMap — the most-used collection in Java, and how key equality and hash codes drive its lookup speed.
+
+<Exercise>
+Use `HashSet` for membership tests and `TreeSet` for sorted deduplication and range queries.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Set<Integer> primes = new HashSet<>(Arrays.asList(2, 3, 5, 7, 11, 13));
+        System.out.println("7 is prime: " + primes.contains(7));
+        System.out.println("9 is prime: " + primes.contains(9));
+
+        Set<String> words = new TreeSet<>(
+            Arrays.asList("banana", "apple", "cherry", "date", "avocado"));
+        System.out.println("Sorted: " + words);
+
+        TreeSet<String> ts = (TreeSet<String>) words;
+        System.out.println("Before cherry: " + ts.headSet("cherry"));
+
+        Set<Integer> a = new HashSet<>(Arrays.asList(1, 2, 3, 4, 5));
+        Set<Integer> b = new HashSet<>(Arrays.asList(3, 4, 5, 6, 7));
+        a.retainAll(b);
+        System.out.println("Intersection: " + new TreeSet<>(a));
+    }
+}
+```
+
+**What the tests check:**
+- `primes.contains(7)` is `true`; `primes.contains(9)` is `false`
+- `words` prints as `[apple, avocado, banana, cherry, date]`
+- `headSet("cherry")` returns `[apple, avocado, banana]`
+- Intersection of `{1..5}` and `{3..7}` is `[3, 4, 5]`
+
+<Note>Hint: `headSet(e)` returns elements **strictly less than** `e` — `"cherry"` itself is not included. The result is a sorted view backed by the original TreeSet.</Note>
+</Exercise>

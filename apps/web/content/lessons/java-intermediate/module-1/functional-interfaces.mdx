@@ -1,0 +1,280 @@
+export const meta = {
+  title: "Functional Interfaces — A First Look",
+  duration: 14,
+  order: 6,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "fi-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which `java.util.function` interface best models a method that takes a `String` and returns nothing?",
+    options: [
+      { text: "Function<String, Void>", correct: false, feedback: "`Function<T,R>` requires a return value. Using `Void` as the return type is awkward and requires returning `null` explicitly. `Consumer<String>` is the natural fit." },
+      { text: "Supplier<String>", correct: false, feedback: "`Supplier<T>` takes *no* arguments and *produces* a value. It's the opposite of what's described here." },
+      { text: "Consumer<String>", correct: true, feedback: "Correct — `Consumer<T>` takes one argument and returns nothing (`void`). Its abstract method is `void accept(T t)`." },
+      { text: "Predicate<String>", correct: false, feedback: "`Predicate<T>` takes an argument and returns a `boolean`. 'Returns nothing' means `Consumer`, not `Predicate`." },
+    ],
+    explanation: "`Consumer<T>` models side-effectful operations: logging, storing, printing. It consumes a value but produces nothing. `Predicate` tests and returns boolean, `Function` transforms, `Supplier` produces.",
+    hint: "Think about the word 'consumer' — it takes in but doesn't give back.",
+  },
+  endQ1: {
+    id: "fi-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.function.*;
+public class Main {
+    public static void main(String[] args) {
+        Predicate<Integer> isEven = n -> n % 2 == 0;
+        System.out.println(isEven.test(4));
+        System.out.println(isEven.test(7));
+        Function<String, Integer> len = s -> s.length();
+        System.out.println(len.apply("Java"));
+    }
+}`,
+    expectedOutput: "true\nfalse\n4",
+    explanation: "`isEven.test(4)` evaluates `4 % 2 == 0` → `true`. `isEven.test(7)` evaluates `7 % 2 == 0` → `false`. `len.apply(\"Java\")` returns `\"Java\".length()` → `4`.",
+  },
+  endQ2: {
+    id: "fi-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.function.*;
+public class Main {
+    public static void main(String[] args) {
+        Supplier<String> msg = () -> "Ready";
+        System.out.println(msg.test());
+    }
+}`,
+    buggyLine: 5,
+    issue: "Supplier's abstract method is get(), not test()",
+    explanation: "`Supplier<T>` exposes `T get()`. The method `test()` belongs to `Predicate<T>`. Calling `.test()` on a `Supplier` is a compile error. Fix it: `System.out.println(msg.get());`.",
+    hint: "Each functional interface has its own method name. Which method does `Supplier` declare?",
+  },
+  endQ3: {
+    id: "fi-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "A lambda that takes no arguments and returns the string \"ok\" can be stored in a ___<String> variable.",
+    code: "___<String> s = () -> \"ok\";",
+    correctAnswers: ["Supplier"],
+    caseSensitive: true,
+    explanation: "`Supplier<T>` models 'produce a value without input'. Its abstract method is `T get()`. A lambda `() -> \"ok\"` matches `String get()` exactly, so it fits `Supplier<String>`.",
+  },
+  endQ4: {
+    id: "fi-end-4",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "What does `@FunctionalInterface` do when placed on an interface?",
+    options: [
+      { text: "It makes the interface automatically implement a lambda.", correct: false, feedback: "Lambdas implement interfaces — not the other way around. `@FunctionalInterface` does not generate any implementation." },
+      { text: "It causes a compile error if the interface has more or fewer than one abstract method.", correct: true, feedback: "Correct — it is a compile-time guard. If you accidentally add a second abstract method, the compiler rejects the file immediately, catching the mistake early." },
+      { text: "It prevents the interface from having `default` methods.", correct: false, feedback: "`@FunctionalInterface` interfaces may freely have `default` and `static` methods. Only the count of *abstract* methods is restricted to exactly one." },
+      { text: "It makes all implementing classes automatically serializable.", correct: false, feedback: "`@FunctionalInterface` is purely a design-time annotation with no runtime effect on serialization or anything else." },
+    ],
+    explanation: "`@FunctionalInterface` is a documentation and compile-time-safety annotation. It tells both readers and the compiler 'this interface must have exactly one abstract method.' Adding a second abstract method immediately becomes a compile error, guarding the invariant that enables lambdas.",
+    hint: "Annotations often enforce compile-time contracts. What contract does this annotation enforce?",
+  },
+};
+
+Every time you write a lambda in Java, you are implementing a **functional interface** — an interface with exactly one abstract method (SAM: Single Abstract Method). The `java.util.function` package ships four archetypal ones that cover the vast majority of use cases. Understanding them unlocks lambdas, streams, and most of modern Java's API surface.
+
+## What makes an interface "functional"
+
+The `@FunctionalInterface` annotation is a compile-time guard that enforces the single-abstract-method rule:
+
+```java
+@FunctionalInterface
+interface Transformer {
+    String transform(String input);  // exactly one abstract method
+    // default and static methods are allowed alongside it
+}
+```
+
+Any interface with exactly one abstract method is a functional interface, annotated or not. The annotation just makes the compiler catch accidental violations:
+
+```java
+Transformer shout = input -> input.toUpperCase();
+System.out.println(shout.transform("hello"));  // HELLO
+```
+
+The lambda `input -> input.toUpperCase()` is shorthand for an anonymous class that implements `Transformer`. The compiler infers the single abstract method and wires the lambda body to it.
+
+## The four archetypes in `java.util.function`
+
+### `Predicate<T>` — test a condition
+
+```java
+Predicate<String> startsWithJ = s -> s.startsWith("J");
+System.out.println(startsWithJ.test("Java"));   // true
+System.out.println(startsWithJ.test("Python")); // false
+```
+
+`Predicate<T>` has abstract method `boolean test(T t)`. It answers a yes/no question about its argument. Common uses: filtering collections, validating inputs, conditional logic.
+
+### `Function<T, R>` — transform a value
+
+```java
+Function<String, Integer> wordCount = s -> s.split(" ").length;
+System.out.println(wordCount.apply("one two three"));  // 3
+```
+
+`Function<T, R>` has abstract method `R apply(T t)`. It maps one type to another. Common uses: parsing, formatting, extracting fields from objects.
+
+### `Consumer<T>` — act on a value, return nothing
+
+```java
+Consumer<String> logger = msg -> System.out.println("[LOG] " + msg);
+logger.accept("Server started");   // [LOG] Server started
+logger.accept("Request received"); // [LOG] Request received
+```
+
+`Consumer<T>` has abstract method `void accept(T t)`. It is side-effectful by definition — it does something with its argument but produces no result. Common uses: printing, writing to a database, updating state.
+
+### `Supplier<T>` — produce a value, take nothing
+
+```java
+Supplier<Double> randomPrice = () -> Math.random() * 100;
+System.out.println(randomPrice.get());  // e.g., 73.41...
+```
+
+`Supplier<T>` has abstract method `T get()`. It produces a value on demand without input. Common uses: lazy initialization, test data factories, default value providers.
+
+<Note>Memory trick: **P**redicate **t**ests, **F**unction **t**ransforms, **C**onsumer **c**onsumes, **S**upplier **s**upplies. Each word pair starts with the same letter. The method names (`test`, `apply`, `accept`, `get`) are worth memorizing — the compiler won't help you if you call the wrong one.</Note>
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+The starter code uses all four interfaces. Run it as-is first — it works because no implementation is needed from you this time. Study each block and trace the output before reading the expected result:
+
+```
+false
+true
+Item #1
+Item #42
+[APPLE, BANANA]
+Hello, Java!
+```
+
+Notice how `Consumer<String>` accumulates side effects: `seen.add(...)` modifies a list rather than returning anything. The list is printed at the end to show the accumulated effect.
+
+## Composing functional interfaces
+
+The `java.util.function` interfaces include `default` methods for composition:
+
+```java
+Predicate<String> isLong  = s -> s.length() > 5;
+Predicate<String> hasSpace = s -> s.contains(" ");
+
+// Compose with and / or / negate
+Predicate<String> longWithSpace = isLong.and(hasSpace);
+System.out.println(longWithSpace.test("Hello World")); // true
+System.out.println(longWithSpace.test("Hi"));          // false
+
+Function<String, String> trim  = String::trim;
+Function<String, String> upper = String::toUpperCase;
+Function<String, String> clean = trim.andThen(upper);  // chain
+System.out.println(clean.apply("  hello  "));          // HELLO
+```
+
+`Predicate.and(other)` returns a new predicate that is true only when both are true. `Function.andThen(after)` pipes the output of the first into the input of the second. These compositions produce new functional interface instances — you can build complex logic from simple pieces.
+
+## Storing and passing lambdas
+
+Because functional interfaces are just interfaces, they can be stored in variables, passed as method arguments, and returned from methods:
+
+```java
+static void processAll(String[] items, Consumer<String> action) {
+    for (String item : items) {
+        action.accept(item);
+    }
+}
+
+public static void main(String[] args) {
+    String[] names = {"Alice", "Bob", "Charlie"};
+    processAll(names, name -> System.out.println("Hello, " + name));
+}
+// Hello, Alice
+// Hello, Bob
+// Hello, Charlie
+```
+
+`processAll` doesn't care how `action` is implemented — it just calls `accept`. Tomorrow you could pass a different lambda (e.g., one that logs to a file) without touching `processAll` at all.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling the wrong method name** — `Predicate` uses `.test()`, `Function` uses `.apply()`, `Consumer` uses `.accept()`, `Supplier` uses `.get()`. These are four distinct names. Calling `.test()` on a `Consumer` is a compile error, not a runtime one, so you'll find out quickly — but it's disorienting at first.
+- **Confusing `Function<T,R>` types** — `Function<String, Integer>` takes a `String` and returns an `Integer`. Getting the type parameters backwards (`Function<Integer, String>`) compiles only if the lambda's body accidentally fits the swapped types. Pay attention to the order: input type first, output type second.
+- **Using `Function<String, Void>`** instead of `Consumer<String>` — `Void` is a class, not `void`. Using it forces you to `return null` in the lambda body. Always prefer `Consumer` for side-effectful, no-return operations.
+- **Forgetting `@FunctionalInterface` makes the compiler your ally** — if you design your own functional interface, add the annotation. It costs nothing and prevents a future teammate from accidentally adding a second abstract method and breaking all existing lambdas.
+- **Thinking lambdas are magical** — a lambda is just a concise anonymous class. `s -> s.toUpperCase()` compiles to something that implements the target functional interface's single abstract method. All the rules of interfaces still apply.
+
+## Recap
+
+Functional interfaces are the bridge between Java's object-oriented type system and the functional-style programming enabled by lambdas. The four standard archetypes cover almost every scenario:
+
+- **`Predicate<T>`** — `boolean test(T t)` — test a condition
+- **`Function<T,R>`** — `R apply(T t)` — transform a value
+- **`Consumer<T>`** — `void accept(T t)` — act on a value, return nothing
+- **`Supplier<T>`** — `T get()` — produce a value, take nothing
+- Any interface with exactly one abstract method is a functional interface; `@FunctionalInterface` enforces this at compile time
+- Lambdas implement functional interfaces — the compiler matches the lambda signature to the single abstract method
+- Composition methods (`and`, `or`, `negate`, `andThen`, `compose`) build complex logic from simple pieces
+
+**Up next:** Module 2 — Exception Handling (first lesson: What Are Exceptions?).
+
+<Exercise>
+Study the four functional interface usages in `main`. No changes are needed — but make sure you understand each one before moving on. The exercise is to read, predict the output, then click Run to verify.
+
+```java
+import java.util.function.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Predicate<T>: tests a condition → boolean
+        Predicate<String> isLong = s -> s.length() > 5;
+        System.out.println(isLong.test("Hi"));
+        System.out.println(isLong.test("Hello, World"));
+
+        // Function<T,R>: transforms a value
+        Function<Integer, String> toLabel = n -> "Item #" + n;
+        System.out.println(toLabel.apply(1));
+        System.out.println(toLabel.apply(42));
+
+        // Consumer<T>: acts on a value, returns nothing
+        List<String> seen = new ArrayList<>();
+        Consumer<String> record = s -> seen.add(s.toUpperCase());
+        record.accept("apple");
+        record.accept("banana");
+        System.out.println(seen);
+
+        // Supplier<T>: produces a value, takes nothing
+        Supplier<String> greeting = () -> "Hello, Java!";
+        System.out.println(greeting.get());
+    }
+}
+```
+
+**What the tests check:**
+- `isLong.test("Hi")` returns `false`
+- `isLong.test("Hello, World")` returns `true`
+- `toLabel.apply(1)` returns `"Item #1"`
+- `toLabel.apply(42)` returns `"Item #42"`
+- After both `record.accept(...)` calls, `seen` equals `["APPLE", "BANANA"]`
+- `greeting.get()` returns `"Hello, Java!"`
+
+<Note>Hint: trace each lambda by substituting the argument into the body. For `isLong`, `"Hi".length()` is 2, which is not greater than 5 — so the result is `false`.</Note>
+</Exercise>

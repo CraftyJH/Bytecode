@@ -1,0 +1,332 @@
+export const meta = {
+  title: "Overview — The Collections Landscape",
+  duration: 12,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "cov-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which interface sits at the very top of the collection hierarchy (excluding Map)?",
+    options: [
+      { text: "Collection", correct: false, feedback: "`Collection` extends `Iterable` — there is one level above it." },
+      { text: "Iterable", correct: true, feedback: "Correct! `Iterable` is the root. It provides the `iterator()` method used by every for-each loop." },
+      { text: "List", correct: false, feedback: "`List` extends `Collection`, which extends `Iterable` — it's two levels down." },
+      { text: "AbstractCollection", correct: false, feedback: "`AbstractCollection` is an abstract helper class, not the root of the interface hierarchy." },
+    ],
+    explanation: "`Iterable<T>` is the topmost interface. It declares `iterator()`, which is all the for-each loop needs. `Collection` extends it and adds bulk operations like `add`, `remove`, and `size`.",
+  },
+  endQ1: {
+    id: "cov-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> list = new ArrayList<>();
+        list.add("a");
+        list.add("b");
+        list.add("a");
+        Set<String> set = new HashSet<>(list);
+        System.out.println(list.size());
+        System.out.println(set.size());
+    }
+}`,
+    expectedOutput: "3\n2",
+    explanation: "A `List` allows duplicates, so all three elements are stored. A `Set` rejects duplicates, leaving only `\"a\"` and `\"b\"` — size 2.",
+  },
+  endQ2: {
+    id: "cov-end-2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which collection type would you choose to count how many times each word appears in a document?",
+    options: [
+      { text: "List<String>", correct: false, feedback: "A List stores elements in sequence but doesn't associate counts with words." },
+      { text: "Set<String>", correct: false, feedback: "A Set tracks unique words but not how many times each appears." },
+      { text: "Map<String, Integer>", correct: true, feedback: "Correct! A Map pairs each unique word (key) with its count (value)." },
+      { text: "Queue<String>", correct: false, feedback: "A Queue is designed for FIFO processing, not key-value counting." },
+    ],
+    explanation: "Word-frequency counting is the canonical Map use case: the word is the key, the running total is the value. `HashMap<String, Integer>` is the usual choice.",
+  },
+  endQ3: {
+    id: "cov-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the statement: Map does NOT extend ___.",
+    code: "// Map does NOT extend ___",
+    correctAnswers: ["Collection", "Iterable"],
+    caseSensitive: true,
+    explanation: "`Map` is a separate hierarchy from `Collection`. It doesn't extend `Iterable` or `Collection`, which is why you can't use a raw `Map` in a for-each loop without calling `.entrySet()`, `.keySet()`, or `.values()` first.",
+  },
+  endQ4: {
+    id: "cov-end-4",
+    type: "find_the_bug",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Vector<String> names = new Vector<>();
+        names.add("Alice");
+        names.add("Bob");
+        System.out.println(names.get(0));
+    }
+}`,
+    buggyLine: 4,
+    issue: "Vector is a legacy, synchronized class that should be replaced with ArrayList",
+    explanation: "`Vector` predates the Collections Framework and carries unnecessary synchronization overhead on every operation. Use `ArrayList` instead. If you need thread safety, use `Collections.synchronizedList(new ArrayList<>())` or a `CopyOnWriteArrayList` from `java.util.concurrent`.",
+  },
+};
+
+Arrays are fine for a handful of fixed-size values. The moment you need to **grow, shrink, deduplicate, or look things up by key**, you reach for the **Collections Framework** — a family of interfaces and implementations that ships with every version of Java.
+
+In this lesson you'll see the big picture: what interfaces exist, how they relate, when to pick which one, and what time-complexity guarantees matter in practice. The following lessons each zoom into one implementation.
+
+## The interface hierarchy
+
+Almost every collection class you'll ever use traces back to two roots:
+
+```
+java.lang.Iterable<T>
+  └─ java.util.Collection<T>
+       ├─ java.util.List<T>        (ordered, duplicates allowed)
+       ├─ java.util.Set<T>         (no duplicates)
+       └─ java.util.Queue<T>       (designed for FIFO/priority access)
+            └─ java.util.Deque<T>  (double-ended queue)
+
+java.util.Map<K,V>                 (key → value, NOT a Collection)
+```
+
+`Iterable` is the true root. It declares a single method, `iterator()`, which is all the enhanced for-each loop (`for (T x : collection)`) needs. `Collection` extends `Iterable` and adds the operations every collection must support: `add`, `remove`, `contains`, `size`, `isEmpty`, `clear`, and bulk variants like `addAll`.
+
+<Note>`Map` is intentionally **not** a `Collection`. A map stores pairs, not individual elements, so bulk-collection semantics like `size()` (which count would you return — keys? values? entries?) don't map cleanly onto a flat element model. It's a parallel hierarchy.</Note>
+
+## The main implementations at a glance
+
+| Interface | Common implementations | Signature property |
+|-----------|----------------------|--------------------|
+| `List`    | `ArrayList`, `LinkedList` | Ordered, index-addressable |
+| `Set`     | `HashSet`, `LinkedHashSet`, `TreeSet` | No duplicates |
+| `Queue`   | `LinkedList`, `PriorityQueue`, `ArrayDeque` | Head/tail access |
+| `Deque`   | `ArrayDeque`, `LinkedList` | Stack + queue in one |
+| `Map`     | `HashMap`, `LinkedHashMap`, `TreeMap` | Key → value lookup |
+
+## When to use which
+
+Picking the right collection up front saves refactoring later. Here is a practical decision guide:
+
+**Do you need to look things up by a key?** → `Map`
+
+**Do you need to store pairs of associated values?** → same answer: `Map`
+
+**Do you care about order and need direct index access?** → `List` (almost always `ArrayList`)
+
+**Do you need to prevent duplicates automatically?** → `Set`
+
+**Do you need to process items in arrival order (FIFO)?** → `Queue`
+
+**Do you need a stack (LIFO) or need to push/pop both ends?** → `Deque` (use `ArrayDeque`)
+
+A secondary question: **do you need sorted order?** If yes, favour `TreeSet` over `HashSet` or `TreeMap` over `HashMap` — but expect O(log n) operations instead of O(1).
+
+## Time-complexity reference
+
+Before you commit to a data structure, it's worth knowing the cost of its core operations.
+
+| Operation | ArrayList | LinkedList | HashSet | TreeSet | HashMap | TreeMap |
+|-----------|-----------|------------|---------|---------|---------|---------|
+| `add` (end / put) | O(1) amortized | O(1) | O(1) avg | O(log n) | O(1) avg | O(log n) |
+| `add` (middle) | O(n) | O(n) index, O(1) with iterator | — | — | — | — |
+| `get` / `contains` | O(1) / O(n) | O(n) / O(n) | — / O(1) avg | — / O(log n) | O(1) avg | O(log n) |
+| `remove` | O(n) | O(n) index | O(1) avg | O(log n) | O(1) avg | O(log n) |
+| Iteration | O(n) | O(n) | O(n) | O(n) sorted | O(n) | O(n) sorted |
+
+"O(1) avg" means *amortized average*. In the worst case (many hash collisions), `HashMap` operations degrade toward O(n), though Java's HashMap has mitigated this with tree-bins since Java 8.
+
+<Note>Don't memorise the table — understand the **shape** of each structure. Hash-based collections trade ordering for O(1) speed. Tree-based collections sacrifice some speed for sorted order. Arrays/ArrayLists trade flexible sizing for O(1) random access. Once you know the shape, the complexity follows naturally.</Note>
+
+## A first look at all three roots
+
+```java
+import java.util.*;
+
+public class CollectionsIntro {
+    public static void main(String[] args) {
+        // List: ordered, duplicates OK
+        List<String> cities = new ArrayList<>();
+        cities.add("London");
+        cities.add("Paris");
+        cities.add("London");   // duplicate allowed
+        System.out.println(cities);         // [London, Paris, London]
+        System.out.println(cities.get(1));  // Paris (index access)
+
+        // Set: no duplicates
+        Set<String> uniqueCities = new HashSet<>(cities);
+        System.out.println(uniqueCities);   // [London, Paris] (order may vary)
+
+        // Map: key → value
+        Map<String, Integer> population = new HashMap<>();
+        population.put("London", 9_000_000);
+        population.put("Paris",  2_100_000);
+        System.out.println(population.get("Paris")); // 2100000
+    }
+}
+```
+
+## Polymorphism through interfaces
+
+One of the most important practices in the Collections Framework is **programming to the interface, not the implementation**:
+
+```java
+// Prefer this:
+List<String> names = new ArrayList<>();
+
+// Over this:
+ArrayList<String> names = new ArrayList<>();
+```
+
+By declaring the variable as `List<String>`, you can swap in a `LinkedList` (or a mock in a test) without changing any code that uses `names`. This is the Liskov Substitution Principle in everyday practice.
+
+The same applies to method signatures:
+
+```java
+// Accepts any List — flexible
+void process(List<String> items) { ... }
+
+// Unnecessarily locked to ArrayList
+void process(ArrayList<String> items) { ... }
+```
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+```java
+import java.util.*;
+
+public class Demo {
+    public static void main(String[] args) {
+        // Start with a list that has duplicates
+        List<Integer> scores = new ArrayList<>(Arrays.asList(88, 95, 72, 95, 88, 100));
+        System.out.println("All scores: " + scores);         // [88, 95, 72, 95, 88, 100]
+
+        // Deduplicate with a Set
+        Set<Integer> unique = new LinkedHashSet<>(scores);   // LinkedHashSet preserves insertion order
+        System.out.println("Unique scores: " + unique);      // [88, 95, 72, 100]
+
+        // Count occurrences with a Map
+        Map<Integer, Integer> freq = new HashMap<>();
+        for (int s : scores) {
+            freq.put(s, freq.getOrDefault(s, 0) + 1);
+        }
+        System.out.println("Frequency of 95: " + freq.get(95)); // 2
+    }
+}
+```
+
+## Legacy collections to avoid
+
+Java has been around since 1995, and several collection classes predate the modern framework:
+
+| Legacy class | Modern replacement | Why avoid? |
+|---|---|---|
+| `Vector` | `ArrayList` | Synchronized on every call — expensive when you don't need thread safety |
+| `Hashtable` | `HashMap` | Same synchronization problem; doesn't allow `null` keys |
+| `Stack` | `ArrayDeque` | Extends `Vector` (inherits its baggage); `Deque` is faster and more principled |
+| `Enumeration` | `Iterator` | Older cursor API with fewer capabilities |
+
+You will still see these in legacy codebases, so knowing them is useful — just don't write new code with them.
+
+<Note>If you need a **thread-safe** collection, reach for `java.util.concurrent`: `ConcurrentHashMap`, `CopyOnWriteArrayList`, or `BlockingQueue` implementations. These are designed for concurrency and are far more efficient than the old synchronized wrappers.</Note>
+
+## The Collections utility class
+
+`java.util.Collections` (note the plural) is a helper class full of static methods that operate on any `Collection` or `List`:
+
+```java
+import java.util.*;
+
+public class UtilDemo {
+    public static void main(String[] args) {
+        List<Integer> nums = new ArrayList<>(Arrays.asList(3, 1, 4, 1, 5, 9, 2, 6));
+
+        System.out.println(Collections.min(nums));   // 1
+        System.out.println(Collections.max(nums));   // 9
+        Collections.sort(nums);
+        System.out.println(nums);                    // [1, 1, 2, 3, 4, 5, 6, 9]
+        Collections.reverse(nums);
+        System.out.println(nums);                    // [9, 6, 5, 4, 3, 2, 1, 1]
+        Collections.shuffle(nums);                   // random order each run
+    }
+}
+```
+
+Think of `Collections` as the Swiss Army knife that wraps around any collection the framework defines.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Using raw types** (`List names = new ArrayList()`) — without the generic type parameter you lose compile-time type checking and get unchecked-cast warnings everywhere. Always supply the type: `List<String> names = new ArrayList<>()`.
+- **Reaching for `Vector` or `Hashtable`** — they're slow by default due to blanket synchronization. Use `ArrayList` or `HashMap` in single-threaded code. For concurrent code, use `java.util.concurrent` classes.
+- **Declaring the concrete type** (`ArrayList<String> x = new ArrayList<>()`) instead of the interface (`List<String> x`). This locks you into one implementation and makes refactoring harder.
+- **Confusing `Collections` (utility class) with `Collection` (interface)** — one has an "s". `Collections.sort()` is the utility method; `Collection` is the interface your list implements.
+- **Treating Map as a Collection** — `Map` doesn't implement `Collection`, so you can't pass a `Map` where a `Collection` is expected. Use `.entrySet()`, `.keySet()`, or `.values()` to get a proper view.
+
+## Recap
+
+The Collections Framework gives you a coherent, interface-driven toolbox for every data-structure need. The key insight is that each interface (`List`, `Set`, `Queue`, `Map`) represents a *contract* — a set of behaviours — and each concrete class fulfils that contract with a specific internal structure tuned for different trade-offs.
+
+- **`Iterable → Collection → List/Set/Queue`** form the main hierarchy; `Map` is separate
+- **`List`** keeps insertion order and allows duplicates; great for sequences you access by index
+- **`Set`** enforces uniqueness; great for membership tests and deduplication
+- **`Map`** pairs keys with values; great for lookup tables and counting
+- **`Queue`/`Deque`** model processing pipelines and stacks
+- Always program to **interfaces**, not concrete types
+- Avoid **legacy classes** (`Vector`, `Hashtable`, `Stack`) in new code
+
+**Up next:** ArrayList — how the dynamic array works under the hood and why it's almost always the right List.
+
+<Exercise>
+Complete the `main` method to demonstrate all three major collection types: a `List` that preserves duplicates, a `Set` that removes them, and a `Map` for stock counts.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> shopping = new ArrayList<>();
+        // TODO: add "milk", "eggs", "bread", "eggs"
+        System.out.println("Shopping (" + shopping.size() + "): " + shopping);
+
+        Set<String> unique = new TreeSet<>(shopping);
+        System.out.println("Unique items: " + unique);
+
+        Map<String, Integer> stock = new TreeMap<>();
+        // TODO: put "milk"->12, "eggs"->24, "bread"->8
+        System.out.println("Eggs in stock: " + stock.get("eggs"));
+    }
+}
+```
+
+**What the tests check:**
+- `shopping` has 4 elements including the duplicate `"eggs"`
+- `unique` has 3 elements in alphabetical order: `[bread, eggs, milk]`
+- `stock.get("eggs")` returns `24`
+
+<Note>Hint: `TreeSet` and `TreeMap` sort their contents automatically — you don't need to call `sort()` separately.</Note>
+</Exercise>

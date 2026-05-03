@@ -1,0 +1,364 @@
+export const meta = {
+  title: "Throwing Exceptions",
+  duration: 12,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "te-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        try {
+            System.out.println(clamp(5, 1, 10));
+            System.out.println(clamp(0, 1, 10));
+        } catch (IllegalArgumentException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    static int clamp(int value, int min, int max) {
+        if (min > max) throw new IllegalArgumentException(
+            "min " + min + " > max " + max);
+        return Math.max(min, Math.min(max, value));
+    }
+}`,
+    expectedOutput: "5\n1",
+    explanation: "`clamp(5, 1, 10)` returns 5 (already in range). `clamp(0, 1, 10)` returns 1 (clamped to min). Neither call violates the `min > max` guard, so no exception is thrown.",
+  },
+  endQ1: {
+    id: "te-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        try {
+            String result = process(null);
+            System.out.println(result);
+        } catch (NullPointerException e) {
+            System.out.println("Null: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            System.out.println("Illegal: " + e.getMessage());
+        }
+    }
+
+    static String process(String s) {
+        if (s == null) throw new NullPointerException("input must not be null");
+        if (s.isBlank()) throw new IllegalArgumentException("input must not be blank");
+        return s.trim().toUpperCase();
+    }
+}`,
+    expectedOutput: "Null: input must not be null",
+    explanation: "`s` is null, so the first guard fires and throws `NullPointerException`. The first catch matches and prints the message. The `IllegalArgumentException` catch is never reached.",
+  },
+  endQ2: {
+    id: "te-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the main advantage of throwing an exception early (guard clause at the top of a method)?",
+    options: [
+      { text: "It makes the method run faster.", correct: false, feedback: "The performance difference is negligible. The real benefit is code clarity." },
+      { text: "It keeps the main logic unindented and easy to read, and catches bad input at the boundary.", correct: true },
+      { text: "It converts the exception to a checked exception automatically.", correct: false, feedback: "Guard clauses don't change whether an exception is checked or unchecked." },
+      { text: "It prevents the exception from printing a stack trace.", correct: false, feedback: "Whether a stack trace is printed depends on whether the exception is caught, not where it is thrown." },
+    ],
+    explanation: "Guard clauses (throwing early on invalid input) keep the happy path clean and linear. Without them, you'd need nested if/else blocks throughout the method body. They also enforce preconditions at the method boundary, making contracts explicit.",
+  },
+  endQ3: {
+    id: "te-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the keyword that signals an exception from inside a method body:",
+    code: `if (value < 0) {
+    ___ new IllegalArgumentException("negative value: " + value);
+}`,
+    correctAnswers: ["throw"],
+    caseSensitive: true,
+    explanation: "`throw` (no 's') is the statement that actually signals an exception. `throws` (with 's') is only used in method signatures to declare checked exceptions that may propagate.",
+  },
+  endQ4: {
+    id: "te-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        try {
+            connect(null);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught: " + e.getMessage());
+        }
+    }
+
+    static void connect(String host) {
+        if (host == null) {
+            new IllegalArgumentException("host is null");
+        }
+        System.out.println("Connecting to " + host.toUpperCase());
+    }
+}`,
+    buggyLine: 12,
+    issue: "The exception object is constructed but never thrown — the `throw` keyword is missing",
+    explanation: "`new IllegalArgumentException(...)` merely creates an object; without `throw`, it is immediately garbage collected. Execution continues to `host.toUpperCase()` which throws a `NullPointerException`. Fix: `throw new IllegalArgumentException(\"host is null\");`.",
+  },
+};
+
+You've seen exceptions caught; now you'll learn to throw them intentionally. Throwing exceptions is how you enforce *contracts* — the rules your methods expect callers to follow. A method that accepts a file path should refuse null paths loudly rather than silently producing confusing behavior several layers deeper.
+
+## The `throw` statement
+
+`throw` signals an exception from inside any method body. It takes any `Throwable` object:
+
+```java
+static void printName(String name) {
+    if (name == null) {
+        throw new NullPointerException("name must not be null");
+    }
+    System.out.println("Hello, " + name);
+}
+```
+
+Execution stops at `throw`. If no catch block in the current stack handles it, the exception propagates up. `throw` takes *one* expression — the exception object — and that expression must be non-null.
+
+<Note>`throw` (no 's') is the action; `throws` (with 's') in the method signature is the declaration. Students commonly confuse the two. Remember: the body *throws*, the signature *declares throws*.</Note>
+
+## Guard clauses: validate early
+
+A **guard clause** is a `throw` (or `return`) at the top of a method that immediately rejects invalid input. It is the most important technique for keeping method bodies clean:
+
+```java
+static double divide(double numerator, double denominator) {
+    if (denominator == 0.0) {
+        throw new ArithmeticException("denominator must not be zero");
+    }
+    // Happy path — no nesting needed
+    return numerator / denominator;
+}
+```
+
+Compare that to the alternative without a guard:
+
+```java
+static double divide(double numerator, double denominator) {
+    if (denominator != 0.0) {
+        return numerator / denominator;
+    } else {
+        throw new ArithmeticException("denominator must not be zero");
+    }
+}
+```
+
+Both work, but the guard-clause version keeps the main logic at the top level. With multiple guards, the difference becomes even more dramatic.
+
+## Choosing the right exception type
+
+Java's standard library provides many exception types. Picking the right one makes your code self-documenting:
+
+| Situation | Exception type |
+|---|---|
+| A method argument violates the contract | `IllegalArgumentException` |
+| The object is in a state that doesn't allow this operation | `IllegalStateException` |
+| A required argument (or required value) is null | `NullPointerException` |
+| An array or list index is out of bounds | `ArrayIndexOutOfBoundsException` / `IndexOutOfBoundsException` |
+| An operation is not implemented / not supported | `UnsupportedOperationException` |
+| A numeric computation overflowed or underflowed | `ArithmeticException` |
+
+Always prefer a specific type over `RuntimeException` directly — the exception class itself is documentation.
+
+```java
+static void setAge(int age) {
+    if (age < 0 || age > 150) {
+        throw new IllegalArgumentException("Age out of realistic range: " + age);
+    }
+    this.age = age;
+}
+
+static void start() {
+    if (alreadyRunning) {
+        throw new IllegalStateException("Cannot start: already running");
+    }
+    alreadyRunning = true;
+}
+```
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Writing good exception messages
+
+An exception message is read by a developer trying to understand what went wrong. Good messages are specific and include the bad value:
+
+```java
+// Bad — no context
+throw new IllegalArgumentException("invalid input");
+
+// Good — includes the actual value and why it's wrong
+throw new IllegalArgumentException(
+    "Expected positive integer, got: " + value + " (must be >= 1)");
+```
+
+Think of the message as a note to your future self at 2 AM trying to diagnose a production outage.
+
+## Re-throwing exceptions
+
+Sometimes a method catches an exception, does some cleanup or logging, and then re-throws it:
+
+```java
+static void saveToDatabase(Record r) throws SQLException {
+    try {
+        db.insert(r);
+    } catch (SQLException e) {
+        log.error("Failed to insert record " + r.id, e);
+        throw e;   // re-throw the same exception
+    }
+}
+```
+
+`throw e` re-throws the existing exception object, preserving its original stack trace. The caller sees the same `SQLException` that the database driver produced.
+
+## Wrapping exceptions (exception chaining)
+
+Instead of re-throwing the original, you can *wrap* it in a new exception. This is useful for translating low-level exceptions into meaningful domain-level ones:
+
+```java
+static User loadUser(int id) {
+    try {
+        return database.findById(id);
+    } catch (SQLException e) {
+        // Caller doesn't know about SQL — give them a domain exception
+        throw new RuntimeException("Could not load user with id " + id, e);
+    }
+}
+```
+
+The second argument to most exception constructors is the **cause**. The cause is visible in stack traces and accessible via `getCause()`. Never wrap without preserving the cause — you'd lose the original stack trace.
+
+```java
+// Bad — cause is lost
+throw new RuntimeException("Could not load user");
+
+// Good — cause is preserved
+throw new RuntimeException("Could not load user", e);
+```
+
+## A realistic validation example
+
+Guard clauses are especially powerful when combined with descriptive messages:
+
+```java
+static void transferFunds(Account from, Account to, double amount) {
+    if (from == null) throw new NullPointerException("source account must not be null");
+    if (to == null)   throw new NullPointerException("destination account must not be null");
+    if (amount <= 0)  throw new IllegalArgumentException(
+        "Transfer amount must be positive, got: " + amount);
+    if (from.getBalance() < amount) throw new IllegalStateException(
+        "Insufficient funds: balance " + from.getBalance() + " < requested " + amount);
+
+    from.debit(amount);
+    to.credit(amount);
+}
+```
+
+Each guard addresses a distinct failure mode with a distinct exception type and a message that pinpoints the problem. The actual transfer logic at the bottom is uncluttered and easy to audit.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        String[] names = {"Alice", "", null, "Bob"};
+        for (String name : names) {
+            try {
+                System.out.println(greet(name));
+            } catch (NullPointerException e) {
+                System.out.println("NPE: " + e.getMessage());
+            } catch (IllegalArgumentException e) {
+                System.out.println("IAE: " + e.getMessage());
+            }
+        }
+    }
+
+    static String greet(String name) {
+        if (name == null)    throw new NullPointerException("name is null");
+        if (name.isBlank())  throw new IllegalArgumentException("name is blank");
+        return "Hello, " + name + "!";
+    }
+}
+```
+
+Notice that both guards use the exception type most appropriate to the failure mode, and the loop can handle whichever fires.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Creating but not throwing** — `new IllegalArgumentException("bad")` without `throw` compiles fine but does nothing. The object is created and immediately garbage-collected. Always write `throw new ...`.
+- **Vague exception messages** — "invalid input" or "error occurred" are useless in production logs. Always include the actual value and an explanation of why it's wrong. Future-you will be grateful.
+- **Using the wrong exception type** — throwing `RuntimeException` directly when `IllegalArgumentException` exists, or throwing `Exception` when `IOException` would be precise. The type is documentation; choose it deliberately.
+- **Losing the cause when wrapping** — `throw new RuntimeException("msg")` discards the original stack trace. Always pass the caught exception as the second argument: `throw new RuntimeException("msg", e)`.
+- **Throwing inside `finally`** — as covered in Lesson 2, this swallows any in-flight exception. If you must throw from a cleanup path, wrap it carefully and log the suppressed exception.
+
+## Recap
+
+Throwing exceptions is how you enforce contracts and communicate failures precisely. A method that throws at the right moment, with the right type and a clear message, makes the entire codebase more robust.
+
+- `throw new ExceptionType("message")` is the basic syntax; the object must be non-null
+- Guard clauses at the top of a method reject invalid input early, keeping the happy path clean
+- Choose the most specific standard exception type available; the type name itself is documentation
+- Re-throw with `throw e` to preserve the original stack trace; wrap with `throw new SomeException("msg", e)` to translate exceptions across layers
+- Always include the bad value and an explanation in exception messages
+
+**Up next:** Creating Custom Exceptions — defining your own exception classes with extra fields, error codes, and structured context.
+
+<Exercise>
+Complete the two guard clauses: `safeSqrt` should throw `IllegalArgumentException` for negative inputs, and `getElement` should throw `ArrayIndexOutOfBoundsException` for out-of-range indices.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        runTest(() -> System.out.println(safeSqrt(16.0)),   IllegalArgumentException.class);
+        runTest(() -> System.out.println(safeSqrt(-4.0)),   IllegalArgumentException.class);
+        runTest(() -> System.out.println(getElement(new int[]{10, 20, 30}, 1)), ArrayIndexOutOfBoundsException.class);
+        runTest(() -> System.out.println(getElement(new int[]{10, 20, 30}, 5)), ArrayIndexOutOfBoundsException.class);
+    }
+
+    static double safeSqrt(double n) {
+        if (n < 0) {
+            // TODO: throw new IllegalArgumentException("Cannot take sqrt of negative: " + n)
+        }
+        return Math.sqrt(n);
+    }
+
+    static int getElement(int[] arr, int index) {
+        if (index < 0 || index >= arr.length) {
+            // TODO: throw new ArrayIndexOutOfBoundsException("Index " + index + " out of bounds for length " + arr.length)
+        }
+        return arr[index];
+    }
+
+    static void runTest(Runnable r, Class<? extends RuntimeException> expected) {
+        try { r.run(); }
+        catch (RuntimeException e) { System.out.println("Error: " + e.getMessage()); }
+    }
+}
+```
+
+**What the tests check:**
+- `safeSqrt(16.0)` prints `4.0`
+- `safeSqrt(-4.0)` prints `Error: Cannot take sqrt of negative: -4.0`
+- `getElement(arr, 1)` prints `20`
+- `getElement(arr, 5)` prints `Error: Index 5 out of bounds for length 3`
+
+<Note>Hint: `Math.sqrt(16.0)` returns the double `4.0`, which prints as `4.0`. The messages must match exactly, including the colon and space before the value.</Note>
+</Exercise>

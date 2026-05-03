@@ -1,0 +1,322 @@
+export const meta = {
+  title: "What Are Exceptions?",
+  duration: 10,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "wae-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which class sits at the very top of Java's exception hierarchy?",
+    options: [
+      { text: "Exception", correct: false, feedback: "`Exception` is one branch below the root — it doesn't cover `Error` or other `Throwable` subtypes." },
+      { text: "RuntimeException", correct: false, feedback: "`RuntimeException` is a subclass of `Exception`, which is itself below `Throwable`." },
+      { text: "Throwable", correct: true },
+      { text: "Object", correct: false, feedback: "`Object` is the root of all Java classes, but `Throwable` is the root of everything that can be thrown or caught." },
+    ],
+    explanation: "`Throwable` is the ultimate parent. It has two direct children: `Error` (JVM-level problems you generally can't recover from) and `Exception` (problems programs can and should handle).",
+  },
+  endQ1: {
+    id: "wae-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    public static void main(String[] args) {
+        try {
+            int[] arr = new int[3];
+            arr[5] = 42;
+        } catch (ArrayIndexOutOfBoundsException e) {
+            System.out.println("Caught: " + e.getMessage());
+        }
+        System.out.println("Continuing");
+    }
+}`,
+    expectedOutput: "Caught: Index 5 out of bounds for length 3\nContinuing",
+    explanation: "The JVM throws `ArrayIndexOutOfBoundsException` when index 5 is accessed on a 3-element array. The catch block handles it and execution continues normally after the try-catch.",
+  },
+  endQ2: {
+    id: "wae-end-2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is an 'Error' in Java's exception hierarchy?",
+    options: [
+      { text: "Any bug in your code.", correct: false, feedback: "Bugs can surface as any kind of `Throwable` — `Error` specifically means a serious JVM-level failure." },
+      { text: "A serious JVM-level problem that programs typically cannot recover from.", correct: true },
+      { text: "A checked exception that must be declared with `throws`.", correct: false, feedback: "`Error` is not a checked exception — it's a separate branch of `Throwable` entirely." },
+      { text: "A compile-time failure.", correct: false, feedback: "Compile-time failures are not represented by `Error` at runtime. `Error` is thrown at runtime by the JVM." },
+    ],
+    explanation: "Examples of `Error` include `OutOfMemoryError` and `StackOverflowError`. These signal that the JVM itself is in trouble. Catching them is almost never correct.",
+  },
+  endQ3: {
+    id: "wae-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the class name that every catchable program-level problem extends:",
+    code: "catch (___ e) { ... }  // catches all program exceptions",
+    correctAnswers: ["Exception"],
+    caseSensitive: true,
+    explanation: "`Exception` is the root of the program-exception branch. Catching it grabs everything except `Error` subtypes — which is usually too broad, but technically correct as a base class.",
+  },
+  endQ4: {
+    id: "wae-end-4",
+    type: "find_the_bug",
+    difficulty: "easy",
+    code: `public class Main {
+    public static void main(String[] args) {
+        String s = null;
+        System.out.println(s.length());
+        System.out.println("Done");
+    }
+}`,
+    buggyLine: 4,
+    issue: "Calling a method on a null reference causes NullPointerException",
+    explanation: "`s` is `null`, so `s.length()` throws a `NullPointerException` at runtime. \"Done\" is never printed. Fix by checking `if (s != null)` before calling the method, or by initializing `s` to an actual string.",
+  },
+};
+
+Every program encounters unexpected situations: a file is missing, a user types letters where a number was expected, the network drops mid-request. Java's **exception system** is a structured way to signal and handle these situations without tangling error-checking code with normal logic.
+
+Before exceptions existed (think C), functions had to return special error codes. Every caller had to check the return value and pass it up the chain. It was easy to forget one check, and the real logic was buried in a forest of `if (err != 0)` guards. Exceptions separate the happy path from the error path cleanly.
+
+## The exception hierarchy
+
+Java models all exceptional events as objects. The root of the hierarchy is **`Throwable`**, which has two direct children:
+
+```
+Throwable
+├── Error                        ← JVM-level, don't catch
+│   ├── OutOfMemoryError
+│   ├── StackOverflowError
+│   └── ...
+└── Exception                    ← program-level, handle these
+    ├── RuntimeException         ← unchecked (compiler lets you ignore)
+    │   ├── NullPointerException
+    │   ├── ArrayIndexOutOfBoundsException
+    │   ├── IllegalArgumentException
+    │   └── ...
+    ├── IOException              ← checked (compiler forces you to handle)
+    ├── SQLException             ← checked
+    └── ...
+```
+
+**`Error`** signals that the JVM itself is failing. `OutOfMemoryError` means no heap space remains; `StackOverflowError` means infinite (or very deep) recursion has exhausted the call stack. You almost never catch these — by the time they fire, there is often nothing you can safely do.
+
+**`Exception`** is what your code works with. It splits further into *checked* and *unchecked* exceptions, which you'll explore fully in Lesson 3.
+
+<Note>You can throw any `Throwable` subclass, but catching `Error` or bare `Throwable` is almost always a mistake. Stick to `Exception` and its subtypes unless you have a very specific reason.</Note>
+
+## How Java signals an exception
+
+When something goes wrong, the JVM (or your code) constructs a `Throwable` object and **throws** it. Normal execution stops at that exact point. Java looks for the nearest matching `catch` block, unwinding the call stack frame by frame until it finds one. If none is found, the thread terminates and Java prints a **stack trace**.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        divide(10, 0);          // triggers ArithmeticException
+        System.out.println("This never runs");
+    }
+
+    static int divide(int a, int b) {
+        return a / b;           // JVM throws here
+    }
+}
+```
+
+Running this produces:
+
+```
+Exception in thread "main" java.lang.ArithmeticException: / by zero
+    at Main.divide(Main.java:8)
+    at Main.main(Main.java:3)
+```
+
+Notice execution stops at `divide` — it never reaches the `println`.
+
+## Anatomy of a stack trace
+
+A stack trace is your debugger's best friend. Let's decode the one above:
+
+```
+Exception in thread "main" java.lang.ArithmeticException: / by zero
+    at Main.divide(Main.java:8)
+    at Main.main(Main.java:3)
+```
+
+| Part | Meaning |
+|---|---|
+| `Exception in thread "main"` | Which thread crashed |
+| `java.lang.ArithmeticException` | Fully-qualified exception class |
+| `/ by zero` | The message stored in the exception object |
+| `at Main.divide(Main.java:8)` | Class, method, file, and line where it was thrown |
+| `at Main.main(Main.java:3)` | The caller that led to the throw |
+
+Read a stack trace **top to bottom**: the top line is where the problem actually occurred; the lines below show the chain of calls that got there. In deep frameworks the trace can be 40 lines long — focus on the lines that mention your own class names.
+
+<Note>In real projects you'll often see "caused by" chains where one exception wraps another. The original root cause is at the very bottom of the trace. Always scroll to the bottom first when diagnosing a new error.</Note>
+
+## Why exceptions beat error codes
+
+Consider two styles:
+
+```java
+// Error-code style (painful)
+int result = divide(a, b);
+if (result == DIVIDE_ERROR) {
+    int result2 = doSomethingElse();
+    if (result2 == SOMETHING_ERROR) {
+        // ...
+    }
+}
+```
+
+```java
+// Exception style (clean)
+try {
+    int result = divide(a, b);
+    int result2 = doSomethingElse();
+    // more happy-path code...
+} catch (ArithmeticException e) {
+    handleDivisionError(e);
+}
+```
+
+Exceptions allow you to group a block of happy-path code together and handle failures in a single place. Critically, if an intermediate method forgets to check a return code, the bug is silent. If an intermediate method fails to catch an exception, it propagates automatically — you cannot accidentally ignore it.
+
+## A first look at catching exceptions
+
+The `try` block holds code that might throw. The `catch` block runs only if the matching exception is thrown:
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        try {
+            int result = Integer.parseInt("abc");   // throws NumberFormatException
+            System.out.println(result);
+        } catch (NumberFormatException e) {
+            System.out.println("Bad number: " + e.getMessage());
+        }
+        System.out.println("Program continues");
+    }
+}
+```
+
+Output:
+```
+Bad number: For input string: "abc"
+Program continues
+```
+
+The exception was caught, handled, and execution resumed normally. The crucial point: code **after** the try-catch still runs.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## More exception examples
+
+Not all exceptions come from the JVM — your own methods can detect invalid situations and throw:
+
+```java
+static double squareRoot(double n) {
+    if (n < 0) {
+        throw new IllegalArgumentException("Cannot take sqrt of " + n);
+    }
+    return Math.sqrt(n);
+}
+```
+
+You'll learn the full `throw` syntax in Lesson 4. For now, notice the pattern: check the precondition, describe the problem in the message, stop execution immediately.
+
+Another common source of exceptions is null references:
+
+```java
+String name = null;
+System.out.println(name.toUpperCase());  // NullPointerException
+```
+
+`NullPointerException` (NPE) is the most common exception Java programmers encounter. Java 17+ includes "helpful NPEs" that tell you *which* variable was null:
+
+```
+NullPointerException: Cannot invoke "String.toUpperCase()" because "name" is null
+```
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        String[] inputs = {"10", "abc", "5"};
+        for (String s : inputs) {
+            try {
+                int n = Integer.parseInt(s);
+                System.out.println("Parsed: " + n);
+            } catch (NumberFormatException e) {
+                System.out.println("Skipping bad input: " + s);
+            }
+        }
+    }
+}
+```
+
+Run this and verify you see `Parsed: 10`, `Skipping bad input: abc`, `Parsed: 5`. Then try adding `"null"` and `""` to the array to see what messages you get.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Reading the stack trace from the wrong end** — the top of the trace is the throw site, but in framework-heavy code the top 20 lines may all be library code. Scan for lines with *your* class name; that's where the real story is. Knowing how to read a trace quickly is one of the highest-value debugging skills you can develop.
+- **Confusing `Error` and `Exception`** — students sometimes try to catch `StackOverflowError` to "handle" infinite recursion. You can technically catch an `Error`, but by the time one fires the JVM state is too corrupted to do anything useful. The fix is always in your code logic, not the catch block.
+- **Assuming the program crashes permanently** — catching an exception and handling it properly means the program keeps running. This is the whole point: you can recover from a bad parse, retry a network call, or show the user a friendly message instead of an ugly stack trace.
+- **Ignoring the exception message** — `e.getMessage()` contains the human-readable explanation. Always include it when logging or displaying errors. An empty catch block that swallows the message makes bugs nearly impossible to diagnose.
+
+## Recap
+
+Exceptions are Java's structured mechanism for signalling and handling runtime errors. They beat error codes because failures propagate automatically and you can keep the happy path readable.
+
+- **`Throwable`** is the hierarchy root; `Error` (JVM-level) and `Exception` (program-level) are its two branches
+- When an exception is thrown, execution stops and the JVM searches up the call stack for a matching `catch` block
+- A stack trace shows *exactly* where the throw happened and the chain of method calls leading to it
+- `try { ... } catch (SomeException e) { ... }` is the fundamental syntax for handling an exception
+
+**Up next:** try, catch, and finally — multi-catch, catch ordering, and what happens when you need cleanup code that always runs.
+
+<Exercise>
+Complete `safeDivide` so that it prints the division result when it succeeds, and prints a friendly error message when dividing by zero.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        safeDivide(10, 2);
+        safeDivide(5, 0);
+        safeDivide(9, 3);
+    }
+
+    static void safeDivide(int a, int b) {
+        try {
+            // TODO: compute and print a + " / " + b + " = " + (a / b)
+        } catch (ArithmeticException e) {
+            // TODO: print "Cannot divide " + a + " by zero"
+        }
+    }
+}
+```
+
+**What the tests check:**
+- Calling `safeDivide(10, 2)` prints `10 / 2 = 5`
+- Calling `safeDivide(5, 0)` prints `Cannot divide 5 by zero`
+- Calling `safeDivide(9, 3)` prints `9 / 3 = 3`
+- No exception escapes the method
+
+<Note>Hint: integer division `a / b` throws `ArithmeticException` (not a checked exception) when `b` is zero. The catch block receives the exception but you don't need to call `e.getMessage()` here — just build the message from `a`.</Note>
+</Exercise>

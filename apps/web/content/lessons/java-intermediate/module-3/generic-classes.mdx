@@ -1,0 +1,404 @@
+export const meta = {
+  title: "Generic Classes",
+  duration: 14,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "gc-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.ArrayList;
+import java.util.List;
+
+class Box<T> {
+    private T value;
+    Box(T value) { this.value = value; }
+    T get()      { return value; }
+    void set(T v){ this.value = v; }
+
+    @Override
+    public String toString() { return "Box[" + value + "]"; }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        Box<String> b = new Box<>("hello");
+        System.out.println(b);
+        b.set("world");
+        System.out.println(b.get().toUpperCase());
+        System.out.println(b);
+    }
+}`,
+    expectedOutput: "Box[hello]\nWORLD\nBox[world]",
+    explanation: "`Box<String>` stores a String. The first `println` uses `toString()` which prints `Box[hello]`. After `set(\"world\")`, `get()` returns a String so `.toUpperCase()` is available directly. The final `println` shows the updated state.",
+  },
+  endQ1: {
+    id: "gc-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+
+class Stack<T> {
+    private final List<T> items = new ArrayList<>();
+    void push(T item) { items.add(item); }
+    T pop() {
+        if (items.isEmpty()) throw new NoSuchElementException();
+        return items.remove(items.size() - 1);
+    }
+    int size() { return items.size(); }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        Stack<String> s = new Stack<>();
+        s.push("a");
+        s.push("b");
+        s.push("c");
+        System.out.println(s.size());
+        System.out.println(s.pop());
+        System.out.println(s.pop());
+        System.out.println(s.size());
+    }
+}`,
+    expectedOutput: "3\nc\nb\n1",
+    explanation: "Three items are pushed. `size()` returns 3. `pop()` removes from the end (LIFO), so the first pop returns `c`, the second returns `b`. One item remains.",
+  },
+  endQ2: {
+    id: "gc-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which of the following is true about raw types in modern Java?",
+    options: [
+      { text: "Raw types are recommended for maximum flexibility.", correct: false, feedback: "Raw types sacrifice compile-time type safety; they are actively discouraged." },
+      { text: "Using a raw type suppresses all generic type checks and produces compiler warnings.", correct: true, feedback: "Correct — raw types bypass generics entirely and the compiler warns you with 'unchecked' warnings." },
+      { text: "Raw types are identical to using `<Object>` as the type argument.", correct: false, feedback: "`List<Object>` is a parameterized type that does participate in generic checking; a raw `List` does not." },
+      { text: "Raw types were removed in Java 11.", correct: false, feedback: "Raw types still exist in Java for backward compatibility, though IDEs and the compiler warn against them." },
+    ],
+    explanation: "A raw type (`List` instead of `List<String>`) tells the compiler to turn off generics for that variable. You lose type safety, get 'unchecked' warnings, and open yourself to `ClassCastException` at runtime. Use them only when forced to interoperate with truly legacy code.",
+  },
+  endQ3: {
+    id: "gc-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the generic class declaration so it stores a key of type K and a value of type V:",
+    code: `class Entry<___, ___> {
+    K key;
+    V value;
+}`,
+    correctAnswers: ["K, V", "K,V"],
+    caseSensitive: false,
+    explanation: "Multiple type parameters are separated by commas inside the angle brackets: `<K, V>`. By convention single uppercase letters are used — `K` for key, `V` for value — but any identifier works.",
+  },
+  endQ4: {
+    id: "gc-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class Wrapper<T> {
+    T value;
+
+    Wrapper(T value) {
+        this.value = value;
+    }
+
+    static T echo(T v) {   // line 8
+        return v;
+    }
+}`,
+    buggyLine: 8,
+    issue: "A static method cannot reference the class-level type parameter `T`",
+    explanation: "The type parameter `T` declared on `Wrapper<T>` belongs to instances — it is not in scope for static members. A static generic method must declare its own type parameter: `static <T> T echo(T v) { return v; }`. This makes the `T` local to the method rather than the class.",
+  },
+};
+
+A generic class is a class whose behaviour is parameterized by one or more types supplied by the caller. You write the logic once; the compiler adapts it for every type you use it with. This is the mechanism behind every `ArrayList<E>`, `HashMap<K,V>`, and `Optional<T>` in the Java standard library.
+
+## Declaring a type parameter
+
+Place the type parameter list in angle brackets immediately after the class name:
+
+```java
+class Box<T> {
+    private T value;
+
+    Box(T value) {
+        this.value = value;
+    }
+
+    T get() {
+        return value;
+    }
+
+    void set(T newValue) {
+        this.value = newValue;
+    }
+}
+```
+
+`T` is a placeholder. When you write `Box<String>`, the compiler substitutes `String` for every occurrence of `T`. When you write `Box<Integer>`, it substitutes `Integer`. You write the class once, and it is reused correctly for every type.
+
+The name `T` is a convention, not a rule. Common single-letter conventions are:
+
+| Letter | Meaning |
+| ------ | ------- |
+| `T`    | Type (generic) |
+| `E`    | Element (collections) |
+| `K`    | Key |
+| `V`    | Value |
+| `R`    | Return type |
+| `N`    | Number |
+
+You can use any identifier, but deviating from convention without a good reason hurts readability.
+
+## A generic Stack
+
+A stack is one of the clearest illustrations of a generic class — the data-structure logic (push, pop, peek) is completely independent of the element type:
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+
+class Stack<E> {
+    private final List<E> items = new ArrayList<>();
+
+    void push(E item) {
+        items.add(item);
+    }
+
+    E pop() {
+        if (items.isEmpty()) throw new NoSuchElementException("Stack is empty");
+        return items.remove(items.size() - 1);
+    }
+
+    E peek() {
+        if (items.isEmpty()) throw new NoSuchElementException("Stack is empty");
+        return items.get(items.size() - 1);
+    }
+
+    int     size()    { return items.size(); }
+    boolean isEmpty() { return items.isEmpty(); }
+}
+```
+
+Usage:
+
+```java
+Stack<String> history = new Stack<>();
+history.push("home");
+history.push("products");
+history.push("checkout");
+System.out.println(history.peek());  // checkout
+System.out.println(history.pop());   // checkout
+System.out.println(history.pop());   // products
+```
+
+The same class works equally well for `Stack<Integer>` or `Stack<Double>` without a single change to its source.
+
+<Note>Notice that the `List<E>` field is also parameterized with the same `E`. Inside the class, `E` acts like a real type — you can declare fields, parameters, and return types with it. The compiler verifies all usages are consistent.</Note>
+
+## Multiple type parameters
+
+A class can declare more than one type parameter, separated by commas:
+
+```java
+class Pair<A, B> {
+    final A first;
+    final B second;
+
+    Pair(A first, B second) {
+        this.first  = first;
+        this.second = second;
+    }
+
+    @Override
+    public String toString() {
+        return "(" + first + ", " + second + ")";
+    }
+}
+```
+
+This lets you create heterogeneous pairs where each component has its own type:
+
+```java
+Pair<String, Integer>  person  = new Pair<>("Alice", 30);
+Pair<Double, Boolean>  result  = new Pair<>(3.14, true);
+Pair<String, String>   coords  = new Pair<>("40.7N", "74.0W");
+
+System.out.println(person);          // (Alice, 30)
+System.out.println(result.second);   // true  — typed Boolean, no cast
+System.out.println(coords.first.charAt(0));  // '4'  — typed String
+```
+
+`HashMap<K, V>` is the most widely-used two-parameter generic class in Java — `K` is the key type and `V` is the value type.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Generic classes and inheritance
+
+Generic classes participate in inheritance the same way ordinary classes do. You can extend a generic class with another generic class, fix the type parameter in a subclass, or mix both:
+
+```java
+// Fix the type parameter
+class StringBox extends Box<String> {
+    StringBox(String value) { super(value); }
+
+    String shout() { return get().toUpperCase(); }
+}
+
+// Extend while keeping the parameter open
+class LoggedBox<T> extends Box<T> {
+    LoggedBox(T value) {
+        super(value);
+        System.out.println("Created with: " + value);
+    }
+}
+```
+
+When you fix the parameter (`extends Box<String>`), the subclass is no longer generic itself. When you keep it open (`extends Box<T>`), the subclass must also declare `<T>`.
+
+<Note>A `List<String>` is NOT a subtype of `List<Object>`, even though `String` is a subtype of `Object`. This surprises many developers coming from other languages. The reason is that `List<Object>` allows `add(Object)`, which would let you silently corrupt a `List<String>`. Wildcards (covered in a later lesson) handle this use case safely.</Note>
+
+## Raw types and why to avoid them
+
+A **raw type** is a generic class used without its type argument:
+
+```java
+// Raw type — do not do this
+Stack raw = new Stack();
+raw.push("hello");
+raw.push(42);           // compiles with no error
+String s = (String) raw.pop();  // blows up at runtime for Integer
+```
+
+Raw types exist solely for backward compatibility with code written before Java 5. The compiler will emit "unchecked" warnings whenever you use them. In modern Java:
+- Always provide the type argument.
+- Use `@SuppressWarnings("unchecked")` only in tightly controlled low-level library code that you fully understand.
+- IDEs like IntelliJ IDEA treat raw-type usage as a warning that shows up in code inspections.
+
+## Try it
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+class Queue<E> {
+    private final List<E> items = new ArrayList<>();
+
+    void enqueue(E item) { items.add(item); }
+
+    E dequeue() {
+        if (items.isEmpty()) throw new java.util.NoSuchElementException();
+        return items.remove(0);
+    }
+
+    boolean isEmpty() { return items.isEmpty(); }
+    int size()        { return items.size(); }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        Queue<String> q = new Queue<>();
+        q.enqueue("first");
+        q.enqueue("second");
+        q.enqueue("third");
+
+        while (!q.isEmpty()) {
+            System.out.println(q.dequeue());
+        }
+    }
+}
+```
+
+Expected output:
+```
+first
+second
+third
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Static method using the class type parameter** — `static T echo(T v)` does not compile because `T` belongs to instances, not the class itself. Declare a separate `<T>` on the method: `static <T> T echo(T v)`.
+- **Instantiating the type parameter** — `new T()` is illegal because of type erasure. If you need to create instances, pass a `Supplier<T>` or a `Class<T>` and call `clazz.getDeclaredConstructor().newInstance()`.
+- **Arrays of generic types** — `new T[size]` is a compile error. Use `(T[]) new Object[size]` with an `@SuppressWarnings("unchecked")` annotation, or prefer `List<T>` instead.
+- **Raw types in new code** — every raw-type usage silently disables generic checks for that reference. A single raw-type variable can allow `ClassCastException` to propagate to a completely different part of the code.
+
+## Recap
+
+Generic classes let you write data structures and algorithms once and reuse them safely across all types. The type parameter `<T>` is substituted by the compiler at every call site, giving you both compile-time safety and clean code without redundant casts.
+
+- Declare type parameters in angle brackets after the class name: `class Foo<T>`
+- Common conventions: `T`, `E`, `K`, `V`, `R`, `N`
+- Multiple parameters are separated by commas: `class Map<K, V>`
+- Generic classes participate in inheritance; fixing vs. propagating the type parameter are both valid strategies
+- Raw types (`Foo` without `<T>`) bypass type checking entirely — avoid them in all new code
+
+**Up next:** Generic Methods — add type parameters to individual methods without making the entire class generic.
+
+<Exercise>
+Complete the three TODOs in the `Stack<T>` implementation. `push` adds an item, `pop` removes and returns the last one, and `peek` returns it without removing.
+
+```java
+import java.util.*;
+
+public class Main {
+    static class Stack<T> {
+        private final List<T> items = new ArrayList<>();
+
+        void push(T item) {
+            // TODO: add item to items
+        }
+
+        T pop() {
+            if (items.isEmpty()) throw new NoSuchElementException("Stack is empty");
+            // TODO: remove and return the last element
+            return null;
+        }
+
+        T peek() {
+            if (items.isEmpty()) throw new NoSuchElementException("Stack is empty");
+            // TODO: return the last element without removing it
+            return null;
+        }
+
+        int size()        { return items.size(); }
+        boolean isEmpty() { return items.isEmpty(); }
+    }
+
+    public static void main(String[] args) {
+        Stack<Integer> s = new Stack<>();
+        s.push(1); s.push(2); s.push(3);
+        System.out.println("Size: " + s.size());
+        System.out.println("Peek: " + s.peek());
+        System.out.println("Pop: "  + s.pop());
+        System.out.println("Pop: "  + s.pop());
+        System.out.println("Size: " + s.size());
+    }
+}
+```
+
+**What the tests check:**
+- After three pushes, `size()` returns `3`
+- `peek()` returns `3` without changing the size
+- First `pop()` returns `3`, second returns `2`
+- Final `size()` returns `1`
+
+<Note>Hint: `List.remove(int index)` removes by index and returns the removed element. The last index is `items.size() - 1`. For `peek`, use `items.get(items.size() - 1)`.</Note>
+</Exercise>

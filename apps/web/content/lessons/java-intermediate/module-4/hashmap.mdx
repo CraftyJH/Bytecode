@@ -1,0 +1,381 @@
+export const meta = {
+  title: "HashMap",
+  duration: 16,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "hm-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does HashMap.put(key, value) return?",
+    options: [
+      { text: "The new value just stored.", correct: false, feedback: "If it returned the new value, callers couldn't easily detect whether the key already existed." },
+      { text: "The previous value associated with the key, or null if the key was not present.", correct: true, feedback: "Correct! This lets you detect whether a key was replaced (non-null return) or newly added (null return)." },
+      { text: "true if the entry was added, false if the key already existed.", correct: false, feedback: "That's the behaviour of Set.add(). Map.put() returns the old value, not a boolean." },
+      { text: "The index of the bucket where the entry was stored.", correct: false, feedback: "Bucket indices are an internal implementation detail — the Map API never exposes them." },
+    ],
+    explanation: "`put(k, v)` inserts or replaces an entry and returns the **old** value (or `null` if the key is new). This return value is frequently ignored, but it's useful when you want to know what was there before.",
+  },
+  endQ1: {
+    id: "hm-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Map<String, Integer> scores = new HashMap<>();
+        scores.put("Alice", 90);
+        scores.put("Bob",   75);
+        scores.put("Alice", 95);  // replace
+        System.out.println(scores.size());
+        System.out.println(scores.get("Alice"));
+        System.out.println(scores.getOrDefault("Charlie", 0));
+    }
+}`,
+    expectedOutput: "2\n95\n0",
+    explanation: "Putting `\"Alice\"` twice replaces the first value — the map stays at size 2. `get(\"Alice\")` returns the latest value 95. `getOrDefault(\"Charlie\", 0)` returns the default 0 because Charlie isn't in the map.",
+  },
+  endQ2: {
+    id: "hm-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which method adds a value to a key's list, creating the list if the key is absent?",
+    options: [
+      { text: "putIfAbsent(key, new ArrayList<>())", correct: false, feedback: "This is close, but `putIfAbsent` doesn't help you *add* to the existing list — it only sets a value if the key is absent. You'd still need to call `get` and then `add`." },
+      { text: "computeIfAbsent(key, k -> new ArrayList<>()).add(value)", correct: true, feedback: "Correct! `computeIfAbsent` creates the list only if the key is absent, then returns the (possibly new) list. Chaining `.add(value)` appends to it in one line." },
+      { text: "merge(key, new ArrayList<>(), List::addAll)", correct: false, feedback: "`merge` combines an existing value with a new one using a BiFunction, but its signature doesn't handle list appending as cleanly as `computeIfAbsent`." },
+      { text: "getOrDefault(key, new ArrayList<>()).add(value)", correct: false, feedback: "This would add to a temporary empty list without putting it into the map. The map never sees the new list." },
+    ],
+    explanation: "`computeIfAbsent(key, mappingFunction)` looks up the key; if absent, it calls the function to compute a value, stores it, and returns it. Chaining `.add(e)` on the returned list modifies the list that's already stored in the map.",
+  },
+  endQ3: {
+    id: "hm-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To increment a word's count or set it to 1 if not present, fill in the merge call:",
+    code: `freq.___(word, 1, Integer::sum);`,
+    correctAnswers: ["merge"],
+    caseSensitive: true,
+    explanation: "`merge(key, value, remappingFunction)` checks: if the key is absent, store `value`; if present, replace the old value with `remappingFunction.apply(oldValue, value)`. `Integer::sum` adds old and new counts.",
+  },
+  endQ4: {
+    id: "hm-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Map<String, Integer> map = new HashMap<>();
+        map.put("a", 1);
+        map.put("b", 2);
+        map.put("c", 3);
+        for (String key : map) {        // bug here
+            System.out.println(key + "=" + map.get(key));
+        }
+    }
+}`,
+    buggyLine: 8,
+    issue: "Cannot iterate directly over a Map — must iterate over map.entrySet(), map.keySet(), or map.values()",
+    explanation: "`Map` does not implement `Iterable`, so you can't use it directly in a for-each loop. Use `map.keySet()` to iterate over keys, `map.values()` for values, or `map.entrySet()` for key-value pairs: `for (Map.Entry<String, Integer> e : map.entrySet())`.",
+  },
+};
+
+`HashMap` is the most frequently used collection in Java. It powers configuration tables, caches, frequency counters, grouping operations, and virtually any feature that involves looking something up by name. Understanding how it works under the hood will help you use it correctly and spot subtle bugs before they happen.
+
+## What a HashMap stores
+
+A `HashMap<K, V>` stores **key-value pairs**. Each key maps to exactly one value. Keys are unique; values can repeat:
+
+```java
+Map<String, Integer> ages = new HashMap<>();
+ages.put("Alice", 30);
+ages.put("Bob",   25);
+ages.put("Alice", 31);  // replaces the previous value for "Alice"
+System.out.println(ages);       // {Alice=31, Bob=25} (order not guaranteed)
+System.out.println(ages.size()); // 2 — only two keys
+```
+
+## Hash table internals
+
+Internally, `HashMap` maintains an array of **buckets**. Each bucket is a mini-list (or tree) of entries that share the same bucket index.
+
+When you call `put(key, value)`:
+1. Compute `key.hashCode()`.
+2. Derive a bucket index from the hash (e.g., `hash & (capacity-1)`).
+3. Scan that bucket for an entry where `existingKey.equals(key)`.
+4. If found, replace the value; if not found, add a new entry.
+
+`get(key)` follows the same path: compute hash, find bucket, scan with `equals`. Because each bucket typically holds 0–1 entries, both operations run in **O(1) average** time.
+
+```
+Key       hashCode   bucket (capacity=16)
+"Alice"   65_022     65_022 & 15 = 14  → bucket[14]
+"Bob"     66_259     66_259 & 15 =  3  → bucket[3]
+"Carol"   67_022_163 67_022_163 & 15 = 3 → bucket[3] ← collision, same bucket as Bob
+```
+
+<Note>Since Java 8, when a bucket accumulates more than 8 entries (TREEIFY_THRESHOLD), the linked list is converted to a red-black tree, keeping worst-case lookup at O(log n) even under adversarial hash collisions. This makes `HashMap` significantly more robust than older Java versions.</Note>
+
+## Load factor and rehashing
+
+`HashMap` starts with 16 buckets and a **load factor** of 0.75. When the number of entries exceeds `capacity × loadFactor` (i.e., 12 entries for a fresh map), the table is doubled to 32 buckets and every entry is rehashed into the new table.
+
+Rehashing is O(n) but happens geometrically rarely — like capacity doubling in `ArrayList`. If you know your map will hold many entries, pass an initial capacity to avoid early rehashes:
+
+```java
+Map<String, Integer> wordCount = new HashMap<>(10_000); // room for ~7,500 entries
+```
+
+## Reading entries safely
+
+```java
+Map<String, String> config = new HashMap<>();
+config.put("host", "localhost");
+config.put("port", "5432");
+
+// get() returns null if key absent — can cause NullPointerException if unboxed
+String host = config.get("host");    // "localhost"
+String timeout = config.get("timeout"); // null
+
+// getOrDefault — safe alternative
+String t = config.getOrDefault("timeout", "30"); // "30"
+
+// containsKey check
+if (config.containsKey("port")) {
+    System.out.println("Port: " + config.get("port"));
+}
+```
+
+## Conditional puts
+
+Three methods let you express intent more clearly than a manual get-and-check:
+
+```java
+Map<String, Integer> scores = new HashMap<>();
+
+// Put only if key is absent
+scores.putIfAbsent("Alice", 100);  // stores 100
+scores.putIfAbsent("Alice", 200);  // no-op: key exists
+System.out.println(scores.get("Alice")); // 100
+
+// Compute a new value only if the key is absent
+Map<String, List<String>> groups = new HashMap<>();
+groups.computeIfAbsent("fruits", k -> new ArrayList<>()).add("apple");
+groups.computeIfAbsent("fruits", k -> new ArrayList<>()).add("banana");
+System.out.println(groups.get("fruits")); // [apple, banana]
+```
+
+`computeIfAbsent` is the standard pattern for **multi-map** grouping (a map of key → list).
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## merge: the word-count idiom
+
+`merge(key, value, remapFn)` is a one-liner for accumulating values:
+
+```java
+import java.util.*;
+
+public class WordCount {
+    public static void main(String[] args) {
+        String text = "the cat sat on the mat the cat";
+        Map<String, Integer> freq = new HashMap<>();
+
+        for (String word : text.split(" ")) {
+            freq.merge(word, 1, Integer::sum);
+            // If absent → put 1.  If present → old + 1.
+        }
+        System.out.println(freq); // {on=1, mat=1, the=3, sat=1, cat=2}
+    }
+}
+```
+
+Without `merge`, this would need: `freq.put(word, freq.getOrDefault(word, 0) + 1)` — correct but wordier.
+
+## Iterating over a Map
+
+`Map` doesn't implement `Iterable`, so you must choose a view:
+
+```java
+Map<String, Integer> pop = new HashMap<>();
+pop.put("London", 9_000_000);
+pop.put("Paris",  2_100_000);
+pop.put("Tokyo", 14_000_000);
+
+// Keys only
+for (String city : pop.keySet()) {
+    System.out.println(city);
+}
+
+// Values only
+for (int p : pop.values()) {
+    System.out.println(p);
+}
+
+// Key-value pairs — most common
+for (Map.Entry<String, Integer> entry : pop.entrySet()) {
+    System.out.println(entry.getKey() + " → " + entry.getValue());
+}
+
+// Java 8+ forEach
+pop.forEach((city, p) -> System.out.println(city + ": " + p));
+```
+
+<Note>The iteration order of `HashMap` is **not guaranteed** and may change between runs or JDK versions. If you need consistent order, use `LinkedHashMap` (insertion order) or `TreeMap` (sorted by key).</Note>
+
+## forEach and compute
+
+```java
+Map<String, Integer> prices = new HashMap<>();
+prices.put("apple", 120);
+prices.put("banana", 50);
+prices.put("cherry", 300);
+
+// Apply a 10% discount to all prices
+prices.replaceAll((item, price) -> (int)(price * 0.9));
+System.out.println(prices);  // {apple=108, banana=45, cherry=270}
+
+// computeIfPresent — update only if key exists
+prices.computeIfPresent("banana", (k, v) -> v + 10);
+System.out.println(prices.get("banana")); // 55
+```
+
+## Grouping with computeIfAbsent
+
+A classic pattern: group a list of objects into a map of category → list:
+
+```java
+import java.util.*;
+
+public class Grouping {
+    public static void main(String[] args) {
+        List<String> names = Arrays.asList(
+            "Alice", "Bob", "Anna", "Brian", "Carol", "Bart"
+        );
+
+        Map<Character, List<String>> byInitial = new HashMap<>();
+        for (String name : names) {
+            char initial = name.charAt(0);
+            byInitial.computeIfAbsent(initial, k -> new ArrayList<>()).add(name);
+        }
+
+        // Print sorted
+        new TreeMap<>(byInitial).forEach((k, v) -> {
+            Collections.sort(v);
+            System.out.println(k + ": " + v);
+        });
+        // A: [Alice, Anna]
+        // B: [Bob, Brian, Bart] → sorted: [Bart, Bob, Brian]
+        // C: [Carol]
+    }
+}
+```
+
+## Try it
+
+```java
+import java.util.*;
+
+public class Demo {
+    public static void main(String[] args) {
+        // Inventory: item → quantity
+        Map<String, Integer> inv = new HashMap<>();
+        inv.put("bolts",  500);
+        inv.put("nuts",   300);
+        inv.put("washers", 150);
+
+        // Restock nuts
+        inv.merge("nuts", 200, Integer::sum);
+        System.out.println("Nuts: " + inv.get("nuts")); // 500
+
+        // Add a new item
+        inv.putIfAbsent("screws", 1000);
+        System.out.println("Items: " + inv.size()); // 4
+
+        // Low stock alert
+        inv.forEach((item, qty) -> {
+            if (qty < 200) System.out.println("Low stock: " + item);
+        });
+        // Low stock: washers
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Iterating `for (K k : map)` directly** — `Map` doesn't implement `Iterable`. Use `map.keySet()`, `map.values()`, or `map.entrySet()`.
+- **Relying on HashMap iteration order** — `HashMap` order is unpredictable. Use `LinkedHashMap` for insertion order or `TreeMap` for key-sorted order.
+- **Using mutable objects as keys** — if a key's `hashCode()` changes after insertion, the entry is stranded in the wrong bucket. `get()` will return `null` even though the entry exists. Use immutable keys (String, Integer, enums, records).
+- **Forgetting to override `equals` and `hashCode` for custom key classes** — without them, two distinct object instances with the same logical value won't be treated as the same key.
+- **Unboxing `get()` when the key may be absent** — `map.get("missing")` returns `null`. Immediately casting to `int` throws a `NullPointerException`. Use `getOrDefault` or check `containsKey` first.
+
+## Recap
+
+`HashMap` is Java's fastest general-purpose lookup table. It provides O(1) average time for all key-based operations, at the cost of no ordering guarantees.
+
+- **Backed by a hash table** — each key's bucket is computed from `hashCode()`, resolved by `equals()`
+- **O(1) average** for `get`, `put`, `containsKey`, `remove`
+- Key classes must implement both **`equals()`** and **`hashCode()`** consistently
+- Use **immutable keys** to avoid bucket-stranding bugs
+- `getOrDefault`, `putIfAbsent`, `computeIfAbsent`, `merge`, `forEach` are the modern utility methods
+- Iteration order is **not guaranteed** — use `LinkedHashMap` or `TreeMap` when order matters
+
+**Up next:** TreeMap and Sorted Maps — adding sorted key order and powerful range queries on top of the Map interface.
+
+<Exercise>
+Build a map of student names to course lists, then query it with getOrDefault and process all entries.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Map<String, List<String>> courses = new HashMap<>();
+        // TODO: put "Alice"->["Math","Physics"], "Bob"->["English","History","Art"],
+        //        "Charlie"->["Math","CS"]
+
+        System.out.println("Students: " + courses.size());
+
+        courses.get("Alice").add("Chemistry");
+        System.out.println("Alice's courses: " + courses.get("Alice").size());
+
+        int total = 0;
+        for (List<String> c : courses.values()) total += c.size();
+        System.out.println("Total enrolments: " + total);
+
+        System.out.println("Diana's courses: " +
+            courses.getOrDefault("Diana", Collections.emptyList()).size());
+
+        List<String> names = new ArrayList<>(courses.keySet());
+        Collections.sort(names);
+        System.out.println("Students (sorted): " + names);
+    }
+}
+```
+
+**What the tests check:**
+- `courses.size()` is `3`
+- After adding Chemistry, Alice has `3` courses
+- Total enrolments (Alice 3 + Bob 3 + Charlie 2) is `8`
+- `getOrDefault("Diana", ...)` returns a list of size `0`
+- Sorted student names: `[Alice, Bob, Charlie]`
+
+<Note>Hint: use `Arrays.asList(...)` to build each list value. Remember that `Arrays.asList` returns a fixed-size list — wrap it in `new ArrayList<>(Arrays.asList(...))` so you can add to it later.</Note>
+</Exercise>

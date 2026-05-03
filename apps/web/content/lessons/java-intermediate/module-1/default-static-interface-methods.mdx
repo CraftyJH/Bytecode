@@ -1,0 +1,303 @@
+export const meta = {
+  title: "Default and Static Interface Methods",
+  duration: 12,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "dsi-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A class implements `Greeter`, which has `default String greet() { return \"Hello\"; }`. The class does NOT override `greet()`. What happens when you call `greet()` on an instance?",
+    options: [
+      { text: "Compile error — the class must override every method.", correct: false, feedback: "A `default` method already has a body, so the implementing class is not required to override it. The interface-provided body is used automatically." },
+      { text: "The interface's default body runs, returning \"Hello\".", correct: true, feedback: "Correct — `default` methods are inherited by implementing classes exactly like concrete methods are inherited from superclasses. No override is needed." },
+      { text: "A runtime exception is thrown because the method has no class-level body.", correct: false, feedback: "There is no such exception. The JVM finds the `default` method in the interface's bytecode and executes it." },
+      { text: "null is returned.", correct: false, feedback: "The default body `return \"Hello\"` executes normally. `null` would only be returned if that were explicitly coded." },
+    ],
+    explanation: "`default` methods provide a ready-made implementation. If a class doesn't override the method, the interface-supplied body runs. This allows interfaces to add new methods without breaking all existing implementors.",
+    hint: "Think about what 'default' means — what happens when you don't specify otherwise?",
+  },
+  endQ1: {
+    id: "dsi-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `interface Discount {
+    double getRate();
+    default double apply(double price) {
+        return price * (1 - getRate());
+    }
+}
+class SaleDiscount implements Discount {
+    public double getRate() { return 0.2; }
+}
+public class Main {
+    public static void main(String[] args) {
+        Discount d = new SaleDiscount();
+        System.out.println(d.apply(100.0));
+    }
+}`,
+    expectedOutput: "80.0",
+    explanation: "`apply` is a `default` method that calls `getRate()`. At runtime `getRate()` dispatches to `SaleDiscount.getRate()`, returning 0.2. So `apply(100.0)` computes `100.0 * 0.8 = 80.0`.",
+    hint: "Trace `getRate()` to the concrete class, then evaluate the formula.",
+  },
+  endQ2: {
+    id: "dsi-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "How do you call a static interface method `Validator.isPositive(5)`?",
+    options: [
+      { text: "Through an instance: `v.isPositive(5)` where `v` is a `Validator`.", correct: false, feedback: "Static interface methods cannot be called through an instance or via an interface reference — only through the interface name itself." },
+      { text: "Through the interface name: `Validator.isPositive(5)`.", correct: true, feedback: "Correct — static interface methods are called exactly like static class methods: `InterfaceName.methodName(args)`." },
+      { text: "By overriding it in a class, then calling via the class.", correct: false, feedback: "Static interface methods are not inherited by implementing classes and cannot be overridden. They belong strictly to the interface." },
+      { text: "Only through a `super` call inside an implementing class.", correct: false, feedback: "`super.staticMethod()` is not valid for interface static methods. They are accessed only via `InterfaceName.staticMethod()`." },
+    ],
+    explanation: "Static interface methods are tied to the interface type itself, not to instances. They are called as `InterfaceName.method(args)`. Unlike `default` methods, they are not inherited by implementing classes.",
+    hint: "Static methods always belong to a type, never to an instance.",
+  },
+  endQ3: {
+    id: "dsi-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `interface Formatter {
+    String format(String text);
+    default String formatAndWrap(String text) {
+        return "(" + format(text) + ")";
+    }
+}
+
+class UpperFormatter implements Formatter {
+    public String format(String text) {
+        return text.toUpperCase();
+    }
+    public String formatAndWrap(String text) {
+        return format(text);   // forgot the wrapping
+    }
+}`,
+    buggyLine: 12,
+    issue: "The override of formatAndWrap removes the wrapping parentheses, producing different output than the documented default contract",
+    explanation: "The override compiles fine, but it loses the wrapping behaviour. If the design intent is that `formatAndWrap` always wraps its result in parentheses, the override should call `\"(\" + format(text) + \")\"` or simply omit the override entirely and let the default run. Silently overriding a `default` method with weaker behaviour is a logic bug, not a compile error.",
+    hint: "Look at what the `default` version returns vs what the override returns.",
+  },
+  endQ4: {
+    id: "dsi-end-4",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the keyword that makes `of(T value)` belong to the interface itself rather than to instances:",
+    code: "interface Factory<T> {\n    ___ T of(T value);\n}",
+    correctAnswers: ["static"],
+    caseSensitive: true,
+    explanation: "`static` methods in interfaces belong to the interface type, not to implementing instances. They are utility or factory methods (like `List.of(...)` in the Java standard library) that are logically grouped with the interface but don't require an instance to call.",
+  },
+};
+
+Java 8 introduced two game-changing additions to interfaces: **`default` methods** (concrete methods with a body that implementing classes inherit) and **`static` methods** (utility functions tied to the interface type itself). Together they let interfaces evolve without breaking existing code and serve as home for closely related helper logic.
+
+## The problem `default` methods solve
+
+Imagine you ship an interface `Collection` in version 1.0. A year later you want to add a `forEach` method. In old Java, adding any method to the interface would break every class that ever implemented it — suddenly they all fail to compile. With `default` methods, you add a body right in the interface:
+
+```java
+interface Collection<E> {
+    void add(E element);
+    int size();
+
+    // Added later — existing classes don't need to change
+    default boolean isEmpty() {
+        return size() == 0;
+    }
+}
+```
+
+Any existing class that implements `Collection` now automatically inherits `isEmpty()`. Classes that prefer their own implementation can override it.
+
+## Declaring a `default` method
+
+The `default` keyword precedes the return type, and the method has a full body:
+
+```java
+interface Greeter {
+    String getName();  // abstract — must be implemented
+
+    default String greet() {
+        return "Hello, " + getName() + "!";
+    }
+}
+
+class User implements Greeter {
+    private String name;
+    User(String name) { this.name = name; }
+
+    public String getName() { return name; }
+    // greet() is inherited — no override needed
+}
+
+// Usage:
+User u = new User("Alice");
+System.out.println(u.greet());  // Hello, Alice!
+```
+
+`greet()` calls `getName()`, which is abstract. This works because at runtime the actual class always has a `getName()` implementation — the JVM dispatches to it dynamically, exactly as with abstract methods.
+
+<Note>`default` methods in interfaces can call the interface's own abstract methods (as the example above shows) but they cannot access instance fields — interfaces have none. If you need shared state, use an abstract class.</Note>
+
+## Overriding a `default` method
+
+A class can override a `default` method just like any other:
+
+```java
+class FormalUser implements Greeter {
+    private String name;
+    FormalUser(String name) { this.name = name; }
+
+    public String getName() { return name; }
+
+    @Override
+    public String greet() {
+        return "Good day, " + getName() + ". How do you do?";
+    }
+}
+```
+
+The class's own version wins. If a class inherits conflicting `default` implementations from two interfaces, it *must* override the method to resolve the ambiguity — the compiler will insist.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Static interface methods
+
+`static` methods in interfaces belong to the interface type, not to any instance. They are called via the interface name, not through an object:
+
+```java
+interface MathUtils {
+    static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+}
+
+// Call it through the interface name:
+int x = MathUtils.clamp(150, 0, 100);  // 100
+```
+
+They are not inherited by implementing classes. You cannot call `MathUtils.clamp(...)` on an instance of a class that implements `MathUtils` — only through `MathUtils.clamp(...)` directly.
+
+## Factory methods: a classic static interface method pattern
+
+Static methods are ideal for factory patterns — creating instances of implementations without exposing the class name:
+
+```java
+interface Validator {
+    boolean validate(String input);
+
+    static Validator nonEmpty() {
+        return input -> !input.isEmpty();
+    }
+
+    static Validator maxLength(int max) {
+        return input -> input.length() <= max;
+    }
+}
+
+Validator v1 = Validator.nonEmpty();
+Validator v2 = Validator.maxLength(10);
+System.out.println(v1.validate("hello"));   // true
+System.out.println(v2.validate("hello world"));  // false
+```
+
+The caller never needs to know which class backs the implementation — the factory method is the only contact point. The Java standard library uses this pattern: `Comparator.naturalOrder()`, `List.of(...)`, `Predicate.not(...)`.
+
+## Try it
+
+Run the starter code. Both `upperCase()` and `reverse()` return `null`. Fill in each static factory method to return a `StringTransformer` lambda. Expected output:
+
+```
+HELLO
+[HELLO]
+avaj
+[avaj]
+```
+
+`transformAndTag` is already implemented as a `default` method — once you fix the static factories, the default method will call your implementations automatically.
+
+## When to use each
+
+| | `default` method | `static` method |
+|---|---|---|
+| Called on | An instance (or via interface ref) | The interface type only |
+| Inherited? | Yes — by implementing classes | No |
+| Best for | Shared convenience behaviour, evolving APIs | Factory methods, utility helpers |
+| Can call abstract methods? | Yes | No (no `this` reference) |
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling a static interface method through an instance** — `myFormatter.format(...)` where `format` is `static` is a compile error. Use `Formatter.format(...)`. The compiler will not silently allow the instance-based call the way it does for static class methods.
+- **Forgetting that `default` methods can be overridden** — a `default` is a fallback, not a final. If your class needs different behaviour, override it freely. The `@Override` annotation works here too and catches typos in the signature.
+- **Assuming `default` methods can access fields** — interfaces have no instance fields. A `default` method can only use its parameters, call other interface methods, or call static methods. For stateful helpers, use an abstract class.
+- **Diamond problem with conflicting defaults** — if two interfaces both declare `default void doIt()`, a class implementing both *must* override `doIt()`. The compiler enforces this; the override can explicitly delegate to one interface's default with `InterfaceName.super.doIt()`.
+- **Overriding a `default` method with weaker semantics** — technically legal, but dangerous. If the `default` documents a contract (e.g., "always wraps output in brackets"), silently breaking that contract in an override causes confusing bugs for anyone using the interface type.
+
+## Recap
+
+Default and static interface methods dramatically increased the power of interfaces in Java 8. They let library designers evolve APIs over time and keep utility logic co-located with the interface that motivates it.
+
+- **`default` methods** provide concrete inherited behaviour — ideal for adding methods to existing interfaces without breaking implementors
+- **`static` methods** provide type-level utilities — called as `Interface.method()`, not inherited
+- `default` methods can call abstract methods (dynamically dispatched at runtime)
+- Conflicting `default` methods from two interfaces must be resolved by an explicit override
+- `InterfaceName.super.method()` lets you delegate to a specific interface's default from within the override
+
+**Up next:** Functional Interfaces — a first look at interfaces with exactly one abstract method and how lambdas bring them to life.
+
+<Exercise>
+Implement the two static factory methods in `StringTransformer`. `upperCase()` should return a transformer that converts the input to uppercase. `reverse()` should return one that reverses the characters. The `default` method `transformAndTag` is already written for you.
+
+```java
+interface StringTransformer {
+    String transform(String input);
+
+    default String transformAndTag(String input) {
+        return "[" + transform(input) + "]";
+    }
+
+    static StringTransformer upperCase() {
+        // TODO: return a StringTransformer that converts input to uppercase
+        return null;
+    }
+
+    static StringTransformer reverse() {
+        // TODO: return a StringTransformer that reverses the string
+        return null;
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        StringTransformer upper = StringTransformer.upperCase();
+        StringTransformer rev   = StringTransformer.reverse();
+
+        System.out.println(upper.transform("hello"));
+        System.out.println(upper.transformAndTag("hello"));
+        System.out.println(rev.transform("java"));
+        System.out.println(rev.transformAndTag("java"));
+    }
+}
+```
+
+**What the tests check:**
+- `upper.transform("hello")` returns `"HELLO"`
+- `upper.transformAndTag("hello")` returns `"[HELLO]"`
+- `rev.transform("java")` returns `"avaj"`
+- `rev.transformAndTag("java")` returns `"[avaj]"`
+
+<Note>Hint: `StringTransformer` has exactly one abstract method, so you can return a lambda: `return input -> input.toUpperCase();`. For reverse, `new StringBuilder(input).reverse().toString()` does the work.</Note>
+</Exercise>

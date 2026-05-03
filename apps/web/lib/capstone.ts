@@ -112,7 +112,8 @@ public static int countGuesses(int[] guesses, int secret) {
 }`;
 
 /** Parse Judge0 stdout into structured test results */
-export function parseGradeOutput(stdout: string): GradeResult {
+export function parseGradeOutput(stdout: string, totalTests?: number): GradeResult {
+  const total = totalTests ?? TOTAL_TESTS;
   const lines = stdout.trim().split("\n");
   const results: TestResult[] = [];
   let passed = 0;
@@ -139,7 +140,7 @@ export function parseGradeOutput(stdout: string): GradeResult {
   return {
     results,
     passed,
-    total: TOTAL_TESTS,
-    allPassed: passed === TOTAL_TESTS,
+    total,
+    allPassed: passed === total,
   };
 }

@@ -1,0 +1,371 @@
+export const meta = {
+  title: "Wildcards — ?, ? extends, ? super",
+  duration: 16,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "wc-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.Arrays;
+import java.util.List;
+
+public class Demo {
+    static double sumNumbers(List<? extends Number> list) {
+        double total = 0;
+        for (Number n : list) total += n.doubleValue();
+        return total;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(sumNumbers(Arrays.asList(1, 2, 3)));
+        System.out.println(sumNumbers(Arrays.asList(0.1, 0.2, 0.3)));
+        System.out.println(sumNumbers(Arrays.asList(10L, 20L)));
+    }
+}`,
+    expectedOutput: "6.0\n0.6000000000000001\n30.0",
+    explanation: "`? extends Number` allows `List<Integer>`, `List<Double>`, and `List<Long>` to all be passed. The floating-point imprecision in the second case (0.1 + 0.2 + 0.3) is expected IEEE 754 behaviour, not a bug.",
+  },
+  endQ1: {
+    id: "wc-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.ArrayList;
+import java.util.List;
+
+public class Demo {
+    static void addNumbers(List<? super Integer> list) {
+        list.add(1);
+        list.add(2);
+        list.add(3);
+    }
+
+    public static void main(String[] args) {
+        List<Integer> ints    = new ArrayList<>();
+        List<Number>  numbers = new ArrayList<>();
+        List<Object>  objects = new ArrayList<>();
+
+        addNumbers(ints);
+        addNumbers(numbers);
+        addNumbers(objects);
+
+        System.out.println(ints);
+        System.out.println(numbers);
+        System.out.println(objects);
+    }
+}`,
+    expectedOutput: "[1, 2, 3]\n[1, 2, 3]\n[1, 2, 3]",
+    explanation: "`? super Integer` matches `List<Integer>`, `List<Number>`, and `List<Object>` — any list whose element type is Integer or a supertype of Integer. Each list receives three integers. `toString()` on each list prints them identically.",
+  },
+  endQ2: {
+    id: "wc-end-2",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Which statement correctly explains why `List<Dog>` cannot be passed where `List<Animal>` is expected?",
+    options: [
+      { text: "Because `Dog` does not extend `Animal`.", correct: false, feedback: "This is the opposite of the assumption — the whole question arises precisely because Dog does extend Animal." },
+      { text: "Because generic types are invariant: allowing it would let callers add a Cat to what is actually a List<Dog>.", correct: true, feedback: "Correct — if `List<Dog>` were accepted as `List<Animal>`, the method could call `list.add(new Cat())`, corrupting the List<Dog> at runtime." },
+      { text: "Because type erasure removes the type argument, making both just `List` at runtime.", correct: false, feedback: "Type erasure is real, but that is not the reason the compiler rejects this — the compiler's static analysis catches it before erasure is relevant." },
+      { text: "Because Java collections do not support inheritance at all.", correct: false, feedback: "Java collections absolutely support inheritance — `ArrayList` implements `List`, etc. The issue is specifically about generic parameterization." },
+    ],
+    explanation: "Generic types are **invariant** by default. `List<Dog>` is not a subtype of `List<Animal>` because if it were, you could write `List<Animal> animals = dogList; animals.add(new Cat());` — silently inserting a Cat into a List<Dog>. Wildcards (`? extends Animal`) provide safe read-only covariance without this risk.",
+  },
+  endQ3: {
+    id: "wc-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Fill in the wildcard so the method can read elements as `Number` from any list of Numbers or Number subtypes:",
+    code: `static void printDoubles(List<? ___ Number> list) {
+    for (Number n : list) System.out.println(n.doubleValue());
+}`,
+    correctAnswers: ["extends"],
+    caseSensitive: true,
+    explanation: "`? extends Number` is the upper-bounded wildcard. It means 'some unknown type that is Number or a subclass of Number'. Elements can be read as `Number` (the upper bound), but you cannot add anything to the list.",
+  },
+  endQ4: {
+    id: "wc-end-4",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `import java.util.List;
+import java.util.ArrayList;
+
+public class Demo {
+    static void addItems(List<? extends Number> list) {
+        list.add(42);    // line 6
+    }
+
+    public static void main(String[] args) {
+        List<Integer> nums = new ArrayList<>();
+        addItems(nums);
+    }
+}`,
+    buggyLine: 6,
+    issue: "You cannot add elements to a `List<? extends Number>` — the wildcard type is unknown so no add is safe",
+    explanation: "An upper-bounded wildcard (`? extends Number`) means the list holds some specific but unknown subtype of Number. Adding `42` could corrupt a `List<Double>`. The compiler prevents all adds (except null) to protect type safety. Use `? super Number` if you need to add elements.",
+  },
+};
+
+Type parameters (`<T>`) are named placeholders you introduce yourself. **Wildcards** (`?`) represent an unknown type at a use site — a type someone else chose. They appear as method parameter types and let you write methods that accept many related generic types without sacrificing safety.
+
+## Why wildcards exist: the invariance problem
+
+Suppose `Dog extends Animal`. You might expect `List<Dog>` to be usable wherever `List<Animal>` is required — after all, dogs are animals. But Java generic types are **invariant**:
+
+```java
+List<Dog> dogs = new ArrayList<>();
+// List<Animal> animals = dogs;  // COMPILE ERROR
+
+List<Animal> animals = dogs;     // hypothetically allowed...
+animals.add(new Cat());          // ...this would silently corrupt dogs
+Dog first = dogs.get(0);         // ClassCastException — not a Dog!
+```
+
+If the assignment were allowed, you could insert a `Cat` through the `animals` reference, then blow up when code elsewhere expects only `Dog` objects. The compiler catches this statically by making generic types invariant.
+
+But sometimes you genuinely want to pass a `List<Dog>` to a method that only reads the list as `Animal` objects. That is exactly what wildcards provide.
+
+## The unbounded wildcard `?`
+
+`List<?>` means "a list of some unknown type." You can iterate it and treat every element as `Object`, but you cannot add anything to it (because you don't know what type the list actually holds):
+
+```java
+static void printAll(List<?> list) {
+    for (Object item : list) {
+        System.out.println(item);
+    }
+}
+```
+
+```java
+printAll(Arrays.asList("a", "b", "c"));    // works
+printAll(Arrays.asList(1, 2, 3));           // works
+printAll(Arrays.asList(true, false));       // works
+```
+
+The unbounded wildcard is best for methods that only use `Object`-level operations like `toString()`, `equals()`, or `size()`. It is also common in reflection-heavy code where you truly do not care about the element type.
+
+<Note>You may wonder: why not use `List<Object>` instead of `List<?>`? A `List<Object>` specifically accepts only a `List<Object>` — you could not pass a `List<String>` to it. `List<?>` accepts any list, regardless of element type, because `?` means "I don't know the type but I promise not to add anything unsafe."</Note>
+
+## Upper-bounded wildcard `? extends T` — Producer
+
+`List<? extends Number>` means "a list of some type that is `Number` or a subclass of `Number`." You can **read** elements as `Number`, but you cannot add anything:
+
+```java
+static double sum(List<? extends Number> list) {
+    double total = 0;
+    for (Number n : list) {
+        total += n.doubleValue();  // OK — we know each element IS-A Number
+    }
+    return total;
+    // list.add(3);  // COMPILE ERROR — we don't know the exact type
+}
+```
+
+This method accepts `List<Integer>`, `List<Double>`, `List<Long>`, or `List<BigDecimal>` — any list whose element type is a subtype of `Number`.
+
+```java
+System.out.println(sum(Arrays.asList(1, 2, 3)));          // 6.0
+System.out.println(sum(Arrays.asList(0.5, 1.5, 2.0)));    // 4.0
+```
+
+The list **produces** `Number` values for the method to consume. Hence the mnemonic: **P**roducer **E**xtends.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Lower-bounded wildcard `? super T` — Consumer
+
+`List<? super Integer>` means "a list of some type that is `Integer` or a supertype of `Integer`." You can **add** `Integer` values to it, but you cannot read elements as anything more specific than `Object`:
+
+```java
+static void fill(List<? super Integer> list, int count, int value) {
+    for (int i = 0; i < count; i++) {
+        list.add(value);  // OK — Integer is always a valid element
+    }
+}
+```
+
+```java
+List<Integer> ints    = new ArrayList<>();
+List<Number>  numbers = new ArrayList<>();
+List<Object>  objects = new ArrayList<>();
+
+fill(ints,    3, 7);
+fill(numbers, 2, 9);
+fill(objects, 1, 0);
+
+System.out.println(ints);     // [7, 7, 7]
+System.out.println(numbers);  // [9, 9]
+System.out.println(objects);  // [0]
+```
+
+The list **consumes** `Integer` values from the method. Hence: **C**onsumer **S**uper.
+
+<Note>`? super T` is particularly common with `Comparator` and `Consumer` functional interfaces. `Collections.sort(List<T> list, Comparator<? super T> c)` uses a lower-bounded wildcard so you can pass a `Comparator<Object>` to sort a `List<String>`, because any comparison logic that works on Objects also works on Strings.</Note>
+
+## The PECS rule
+
+**Producer Extends, Consumer Super** — abbreviated PECS — is the rule for choosing between the two bounded wildcards:
+
+| The collection... | Use |
+| ----------------- | --- |
+| produces values you will read | `? extends T` |
+| consumes values you will add  | `? super T` |
+| both reads and writes         | exact type `T` (no wildcard) |
+| neither (just pass around)    | `?` (unbounded) |
+
+A classic PECS example is a `copy` utility:
+
+```java
+static <T> void copy(List<? extends T> src, List<? super T> dest) {
+    for (T item : src) {
+        dest.add(item);
+    }
+}
+```
+
+`src` produces values (`? extends T`), `dest` consumes them (`? super T`). This signature lets you copy a `List<Integer>` into a `List<Number>` or a `List<Object>`.
+
+## `List<Dog>` is NOT a `List<Animal>` — a practical illustration
+
+```java
+static void addAnimal(List<Animal> list) {
+    list.add(new Cat());   // fine for List<Animal>
+}
+
+List<Dog>   dogs = new ArrayList<>();
+addAnimal(dogs);   // COMPILE ERROR — List<Dog> is not List<Animal>
+```
+
+To write a method that accepts any list of Animal subtypes for **reading only**, use the upper-bounded wildcard:
+
+```java
+static void printAnimals(List<? extends Animal> list) {
+    for (Animal a : list) {
+        System.out.println(a.name());   // reading is fine
+    }
+    // list.add(new Cat());  // COMPILE ERROR — safe!
+}
+
+printAnimals(dogs);     // compiles — List<Dog> is accepted
+printAnimals(cats);     // compiles — List<Cat> is accepted
+```
+
+The wildcard prevents accidental writes while allowing polymorphic reads.
+
+## Try it
+
+```java
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Demo {
+    // Copy only elements that satisfy a condition
+    static <T> void copyIf(List<? extends T> src,
+                            List<? super T>   dest,
+                            java.util.function.Predicate<T> pred) {
+        for (T item : src) {
+            if (pred.test(item)) dest.add(item);
+        }
+    }
+
+    public static void main(String[] args) {
+        List<Integer> source = Arrays.asList(1, 2, 3, 4, 5, 6);
+        List<Number>  evens  = new ArrayList<>();
+
+        copyIf(source, evens, n -> n % 2 == 0);
+        System.out.println(evens);  // [2, 4, 6]
+
+        List<String> words = Arrays.asList("ant", "bee", "elephant", "ox");
+        List<Object> long4 = new ArrayList<>();
+        copyIf(words, long4, w -> w.length() >= 4);
+        System.out.println(long4);  // [elephant]
+    }
+}
+```
+
+Expected output:
+```
+[2, 4, 6]
+[elephant]
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Adding to an upper-bounded list** — `List<? extends Number>` is read-only from the compiler's perspective. Trying to `add` any element (except `null`) is a compile error because the actual type could be `List<Integer>`, `List<Double>`, or anything else.
+- **Reading specifically from a lower-bounded list** — `List<? super Integer>` lets you add `Integer`, but `get()` returns `Object`. You must cast if you need a more specific type, which is usually a sign you need a different design.
+- **Confusing `<T extends Number>` and `<? extends Number>`** — the first introduces a named type parameter you can reuse across the signature; the second is a wildcard for one specific parameter. Use a named parameter when you need to relate two positions in the signature; use a wildcard when you only need it in one place and don't need to name it.
+- **Using wildcards in generic class declarations** — `class Foo<? extends Bar>` is not valid. Wildcards appear in use sites (variable types, method parameters), not in class or method-level type parameter declarations.
+
+## Recap
+
+Wildcards are the mechanism Java provides to handle the invariance of generic types gracefully. They let you write flexible APIs that accept families of related parameterized types without sacrificing the type safety that generics provide.
+
+- `?` — unbounded wildcard; read as `Object`, cannot add
+- `? extends T` — upper-bounded; the list produces `T` values for reading
+- `? super T` — lower-bounded; the list consumes `T` values for writing
+- **PECS**: Producer Extends, Consumer Super
+- `List<Dog>` is NOT a `List<Animal>` — generic types are invariant to prevent silent corruption
+- `Collections.copy`, `Collections.sort`, and many other library methods use PECS in their signatures
+
+**Up next:** Module 4 — The Collections Framework — maps, sets, queues, and the algorithms that work across them all.
+
+<Exercise>
+Implement three wildcard-based utility methods that demonstrate the three wildcard forms.
+
+```java
+import java.util.*;
+
+public class Main {
+    // Upper bounded: read Numbers from any List<? extends Number>
+    static double sum(List<? extends Number> list) {
+        // TODO: return sum of all elements using doubleValue()
+        return 0;
+    }
+
+    // Lower bounded: add Integers to any List<? super Integer>
+    static void fillWith(List<? super Integer> list, int count, int value) {
+        // TODO: add 'count' copies of 'value' to list
+    }
+
+    // Unbounded: works with any List — print each element
+    static void printAll(List<?> list) {
+        // TODO: print each element on its own line
+    }
+
+    public static void main(String[] args) {
+        System.out.println(sum(Arrays.asList(1, 2, 3, 4, 5)));
+        System.out.println(sum(Arrays.asList(0.5, 1.5, 2.0)));
+
+        List<Number> numbers = new ArrayList<>();
+        fillWith(numbers, 3, 7);
+        System.out.println(numbers);
+
+        printAll(Arrays.asList("a", "b", "c"));
+    }
+}
+```
+
+**What the tests check:**
+- `sum(Arrays.asList(1, 2, 3, 4, 5))` returns `15.0`
+- `sum(Arrays.asList(0.5, 1.5, 2.0))` returns `4.0`
+- After `fillWith(numbers, 3, 7)`, the list contains `[7, 7, 7]`
+- `printAll` prints `a`, `b`, `c` each on its own line
+
+<Note>Hint: `sum` should accumulate `n.doubleValue()` in a `double` variable. `fillWith` runs a loop `count` times calling `list.add(value)`. `printAll` uses a for-each loop with `System.out.println`.</Note>
+</Exercise>

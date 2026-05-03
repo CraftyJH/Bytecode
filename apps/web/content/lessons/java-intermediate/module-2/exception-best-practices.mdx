@@ -1,0 +1,416 @@
+export const meta = {
+  title: "Best Practices and Common Mistakes",
+  duration: 14,
+  order: 6,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ebp-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    static class Resource implements AutoCloseable {
+        Resource()  { System.out.println("open");  }
+        void use()  { System.out.println("using"); }
+        public void close() { System.out.println("closed"); }
+    }
+
+    public static void main(String[] args) {
+        try (Resource r = new Resource()) {
+            r.use();
+        }
+        System.out.println("after");
+    }
+}`,
+    expectedOutput: "open\nusing\nclosed\nafter",
+    explanation: "try-with-resources calls `close()` automatically when the block exits, even before 'after' is printed. The order is: constructor runs ('open'), block body runs ('using'), close is called ('closed'), then execution continues past the try block ('after').",
+  },
+  endQ1: {
+    id: "ebp-end-1",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `public class Main {
+    static class Conn implements AutoCloseable {
+        Conn()  { System.out.println("connected"); }
+        public void close() { System.out.println("disconnected"); }
+    }
+
+    public static void main(String[] args) {
+        try (Conn a = new Conn(); Conn b = new Conn()) {
+            System.out.println("working");
+        }
+        System.out.println("done");
+    }
+}`,
+    expectedOutput: "connected\nconnected\nworking\ndisconnected\ndisconnected\ndone",
+    explanation: "Multiple resources in one try-with-resources are opened left-to-right and closed right-to-left (LIFO). So `a` opens first, `b` opens second, the block runs, then `b.close()` fires, then `a.close()` fires.",
+  },
+  endQ2: {
+    id: "ebp-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which statement best describes why empty catch blocks are dangerous?",
+    options: [
+      { text: "They cause the program to crash immediately.", correct: false, feedback: "An empty catch block actually prevents crashing — that's the problem. The exception is silently ignored." },
+      { text: "They swallow the exception silently, making failures invisible and very hard to diagnose.", correct: true },
+      { text: "They prevent the `finally` block from running.", correct: false, feedback: "`finally` runs regardless of what the catch block contains, including when it's empty." },
+      { text: "They are a compile-time error in Java.", correct: false, feedback: "Empty catch blocks compile and run without issue — which is precisely why they are dangerous." },
+    ],
+    explanation: "An empty `catch (Exception e) {}` tells the compiler 'I handle this' but does nothing at runtime. The failure disappears. Hours or days later, a symptom surfaces somewhere completely different, with no trace of the original cause. Always at minimum log `e.getMessage()` or re-throw.",
+  },
+  endQ3: {
+    id: "ebp-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the interface name that a class must implement to be usable in try-with-resources:",
+    code: `class MyResource implements ___ {
+    public void close() { /* cleanup */ }
+}`,
+    correctAnswers: ["AutoCloseable"],
+    caseSensitive: true,
+    explanation: "`AutoCloseable` (introduced in Java 7) requires a single `close()` method. Any class that implements it can be declared in a try-with-resources header and will have `close()` called automatically when the block exits. `Closeable` (for I/O streams) extends `AutoCloseable`.",
+  },
+  endQ4: {
+    id: "ebp-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        int[] data = {1, 2, 3};
+        int target = 7;
+        int index = -1;
+        try {
+            for (int i = 0; i < data.length; i++) {
+                if (data[i] == target) throw new RuntimeException("found:" + i);
+            }
+        } catch (RuntimeException e) {
+            index = Integer.parseInt(e.getMessage().split(":")[1]);
+        }
+        System.out.println("Index: " + index);
+    }
+}`,
+    buggyLine: 8,
+    issue: "Using an exception for normal control flow — throwing to signal a found item is an anti-pattern",
+    explanation: "Exceptions are for *exceptional* situations. Using `throw` to break out of a loop with a result violates the principle and is much slower than a simple `break` or early return. Fix: use `index = i; break;` inside the loop, or return `i` from a helper method.",
+  },
+};
+
+The five previous lessons covered the mechanics of exceptions. This final lesson is about judgment: when to use them, how to use them well, and the patterns that experienced Java developers follow — and avoid.
+
+## try-with-resources
+
+Every time you open a file, database connection, or network socket, you hold a system resource that must be released — even if an exception occurs. The manual `finally` approach is verbose and error-prone. **try-with-resources** is the modern solution:
+
+```java
+try (BufferedReader br = new BufferedReader(new FileReader("data.txt"))) {
+    String line;
+    while ((line = br.readLine()) != null) {
+        System.out.println(line);
+    }
+} catch (IOException e) {
+    System.err.println("Failed to read file: " + e.getMessage());
+}
+// br.close() is called automatically here — no finally needed
+```
+
+The resource declaration goes in the `try(...)` parentheses. Any class that implements `AutoCloseable` (which requires only a `close()` method) can be used here.
+
+### Multiple resources
+
+Declare multiple resources separated by semicolons. They open **left to right** and close **right to left** (LIFO — last opened, first closed):
+
+```java
+try (Connection conn = dataSource.getConnection();
+     PreparedStatement ps = conn.prepareStatement(SQL)) {
+    // use ps and conn
+} catch (SQLException e) {
+    System.err.println("DB error: " + e.getMessage());
+}
+// ps.close() runs first, then conn.close()
+```
+
+This ordering matters: closing the statement before the connection is the correct sequence for JDBC.
+
+<Note>try-with-resources handles "suppressed exceptions" correctly. If the body throws and `close()` also throws, the close exception is attached to the primary one as a suppressed exception via `getSuppressed()`. The original exception is not lost, unlike with hand-written `finally` blocks.</Note>
+
+## Don't swallow exceptions silently
+
+This is the single most damaging anti-pattern in Java:
+
+```java
+// TERRIBLE — never do this
+try {
+    processOrder(order);
+} catch (Exception e) {
+    // nothing here
+}
+```
+
+The exception disappears. No log, no message, no rethrow. The order was never processed, but the caller has no idea. Hours of debugging later, you'll find this empty catch and wish you had added even a single print statement.
+
+At a minimum, log the exception:
+
+```java
+try {
+    processOrder(order);
+} catch (Exception e) {
+    System.err.println("Failed to process order " + order.getId()
+        + ": " + e.getMessage());
+    // In production code, use a real logger: log.error("...", e);
+}
+```
+
+In production systems, *always* pass the exception object to the logger — it includes the full stack trace:
+
+```java
+logger.error("Failed to process order {}", order.getId(), e);
+```
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Don't catch Exception or Throwable broadly
+
+Catching `Exception` or `Throwable` grabs far more than intended:
+
+```java
+// DANGEROUS — also catches NullPointerException, OutOfMemoryError, etc.
+try {
+    fetchData();
+} catch (Exception e) {
+    System.out.println("Something went wrong");
+}
+```
+
+`NullPointerException` caught here means a bug was silently hidden. `OutOfMemoryError` caught here means the JVM is in crisis and your code pretended everything was fine. Catch only the specific exception types you actually expect and know how to handle.
+
+If you genuinely need a catch-all for a top-level error boundary (like a web framework's request handler), that's one of the rare legitimate uses — but even there, log everything and consider re-throwing.
+
+## Write meaningful exception messages
+
+```java
+// Useless
+throw new IllegalArgumentException("invalid");
+
+// Useful — includes the value and the constraint
+throw new IllegalArgumentException(
+    "quantity must be positive (1 or more), got: " + quantity);
+```
+
+The value you received, the constraint it violated, and — when relevant — what the valid range is. These three pieces of information turn a 20-minute debugging session into a 20-second one.
+
+## Logging vs re-throwing
+
+A common mistake is *both* logging and re-throwing the same exception at the same level:
+
+```java
+// Creates duplicate log entries — each level logs the same thing
+try {
+    riskyOperation();
+} catch (IOException e) {
+    log.error("IO failed", e);   // logged here
+    throw e;                      // and again at every level above
+}
+```
+
+The rule of thumb: **log or re-throw, not both** — unless the higher level does not log. If you're adding context via wrapping, log once at the top level:
+
+```java
+// Better: wrap and let the top level log once
+try {
+    riskyOperation();
+} catch (IOException e) {
+    throw new ServiceException("Failed during risky operation", e);
+    // The caller decides whether to log or propagate further
+}
+```
+
+## Don't use exceptions for flow control
+
+Exceptions carry significant overhead: when thrown, the JVM captures the full call stack. Using them as a normal branching mechanism is both slower and confusing:
+
+```java
+// ANTI-PATTERN — exceptions as flow control
+static boolean contains(int[] arr, int target) {
+    try {
+        for (int x : arr) {
+            if (x == target) throw new RuntimeException("found");
+        }
+        return false;
+    } catch (RuntimeException e) {
+        return true;
+    }
+}
+
+// CORRECT — use normal control flow
+static boolean contains(int[] arr, int target) {
+    for (int x : arr) {
+        if (x == target) return true;
+    }
+    return false;
+}
+```
+
+Exceptions should model *exceptional* situations — things that genuinely shouldn't happen in the normal flow. If something happens frequently and is expected (like a search returning no results), model it with a return value, an `Optional`, or a dedicated result type.
+
+## Failing fast vs defensive programming
+
+Two philosophies exist, and both have merit:
+
+**Fail fast**: throw early and loudly when something is wrong. This surfaces bugs immediately, at the point of the mistake, with a clear stack trace. Guard clauses (Lesson 4) embody this approach.
+
+**Defensive programming**: anticipate bad input and handle it gracefully rather than crashing. This makes sense at the boundaries of your system (user input, external APIs) where you cannot trust the data.
+
+The resolution: **be defensive at system boundaries** (validate user input, handle network failures) and **fail fast internally** (throw `IllegalArgumentException` when a method receives a bad argument from your own code).
+
+## A complete well-designed example
+
+```java
+import java.io.*;
+import java.util.*;
+
+class ConfigLoader {
+    static Map<String, String> load(String path) throws IOException {
+        Map<String, String> config = new HashMap<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
+            String line;
+            int lineNum = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNum++;
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                int eq = line.indexOf('=');
+                if (eq < 0) throw new IOException(
+                    "Malformed line " + lineNum + ": missing '='");
+                config.put(line.substring(0, eq).trim(),
+                           line.substring(eq + 1).trim());
+            }
+        }
+        return config;
+    }
+}
+```
+
+This example uses try-with-resources (automatic close), throws `IOException` for genuinely exceptional I/O failures, includes line numbers in error messages, and does not swallow anything.
+
+## Try it
+
+```java
+public class Demo {
+    static class Timer implements AutoCloseable {
+        private final String name;
+        private final long start = System.currentTimeMillis();
+
+        Timer(String name) {
+            this.name = name;
+            System.out.println("Starting: " + name);
+        }
+
+        public void close() {
+            long elapsed = System.currentTimeMillis() - start;
+            System.out.println("Finished: " + name + " (" + elapsed + "ms)");
+        }
+    }
+
+    public static void main(String[] args) {
+        try (Timer t = new Timer("demo task")) {
+            Thread.sleep(50);
+            System.out.println("Doing work...");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("Interrupted");
+        }
+    }
+}
+```
+
+`Timer` measures elapsed time as a side effect of `close()`. Notice how try-with-resources makes the timing automatic — no manual finally needed.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Empty catch blocks** — the cardinal sin of exception handling. Even `System.err.println(e.getMessage())` is infinitely better than silence. In real projects, use a logger and pass the full exception object.
+- **Over-broad catches** — `catch (Exception e)` at an inner level hides bugs. Catch only what you expect; let unexpected exceptions propagate to a global handler that can log them properly.
+- **Logging and re-throwing at the same level** — produces duplicated stack traces in logs, making incident analysis confusing. Decide once: handle it here (log, recover) or propagate it (wrap and throw, let above log).
+- **Using try-with-resources for non-`AutoCloseable` resources** — you cannot put an `int` or an `ArrayList` in try-with-resources. The resource must implement `AutoCloseable`. If you manage a resource that isn't `AutoCloseable`, you still need `finally`.
+- **Exceptions in hot loops for flow control** — performance-critical code that uses exceptions for branching can be orders of magnitude slower than normal control flow. Profile before concluding this is your bottleneck, but don't write it this way in the first place.
+
+## Recap
+
+Exception handling done well keeps your code honest, your logs useful, and your system resilient. Exception handling done badly creates invisible failures, noise-filled logs, and production mysteries.
+
+- **try-with-resources** is the correct way to manage any `AutoCloseable` resource; it handles closing (and suppressed exceptions) automatically
+- **Never swallow exceptions silently** — always log or re-throw
+- **Catch specifically**: avoid `Exception` or `Throwable` except at top-level error boundaries
+- **Log or re-throw, not both** at the same level — choose one and be consistent
+- **Exceptions model exceptional situations**, not normal branching — use return values, `Optional`, or result types for expected conditions
+- **Fail fast internally, be defensive at system boundaries** — this pairing keeps code clean and reliable
+
+**Up next:** Module 3 — Generics (first lesson: Why Generics Exist).
+
+<Exercise>
+The starter code already shows the intended structure. Make sure you understand why try-with-resources closes `Connection` automatically, and why the second `try` block prints the error instead of crashing.
+
+```java
+public class Main {
+    static class Connection implements AutoCloseable {
+        private final String host;
+        private boolean open = false;
+
+        Connection(String host) throws Exception {
+            if (host == null || host.isEmpty())
+                throw new IllegalArgumentException("Host required");
+            this.host = host;
+            this.open = true;
+            System.out.println("Connected to " + host);
+        }
+
+        String query(String sql) {
+            if (!open) throw new IllegalStateException("Connection closed");
+            return "result from " + host + ": " + sql;
+        }
+
+        public void close() {
+            open = false;
+            System.out.println("Disconnected from " + host);
+        }
+    }
+
+    public static void main(String[] args) {
+        // TODO: use try-with-resources to open Connection("db.local"),
+        //       call query("SELECT 1"), and print the result
+        try (Connection c = new Connection("db.local")) {
+            System.out.println(c.query("SELECT 1"));
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+
+        // TODO: open Connection("") — should print the caught error
+        try (Connection c = new Connection("")) {
+            System.out.println(c.query("SELECT 1"));
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+}
+```
+
+**What the tests check:**
+- First block prints `Connected to db.local`, then `result from db.local: SELECT 1`, then `Disconnected from db.local`
+- Second block prints `Error: Host required` (the constructor throws before open is set, so `close()` is never called)
+- No unhandled exceptions escape `main`
+
+<Note>Hint: try-with-resources only calls `close()` if the resource was successfully constructed. When `new Connection("")` throws in the constructor, the resource was never opened, so `close()` does not run — which is correct behaviour here.</Note>
+</Exercise>

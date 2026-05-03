@@ -1,0 +1,293 @@
+export const meta = {
+  title: "Implementing Multiple Interfaces",
+  duration: 12,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "imi-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "How does a class declare that it implements two interfaces, `Flyable` and `Swimmable`?",
+    options: [
+      { text: "class Duck implements Flyable implements Swimmable", correct: false, feedback: "Only one `implements` keyword is allowed. Separate the interface names with commas after a single `implements`." },
+      { text: "class Duck implements Flyable, Swimmable", correct: true, feedback: "Correct — multiple interfaces are listed after a single `implements` keyword, separated by commas." },
+      { text: "class Duck extends Flyable, Swimmable", correct: false, feedback: "`extends` is for class inheritance and only accepts one superclass. Use `implements` for interfaces." },
+      { text: "class Duck implements Flyable & Swimmable", correct: false, feedback: "The `&` separator is used in generic type bounds, not in `implements` lists." },
+    ],
+    explanation: "Java allows a class to implement as many interfaces as needed: `class Duck implements Flyable, Swimmable`. Each interface name is separated by a comma after the single `implements` keyword.",
+    hint: "Look at how multiple items are separated in a Java list.",
+  },
+  endQ1: {
+    id: "imi-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `interface Loud {
+    void makeNoise();
+}
+interface Fast {
+    void sprint();
+}
+class Athlete implements Loud, Fast {
+    public void makeNoise() { System.out.println("Go team!"); }
+    public void sprint()    { System.out.println("Running fast!"); }
+}
+public class Main {
+    public static void main(String[] args) {
+        Athlete a = new Athlete();
+        Loud l = a;
+        Fast f = a;
+        l.makeNoise();
+        f.sprint();
+    }
+}`,
+    expectedOutput: "Go team!\nRunning fast!",
+    explanation: "Even though `l` is typed as `Loud` and `f` is typed as `Fast`, both variables point to the same `Athlete` object. Each call dispatches to the single instance's implementation.",
+  },
+  endQ2: {
+    id: "imi-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `interface Resizable {
+    void resize(int factor);
+}
+interface Colorable {
+    void setColor(String color);
+}
+class Shape implements Resizable, Colorable {
+    public void resize(int factor) {
+        System.out.println("Resized by " + factor);
+    }
+    // setColor not implemented
+}`,
+    buggyLine: 8,
+    issue: "Shape implements Colorable but does not provide a body for setColor(String color)",
+    explanation: "When a class implements an interface, it must provide implementations for *all* abstract methods that interface declares. `Shape` is missing `setColor`, so the compiler will refuse to compile it unless you either add the method or declare `Shape` as `abstract`.",
+    hint: "Count the abstract methods the class is obligated to implement.",
+  },
+  endQ3: {
+    id: "imi-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "A class can implement ___ interfaces at the same time (choose a word, not a number).",
+    code: "class Foo implements A, B, C, D { ... }  // how many interfaces is this?",
+    correctAnswers: ["multiple", "many", "several", "four"],
+    caseSensitive: false,
+    explanation: "Java imposes no limit on the number of interfaces a class may implement. This is deliberately different from class inheritance, where only one superclass is allowed.",
+  },
+  endQ4: {
+    id: "imi-end-4",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Both `Saveable` and `Loadable` interfaces declare `void reset()`. Class `File` implements both. What must `File` do?",
+    options: [
+      { text: "Provide two separate reset() methods, one for each interface.", correct: false, feedback: "Java does not support multiple methods with the same name and parameter list — overloading requires different parameters. There can only be one `reset()` implementation." },
+      { text: "Provide exactly one reset() implementation, which satisfies both interfaces simultaneously.", correct: true, feedback: "Correct — because both interfaces declare the same signature, a single implementation fulfils both contracts at once." },
+      { text: "Refuse to compile because of the conflict.", correct: false, feedback: "Java only refuses to compile when two interfaces declare methods with the same name but incompatible return types. Identical signatures are merged into one obligation." },
+      { text: "Rename one of the reset() methods to avoid ambiguity.", correct: false, feedback: "You cannot rename interface methods in the implementing class — the implementation must match the declared signature exactly." },
+    ],
+    explanation: "When two interfaces share an identical method signature, the implementing class satisfies both with a single method body. A conflict only arises if the two interfaces declare the same method name with *different* return types — that is a compile error.",
+    hint: "Think about what 'ambiguity' actually means when the signatures are identical.",
+  },
+};
+
+A real-world object often belongs to more than one category simultaneously. A smartphone is both a camera and a phone and a music player. A Swiss Army knife is a blade, a screwdriver, and a bottle opener. Java models this with **multiple interface implementation**: a single class can sign as many contracts as it needs to.
+
+This is intentional and powerful. Java deliberately restricts a class to one superclass (to avoid the "diamond problem" of competing inherited implementations) but imposes no limit on the number of interfaces. Interfaces carry no implementation to conflict over — just pure method signatures.
+
+## The syntax
+
+List all the interfaces after a single `implements` keyword, separated by commas:
+
+```java
+class Smartphone implements Camera, Phone, MusicPlayer {
+    // must implement every method from all three interfaces
+}
+```
+
+The compiler checks each interface independently. If any abstract method from any interface is missing, the build fails.
+
+## A concrete example
+
+Suppose you're building a document management system. Documents need to be printed and exported:
+
+```java
+interface Printable {
+    void print();
+}
+
+interface Exportable {
+    String export();
+}
+
+class Invoice implements Printable, Exportable {
+    private String client;
+    private double amount;
+
+    Invoice(String client, double amount) {
+        this.client = client;
+        this.amount = amount;
+    }
+
+    @Override
+    public void print() {
+        System.out.println("Invoice for " + client + ": $" + amount);
+    }
+
+    @Override
+    public String export() {
+        return "CSV:" + client + ":" + amount;
+    }
+}
+```
+
+`Invoice` satisfies both contracts. You can now pass an `Invoice` to any method that accepts a `Printable`, any method that accepts an `Exportable`, or both — without duplication.
+
+## Treating the object as different types
+
+Because `Invoice` implements both interfaces, it is assignment-compatible with either interface type:
+
+```java
+Invoice inv = new Invoice("ACME", 500.0);
+
+Printable p = inv;    // valid — Invoice IS-A Printable
+Exportable e = inv;   // valid — Invoice IS-A Exportable
+
+p.print();            // Invoice for ACME: $500.0
+System.out.println(e.export());   // CSV:ACME:500.0
+```
+
+Both variables point to the same object in memory. There's no copying — just different "views" of the same `Invoice` through different interface lenses.
+
+<Note>This IS-A relationship is bidirectional: `instanceof` will return `true` for all implemented interfaces. `inv instanceof Printable` is `true`, and so is `inv instanceof Exportable`.</Note>
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Run the starter code. The `print()` method prints nothing and `export()` returns an empty string. Implement both methods so the output is:
+
+```
+Printing: Q4 Results (12 pages)
+EXPORT:Q4 Results:12
+Printing: Q4 Results (12 pages)
+```
+
+Note that `print()` is called twice — once directly and once through the `Printable` reference `p`. Both calls reach the same implementation.
+
+## Interface segregation: why split the contracts?
+
+You might wonder: why two interfaces instead of one `Document` interface with both methods? The answer is the **Interface Segregation Principle** — clients should not depend on methods they don't use.
+
+Imagine a legacy printer that can print but cannot export. With a single merged interface, the printer's class would be forced to implement `export()` with a stub or throw an exception — messy. With separate interfaces, the printer implements only `Printable`, and the export pathway simply doesn't apply to it:
+
+```java
+class LegacyPrinter implements Printable {
+    @Override
+    public void print() {
+        System.out.println("Printing via legacy driver");
+    }
+    // No export() needed — LegacyPrinter isn't Exportable
+}
+```
+
+Smaller, focused interfaces compose more flexibly than large, monolithic ones.
+
+## What happens when two interfaces share a method name?
+
+If both `Saveable` and `Loadable` declare `void reset()`, a class implementing both only needs — and can only have — one `reset()` method:
+
+```java
+interface Saveable  { void save();  void reset(); }
+interface Loadable  { void load();  void reset(); }
+
+class DataStore implements Saveable, Loadable {
+    public void save()  { System.out.println("Saved"); }
+    public void load()  { System.out.println("Loaded"); }
+    public void reset() { System.out.println("Reset"); }  // satisfies both
+}
+```
+
+A single implementation satisfies both contracts simultaneously because the signature is identical. A true conflict only arises when the same name appears with *different return types* in two interfaces — that is a compile error Java cannot resolve.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Repeating the `implements` keyword** — `class Foo implements A implements B` is a syntax error. Use a comma-separated list: `class Foo implements A, B`.
+- **Forgetting one method from one interface** — if a class implements three interfaces and each has two methods, you owe six implementations. Read compiler errors carefully — they name the exact interface and method that's missing.
+- **Thinking each interface gets its own method copy** — implementing `Runnable` and `Callable` doesn't give you two run-like methods. One method body satisfies whichever interface declared it (or both, if signatures match).
+- **Confusing interface type with class type** — `Printable p = new Printable()` is illegal. Interfaces cannot be instantiated. You instantiate a class, then assign it to an interface variable.
+- **Assuming interface order matters** — `class Foo implements A, B` and `class Foo implements B, A` are equivalent. The order does not affect which methods must be implemented or the object's runtime behaviour.
+
+## Recap
+
+Multiple interface implementation is one of Java's most powerful compositional tools. It lets objects wear many hats without the fragility of multiple inheritance of implementation.
+
+- A class may implement as many interfaces as needed with `class Foo implements A, B, C`
+- Every abstract method from every listed interface must be implemented
+- An object can be stored in a variable typed as any interface it implements
+- Separate, focused interfaces are more reusable than large combined ones (Interface Segregation Principle)
+- Identical method signatures across multiple interfaces collapse into one implementation; different return types are a compile error
+
+**Up next:** Abstract Classes — a middle ground that combines interface-like contracts with shared implementation.
+
+<Exercise>
+Implement `print()` and `export()` inside the `Report` class. `print()` should print `"Printing: "` followed by the title and the page count in parentheses. `export()` should return a colon-separated string starting with `"EXPORT"`.
+
+```java
+interface Printable {
+    void print();
+}
+
+interface Exportable {
+    String export();
+}
+
+class Report implements Printable, Exportable {
+    private String title;
+    private int pages;
+
+    Report(String title, int pages) {
+        this.title = title;
+        this.pages = pages;
+    }
+
+    public void print() {
+        // TODO: print "Printing: " + title + " (" + pages + " pages)"
+    }
+
+    public String export() {
+        // TODO: return "EXPORT:" + title + ":" + pages
+        return "";
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Report r = new Report("Q4 Results", 12);
+        r.print();
+        System.out.println(r.export());
+
+        Printable p = r;
+        p.print();
+    }
+}
+```
+
+**What the tests check:**
+- `print()` outputs `Printing: Q4 Results (12 pages)`
+- `export()` returns `EXPORT:Q4 Results:12`
+- Calling `print()` through a `Printable` reference produces the same output
+
+<Note>Hint: for `print()`, concatenate `"Printing: " + title + " (" + pages + " pages)"` inside `System.out.println`. For `export()`, return `"EXPORT:" + title + ":" + pages`.</Note>
+</Exercise>

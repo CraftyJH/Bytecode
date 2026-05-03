@@ -1,0 +1,372 @@
+export const meta = {
+  title: "TreeMap and Sorted Maps",
+  duration: 12,
+  order: 6,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "tm-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is the time complexity of get() and put() in a TreeMap?",
+    options: [
+      { text: "O(1) average, same as HashMap.", correct: false, feedback: "O(1) is the hash-table guarantee. TreeMap uses a tree, not a hash table." },
+      { text: "O(log n) — the tree must be traversed to the correct leaf.", correct: true, feedback: "Correct! A red-black tree guarantees O(log n) for all navigational operations by maintaining balance." },
+      { text: "O(n) worst case, because the tree can become unbalanced.", correct: false, feedback: "An ordinary binary search tree can degenerate to O(n), but a *red-black* tree self-balances, guaranteeing O(log n) in all cases." },
+      { text: "O(n log n) — every put triggers a sort.", correct: false, feedback: "TreeMap doesn't re-sort on every put; it inserts one element into the right position in O(log n)." },
+    ],
+    explanation: "A red-black tree rebalances on every insert or delete to keep the tree height at most 2 log(n). This guarantees O(log n) for all key-based operations — slower than `HashMap` for plain lookups, but you gain sorted order and range queries.",
+  },
+  endQ1: {
+    id: "tm-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        TreeMap<Integer, String> map = new TreeMap<>();
+        map.put(3, "three");
+        map.put(1, "one");
+        map.put(4, "four");
+        map.put(2, "two");
+        System.out.println(map.firstKey());
+        System.out.println(map.lastKey());
+        System.out.println(map.floorKey(3));
+        System.out.println(map.ceilingKey(3));
+    }
+}`,
+    expectedOutput: "1\n4\n3\n3",
+    explanation: "`TreeMap` stores keys in sorted order: {1, 2, 3, 4}. `firstKey()` = 1, `lastKey()` = 4. `floorKey(3)` = largest key ≤ 3 = 3. `ceilingKey(3)` = smallest key ≥ 3 = 3.",
+  },
+  endQ2: {
+    id: "tm-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "headMap(key) in a TreeMap returns entries with keys that are:",
+    options: [
+      { text: "Greater than or equal to key.", correct: false, feedback: "That's `tailMap(key)`. `headMap` means 'everything before the key'." },
+      { text: "Strictly less than key.", correct: true, feedback: "Correct! `headMap(key)` returns a view of all entries whose key is strictly less than `key`. Use `headMap(key, true)` to include the key itself." },
+      { text: "Less than or equal to key.", correct: false, feedback: "The two-argument form `headMap(key, true)` includes the key. The one-argument form is exclusive." },
+      { text: "Equal to key.", correct: false, feedback: "For an exact key lookup use `get(key)`, not `headMap`." },
+    ],
+    explanation: "`headMap(toKey)` returns a **live view** of the map for keys `k < toKey`. `tailMap(fromKey)` covers `k >= fromKey`. `subMap(from, to)` covers `from <= k < to`. All three accept an optional boolean `inclusive` parameter.",
+  },
+  endQ3: {
+    id: "tm-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To iterate over a TreeMap's keys in reverse (descending) order, call:",
+    code: "for (Integer k : map.___()) { ... }",
+    correctAnswers: ["descendingKeySet"],
+    caseSensitive: true,
+    explanation: "`descendingKeySet()` returns a `NavigableSet` backed by the map, with iteration in reverse order. `descendingMap()` gives the full map reversed. Both are live views — O(1) to create.",
+  },
+  endQ4: {
+    id: "tm-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        TreeMap<String, Integer> scores = new TreeMap<>();
+        scores.put("Alice", 90);
+        scores.put("Bob",   75);
+        scores.put("Carol", 88);
+
+        // Get all scores strictly below "Carol"
+        Map<String, Integer> below = scores.tailMap("Carol"); // bug here
+        System.out.println(below);
+    }
+}`,
+    buggyLine: 9,
+    issue: "tailMap returns keys >= the argument; headMap should be used to get keys < 'Carol'",
+    explanation: "`tailMap(\"Carol\")` returns entries with keys `>= \"Carol\"` — the opposite of what's intended. Use `headMap(\"Carol\")` to get keys strictly less than `\"Carol\"`. If you want to include Carol, use `headMap(\"Carol\", true)`.",
+  },
+};
+
+`HashMap` gives you O(1) lookups but no ordering. Sometimes you need both: to look up by key *and* to query ranges, find neighbours, or iterate in sorted order. That's exactly what `TreeMap` and the `NavigableMap` interface provide.
+
+## Red-black tree structure
+
+`TreeMap<K, V>` stores entries in a **red-black tree** — a self-balancing binary search tree. Every node stores a key-value entry. The tree maintains the binary search property: all keys in the left subtree of a node are smaller; all in the right subtree are larger.
+
+The "red-black" rules keep the tree balanced: no path from root to a leaf is more than twice as long as any other. This guarantees tree height ≤ 2 log(n), which bounds all navigational operations at **O(log n)**.
+
+```
+        Carol(B)
+       /          \
+   Alice(R)     Frank(R)
+     /    \       /
+  [nil]  Bob(B) David(B)
+```
+
+When you `put` or `remove` an entry, the tree may need to **rotate** and **recolour** up to O(log n) nodes to restore balance. This happens automatically — you never manage it manually.
+
+<Note>TreeMap's O(log n) is always *guaranteed*, unlike HashMap's O(1) which is only *average* (worst-case is O(log n) since Java 8, O(n) before that). For most workloads HashMap is faster in absolute terms, but TreeMap gives you predictability and ordering.</Note>
+
+## SortedMap and NavigableMap interfaces
+
+`TreeMap` implements the following hierarchy:
+
+```
+Map<K,V>
+  └─ SortedMap<K,V>          — firstKey, lastKey, headMap, tailMap, subMap
+       └─ NavigableMap<K,V>  — floorKey, ceilingKey, lowerKey, higherKey, descendingMap, ...
+            └─ TreeMap<K,V>  — concrete implementation
+```
+
+`SortedMap` adds the concept of **natural key order** (or a custom `Comparator`). `NavigableMap` adds **fine-grained navigation** to the nearest neighbours.
+
+## SortedMap methods
+
+```java
+import java.util.*;
+
+public class SortedDemo {
+    public static void main(String[] args) {
+        SortedMap<String, Integer> pop = new TreeMap<>();
+        pop.put("Berlin", 3_700_000);
+        pop.put("Cairo",  21_000_000);
+        pop.put("Delhi",  32_000_000);
+        pop.put("Kyoto",   1_500_000);
+        pop.put("Oslo",      700_000);
+
+        System.out.println("First city: " + pop.firstKey());   // Berlin
+        System.out.println("Last city:  " + pop.lastKey());    // Oslo
+
+        // All cities < "Kyoto" (exclusive)
+        System.out.println("Before K: " + pop.headMap("Kyoto"));
+        // {Berlin=3700000, Cairo=21000000, Delhi=32000000}
+
+        // All cities >= "Cairo"
+        System.out.println("C onwards: " + pop.tailMap("Cairo"));
+        // {Cairo=21000000, Delhi=32000000, Kyoto=1500000, Oslo=700000}
+
+        // Range: "Cairo" (incl) to "Kyoto" (excl)
+        System.out.println("C to K: " + pop.subMap("Cairo", "Kyoto"));
+        // {Cairo=21000000, Delhi=32000000}
+    }
+}
+```
+
+All three view methods return **live sub-views** backed by the original `TreeMap`. A `put` on the sub-view puts into the original; a `put` on the original within the range is visible in the sub-view. Putting outside the range through the sub-view throws `IllegalArgumentException`.
+
+## NavigableMap methods
+
+`NavigableMap` adds floor/ceiling/lower/higher navigation — indispensable for nearest-neighbour queries:
+
+| Method | Returns |
+|--------|---------|
+| `floorKey(k)` | Largest key ≤ k, or null |
+| `floorEntry(k)` | Entry with largest key ≤ k, or null |
+| `ceilingKey(k)` | Smallest key ≥ k, or null |
+| `ceilingEntry(k)` | Entry with smallest key ≥ k, or null |
+| `lowerKey(k)` | Largest key strictly < k |
+| `higherKey(k)` | Smallest key strictly > k |
+| `descendingKeySet()` | Keys in reverse order |
+| `descendingMap()` | Entire map reversed |
+| `pollFirstEntry()` | Removes and returns the first entry |
+| `pollLastEntry()` | Removes and returns the last entry |
+
+```java
+import java.util.*;
+
+public class NavDemo {
+    public static void main(String[] args) {
+        TreeMap<Integer, String> priceBook = new TreeMap<>();
+        priceBook.put(100, "economy");
+        priceBook.put(200, "standard");
+        priceBook.put(500, "premium");
+        priceBook.put(1000, "enterprise");
+
+        int budget = 350;
+        // What's the best tier I can afford?
+        Map.Entry<Integer, String> tier = priceBook.floorEntry(budget);
+        System.out.println("Best tier for $" + budget + ": " + tier.getValue()); // standard
+
+        // What's the next tier up?
+        Map.Entry<Integer, String> next = priceBook.higherEntry(budget);
+        System.out.println("Next tier: " + next.getValue()); // premium
+    }
+}
+```
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Custom Comparator
+
+If your keys don't implement `Comparable`, or you want a non-natural order, supply a `Comparator` to the constructor:
+
+```java
+import java.util.*;
+
+public class CustomOrder {
+    public static void main(String[] args) {
+        // Sort strings by length, then alphabetically
+        TreeMap<String, Integer> byLength = new TreeMap<>(
+            Comparator.comparingInt(String::length).thenComparing(Comparator.naturalOrder())
+        );
+        byLength.put("fig",    3);
+        byLength.put("apple",  5);
+        byLength.put("kiwi",   4);
+        byLength.put("banana", 6);
+        byLength.put("pear",   4);
+
+        byLength.forEach((k, v) -> System.out.println(k + " → " + v));
+        // fig → 3
+        // kiwi → 4
+        // pear → 4
+        // apple → 5
+        // banana → 6
+    }
+}
+```
+
+<Note>The `Comparator` you supply replaces the natural ordering entirely — including the duplicate-detection logic. Two keys `a` and `b` are considered the **same** key if `comparator.compare(a, b) == 0`, even if `a.equals(b)` is `false`. Make sure your comparator is consistent with `equals` to avoid surprising deduplication.</Note>
+
+## Real-world use cases
+
+**Range query — calendar events:**
+```java
+TreeMap<LocalTime, String> calendar = new TreeMap<>();
+// ... entries ...
+// "What events happen in the afternoon?" → subMap(LocalTime.NOON, LocalTime.of(17, 0))
+```
+
+**Leaderboard — top-N scores:**
+```java
+TreeMap<Integer, String> board = new TreeMap<>(Comparator.reverseOrder());
+board.put(9850, "Alice");
+board.put(9200, "Bob");
+board.put(9975, "Carol");
+System.out.println("Champion: " + board.firstEntry()); // 9975=Carol
+```
+
+**Version routing — find the config valid at version X:**
+```java
+// NavigableMap lets you ask "what's the latest config at or before version 2.3?"
+TreeMap<String, Config> releases = new TreeMap<>();
+releases.put("1.0", configV1);
+releases.put("2.0", configV2);
+Config active = releases.floorEntry("2.3").getValue(); // configV2
+```
+
+## LinkedHashMap: insertion-order Map
+
+Just as `LinkedHashSet` bridges `HashSet` and `TreeSet`, `LinkedHashMap` bridges `HashMap` and `TreeMap`. It's a `HashMap` augmented with a doubly-linked list tracking insertion (or access) order:
+
+```java
+Map<String, Integer> lhm = new LinkedHashMap<>();
+lhm.put("banana", 2);
+lhm.put("apple",  1);
+lhm.put("cherry", 3);
+System.out.println(lhm); // {banana=2, apple=1, cherry=3} — insertion order!
+```
+
+An access-order `LinkedHashMap` (pass `true` as the third constructor argument) is the basis of an LRU cache: the most recently accessed entry moves to the tail, so the head is always the least-recently used.
+
+## Try it
+
+```java
+import java.util.*;
+
+public class Demo {
+    public static void main(String[] args) {
+        TreeMap<Integer, String> highway = new TreeMap<>();
+        highway.put(15,  "Exit A");
+        highway.put(42,  "Exit B");
+        highway.put(78,  "Exit C");
+        highway.put(110, "Exit D");
+
+        // I'm at km 50 — what's the last exit I passed?
+        Map.Entry<Integer, String> passed = highway.floorEntry(50);
+        System.out.println("Last passed: " + passed.getValue()); // Exit B
+
+        // What's the next exit ahead?
+        Map.Entry<Integer, String> ahead = highway.ceilingEntry(50);
+        System.out.println("Next ahead: " + ahead.getValue()); // Exit C
+
+        // All exits in the first 80 km
+        System.out.println("First 80 km: " + highway.headMap(81));
+        // {15=Exit A, 42=Exit B, 78=Exit C}
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Confusing `headMap` and `tailMap`** — `headMap(k)` = everything *before* k (keys < k); `tailMap(k)` = everything *from* k onwards (keys ≥ k). The names are from the tree's head (smallest) and tail (largest) ends.
+- **Expecting O(1) performance from TreeMap** — TreeMap is always O(log n). If you don't need sorted order or range queries, stick with `HashMap`.
+- **Using a `Comparator` inconsistent with `equals`** — if `comparator.compare(a, b) == 0` but `!a.equals(b)`, one of the two will be silently dropped because the TreeMap treats them as the same key. Ensure `comparator.compare(a, b) == 0` iff `a.equals(b)`.
+- **Modifying keys after insertion** — like `HashMap`, if you mutate a key such that its position in the comparator order changes, the tree structure becomes corrupted. Use immutable keys.
+- **Calling `firstKey()` or `lastKey()` on an empty TreeMap** — these throw `NoSuchElementException`. Use `isEmpty()` first, or use `pollFirstEntry()` / `pollLastEntry()` which return `null` on empty.
+
+## Recap
+
+`TreeMap` adds sorted key order and a rich navigation API to the `Map` contract. It's the right choice whenever you need range queries, floor/ceiling lookups, or to iterate keys in sorted sequence.
+
+- Backed by a **red-black tree**: O(log n) for all key operations, always
+- Implements **`NavigableMap`** — `floorEntry`, `ceilingEntry`, `headMap`, `tailMap`, `subMap`, `descendingMap`
+- Accepts a custom **`Comparator`** for non-natural ordering
+- **`LinkedHashMap`** is the insertion-order (or access-order) alternative for when you want HashMap speed plus predictable order
+- Live sub-views (`headMap`, `tailMap`, `subMap`) are backed by the original — mutations propagate both ways
+
+**Up next:** Choosing the Right Collection — a decision framework to pick confidently between all six implementations.
+
+<Exercise>
+Work with a schedule stored in a `TreeMap` keyed by hour.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        TreeMap<Integer, String> schedule = new TreeMap<>();
+        schedule.put(9,  "Standup");
+        schedule.put(14, "Code review");
+        schedule.put(11, "Design meeting");
+        schedule.put(16, "1-1 with manager");
+        schedule.put(10, "Pair programming");
+
+        System.out.println("Full schedule: " + schedule);
+        System.out.println("First event: " + schedule.firstKey() + ":00");
+        System.out.println("Last event: "  + schedule.lastKey()  + ":00");
+
+        // TODO: print events strictly before noon using headMap(12)
+        System.out.println("Morning: " + schedule.headMap(12));
+
+        Map.Entry<Integer, String> e = schedule.floorEntry(13);
+        System.out.println("Around 13:00: " + e.getKey() + ":00 " + e.getValue());
+
+        List<String> rev = new ArrayList<>();
+        for (Integer k : schedule.descendingKeySet()) rev.add(k + ":00");
+        System.out.println("Reverse: " + String.join(", ", rev));
+    }
+}
+```
+
+**What the tests check:**
+- Full schedule is `{9=Standup, 10=Pair programming, 11=Design meeting, 14=Code review, 16=1-1 with manager}`
+- `firstKey()` is `9`, `lastKey()` is `16`
+- `headMap(12)` returns `{9=Standup, 10=Pair programming, 11=Design meeting}`
+- `floorEntry(13)` key is `11`, value is `"Design meeting"`
+- Reverse order string is `"16:00, 14:00, 11:00, 10:00, 9:00"`
+
+<Note>Hint: `headMap(12)` returns all entries with keys **strictly less than** 12. Since the events are at hours 9, 10, 11, 14, 16, only the first three qualify as "before noon".</Note>
+</Exercise>

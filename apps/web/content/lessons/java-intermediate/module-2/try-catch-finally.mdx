@@ -1,0 +1,354 @@
+export const meta = {
+  title: "try, catch, and finally",
+  duration: 14,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "tcf-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        try {
+            System.out.println("try");
+            if (true) throw new RuntimeException("boom");
+            System.out.println("after throw");
+        } catch (RuntimeException e) {
+            System.out.println("catch: " + e.getMessage());
+        } finally {
+            System.out.println("finally");
+        }
+        System.out.println("done");
+    }
+}`,
+    expectedOutput: "try\ncatch: boom\nfinally\ndone",
+    explanation: "The throw skips 'after throw'. The catch runs because RuntimeException matches. finally always runs — even after a catch. Execution then continues normally after the whole try-catch-finally block.",
+  },
+  endQ1: {
+    id: "tcf-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        try {
+            System.out.println("start");
+            System.out.println(Integer.parseInt("bad"));
+        } catch (NumberFormatException e) {
+            System.out.println("nfe");
+        } catch (RuntimeException e) {
+            System.out.println("rte");
+        } finally {
+            System.out.println("fin");
+        }
+    }
+}`,
+    expectedOutput: "start\nnfe\nfin",
+    explanation: "`NumberFormatException` is a subtype of `RuntimeException`. Because the specific catch comes first, it matches and 'nfe' is printed. The more general `RuntimeException` catch is skipped. `finally` always runs.",
+  },
+  endQ2: {
+    id: "tcf-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When does the `finally` block NOT execute?",
+    options: [
+      { text: "When an exception is thrown and not caught.", correct: false, feedback: "Even if an exception propagates out of the try-catch, finally still runs before the method exits." },
+      { text: "When the try block completes normally.", correct: false, feedback: "finally runs after normal completion too — that's what 'always runs' means." },
+      { text: "When `System.exit()` is called inside the try block.", correct: true },
+      { text: "When a catch block re-throws the exception.", correct: false, feedback: "Re-throwing still triggers finally before the exception continues propagating." },
+    ],
+    explanation: "`System.exit()` terminates the JVM process immediately. Since the JVM is gone, no more bytecode executes — including `finally`. A JVM crash (`Error`) or a `Thread.stop()` can also prevent `finally` from running, but `System.exit()` is the most common exam case.",
+  },
+  endQ3: {
+    id: "tcf-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the keyword that makes cleanup code run whether or not an exception occurred:",
+    code: `try {
+    riskyOperation();
+} catch (Exception e) {
+    handle(e);
+} ___ {
+    cleanup();
+}`,
+    correctAnswers: ["finally"],
+    caseSensitive: true,
+    explanation: "`finally` is the third optional clause of a try statement. Its body executes after the try (or catch) block completes, regardless of whether an exception was thrown or caught.",
+  },
+  endQ4: {
+    id: "tcf-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        try {
+            int n = Integer.parseInt("42");
+        } catch (Exception e) {
+            System.out.println("generic error");
+        } catch (NumberFormatException e) {
+            System.out.println("bad number");
+        }
+    }
+}`,
+    buggyLine: 7,
+    issue: "More general Exception catch appears before the specific NumberFormatException catch — unreachable code / compile error",
+    explanation: "Java requires that catch blocks go from most specific to most general. `NumberFormatException` is a subtype of `Exception`, so placing `catch (Exception e)` first makes the `NumberFormatException` catch unreachable. The compiler will refuse to compile this. Swap the order so `NumberFormatException` comes first.",
+  },
+};
+
+You know that exceptions propagate up the call stack until something catches them. Now it's time to master the full syntax: multiple catch blocks, the order they must appear in, the `finally` block for cleanup that must always run, and a preview of `try-with-resources` that makes resource management nearly automatic.
+
+Think of a `try` block as a guarded zone. You put risky code inside it. The catch blocks are labelled exits — each one handles a specific kind of trouble. The `finally` block is the hallway outside all exits: no matter which door you leave through, you pass through the hallway.
+
+## Multiple catch blocks
+
+A single `try` block can have several `catch` clauses, each catching a different exception type:
+
+```java
+static void parse(String input) {
+    try {
+        int n = Integer.parseInt(input);
+        int result = 100 / n;
+        System.out.println("Result: " + result);
+    } catch (NumberFormatException e) {
+        System.out.println("Not a valid integer: " + input);
+    } catch (ArithmeticException e) {
+        System.out.println("Cannot divide by zero");
+    }
+}
+```
+
+When an exception is thrown, Java tests each `catch` clause **in order** and runs the first one that matches. Only one catch block ever executes per exception.
+
+## Catch ordering: specific before general
+
+`NumberFormatException` extends `RuntimeException` which extends `Exception`. If you place a `catch (Exception e)` before `catch (NumberFormatException e)`, the specific catch is **unreachable** — Java will refuse to compile it:
+
+```java
+// COMPILE ERROR — wrong order
+try {
+    Integer.parseInt(s);
+} catch (Exception e) {           // too broad — swallows everything
+    System.out.println("error");
+} catch (NumberFormatException e) { // unreachable!
+    System.out.println("bad number");
+}
+```
+
+Always write the **most specific** type first and work toward the most general:
+
+```java
+// Correct order
+try {
+    Integer.parseInt(s);
+} catch (NumberFormatException e) {   // specific first
+    System.out.println("bad number");
+} catch (RuntimeException e) {        // broader second
+    System.out.println("runtime error");
+}
+```
+
+<Note>If you ever see a "exception has already been caught" compile error, the first thing to check is whether a catch clause higher up is a supertype of the one below it.</Note>
+
+## Multi-catch: catching multiple types in one clause
+
+Java 7 introduced the pipe (`|`) syntax to handle several unrelated exceptions with the same code:
+
+```java
+try {
+    doRiskyOperation();
+} catch (IOException | SQLException e) {
+    System.out.println("Data layer failed: " + e.getMessage());
+    log(e);
+}
+```
+
+This is cleaner than duplicating the handler body. The variable `e` is implicitly `final` inside a multi-catch clause — you cannot reassign it.
+
+Use multi-catch when two exceptions genuinely deserve identical handling. If they need different responses, keep them separate.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## The `finally` block
+
+`finally` is optional and appears after all catch clauses. Its body **always executes**, whether the try succeeded, a catch ran, or an exception is still propagating:
+
+```java
+static void readFile(String path) {
+    FileReader reader = null;
+    try {
+        reader = new FileReader(path);
+        // ... read data ...
+    } catch (IOException e) {
+        System.out.println("Could not read: " + e.getMessage());
+    } finally {
+        if (reader != null) {
+            try { reader.close(); } catch (IOException ignored) {}
+        }
+        System.out.println("Cleanup done");
+    }
+}
+```
+
+"Cleanup done" prints regardless of whether the file was read successfully. This pattern is essential for releasing resources like file handles, database connections, and network sockets.
+
+<Note>`finally` does NOT run if the JVM is forcibly killed (e.g., `System.exit()`, a hard power-off, or a JVM crash). For normal program flow, including re-thrown exceptions, it always runs.</Note>
+
+## What happens when `finally` itself throws?
+
+If a `finally` block throws an exception, it **replaces** any exception currently in flight. The original exception is lost:
+
+```java
+try {
+    throw new RuntimeException("original");
+} finally {
+    throw new RuntimeException("from finally"); // original is suppressed
+}
+```
+
+This is a common source of subtle bugs. In Java 7+, try-with-resources handles this properly by using "suppressed exceptions" — the primary exception is kept and the secondary one is attached to it. Avoid throwing from `finally` in hand-written code.
+
+## `return` inside `finally`
+
+Similarly, a `return` statement inside `finally` swallows any in-flight exception and also overrides a `return` value from the `try` or `catch` block:
+
+```java
+static int dangerous() {
+    try {
+        throw new RuntimeException("problem");
+    } finally {
+        return 42;  // exception is silently discarded!
+    }
+}
+```
+
+This is considered very bad style. Never `return` from `finally` unless you have a compelling, well-documented reason.
+
+## try-with-resources (preview)
+
+Managing resources in `finally` is verbose and error-prone. Java 7 introduced **try-with-resources** for any object implementing `AutoCloseable`:
+
+```java
+try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
+    String line = reader.readLine();
+    System.out.println(line);
+} catch (IOException e) {
+    System.out.println("Failed: " + e.getMessage());
+}
+// reader.close() is called automatically here
+```
+
+The parentheses after `try` hold one or more resource declarations. Each resource is closed in reverse order at the end of the block, even if an exception occurs. You'll see this pattern in depth in Lesson 6.
+
+## A realistic multi-catch example
+
+Here is a method that validates and converts user input, showing multiple concerns handled cleanly:
+
+```java
+static int parsePositive(String input) {
+    try {
+        int value = Integer.parseInt(input.trim());
+        if (value <= 0) throw new IllegalArgumentException("Must be positive, got: " + value);
+        return value;
+    } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("Not a number: '" + input + "'", e);
+    }
+}
+```
+
+Notice: the `NumberFormatException` is *wrapped* in an `IllegalArgumentException` with a friendlier message. The original exception is passed as the second constructor argument so its stack trace is preserved — callers can still inspect the root cause.
+
+## Try it
+
+```java
+public class Demo {
+    public static void main(String[] args) {
+        String[] tests = {"7", "0", "xyz"};
+        for (String t : tests) {
+            try {
+                int n = Integer.parseInt(t);
+                System.out.println(100 / n);
+            } catch (NumberFormatException e) {
+                System.out.println("Not a number: " + t);
+            } catch (ArithmeticException e) {
+                System.out.println("Division by zero");
+            } finally {
+                System.out.println("Processed: " + t);
+            }
+        }
+    }
+}
+```
+
+Trace through the output before running it, then verify your prediction. Pay attention to when `finally` prints relative to the catch block.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Catching a supertype before a subtype** — the compiler catches this for you with a compile error, but it's worth understanding *why*: if `Exception` is caught first, the subtype catch can never be reached because every subtype IS-A `Exception`. Fix by moving the specific type up.
+- **Empty `finally` cleanup when null** — `finally` runs even if the `try` block threw before the resource was assigned. Always null-check before calling `close()` in a manual `finally`, or use try-with-resources instead.
+- **Swallowing exceptions with `finally` return** — a `return` in `finally` silently discards any exception in flight, turning a crash into a mystery. Reserve `return` for the `try` and `catch` blocks.
+- **Multi-catch with related types** — you cannot write `catch (IOException | FileNotFoundException e)` because `FileNotFoundException` is a subtype of `IOException`. The compiler will reject it. Use just the supertype if you want to catch both.
+
+## Recap
+
+The `try-catch-finally` construct gives you fine-grained control over both the handling and the cleanup of exceptional conditions.
+
+- Multiple `catch` blocks allow different responses to different failures — list them **specific first, general last**
+- The `|` multi-catch syntax avoids duplication when two types need identical handling
+- `finally` is your guaranteed cleanup zone: it runs after the `try` (and any `catch`) completes, no matter what
+- Throwing from `finally` or returning from `finally` are both legal but very dangerous — avoid them
+- `try-with-resources` replaces manual `finally`-based cleanup for anything that implements `AutoCloseable`
+
+**Up next:** Checked vs Unchecked Exceptions — why the compiler forces you to handle some exceptions but not others, and how to choose the right category for your own exceptions.
+
+<Exercise>
+Complete the `finally` block so that every call to `process` prints a "Done: " confirmation line after the main result.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        process("42");
+        process("hello");
+        process("-7");
+        process("100");
+    }
+
+    static void process(String input) {
+        try {
+            int n = Integer.parseInt(input);
+            if (n < 0) throw new IllegalArgumentException("negative");
+            System.out.println("Accepted: " + n);
+        } catch (NumberFormatException e) {
+            System.out.println("Not a number: " + input);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Rejected: " + e.getMessage());
+        } finally {
+            // TODO: print "Done: " + input
+        }
+    }
+}
+```
+
+**What the tests check:**
+- `process("42")` prints `Accepted: 42` then `Done: 42`
+- `process("hello")` prints `Not a number: hello` then `Done: hello`
+- `process("-7")` prints `Rejected: negative` then `Done: -7`
+- `process("100")` prints `Accepted: 100` then `Done: 100`
+- The `finally` block runs in every case, including after a catch
+
+<Note>Hint: the `finally` block can read the `input` parameter just like any other variable in scope. A single `System.out.println` is all you need.</Note>
+</Exercise>

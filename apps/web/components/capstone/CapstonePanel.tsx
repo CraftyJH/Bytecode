@@ -21,6 +21,7 @@ interface Props {
   isPremium: boolean;
   nextPath: string;
   certificatePath: string;
+  badgeTitle?: string;
 }
 
 type PanelState = "idle" | "running" | "grading" | "passed" | "failed";
@@ -50,6 +51,7 @@ export function CapstonePanel({
   isPremium,
   nextPath,
   certificatePath,
+  badgeTitle = "Mastery badge earned.",
 }: Props) {
   const [code, setCode] = useState(starterCode);
   const [panelState, setPanelState] = useState<PanelState>("idle");
@@ -94,7 +96,7 @@ export function CapstonePanel({
       const res = await fetch("/api/capstone/grade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, capstoneId }),
       });
       const data = await res.json();
 
@@ -268,7 +270,7 @@ export function CapstonePanel({
               <Trophy size={20} className="text-ok shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-ok">All {totalTests} tests passed!</p>
-                <p className="text-xs text-prose-muted mt-0.5">Java Beginner — Module 1 Mastery badge earned.</p>
+                <p className="text-xs text-prose-muted mt-0.5">{badgeTitle}</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -335,7 +337,7 @@ export function CapstonePanel({
           <div className="px-4 py-3">
             <p className="text-xs text-prose-faint" style={{ fontFamily: "var(--font-mono)" }}>
               {isPremium
-                ? "// click Run to test your demo · click Submit to run all 14 tests"
+                ? `// click Run to test your demo · click Submit to run all ${totalTests} tests`
                 : "// click Run to test your code"}
             </p>
           </div>
@@ -344,7 +346,7 @@ export function CapstonePanel({
         {isWorking && (
           <div className="px-4 py-3">
             <p className="text-xs text-prose-faint animate-pulse" style={{ fontFamily: "var(--font-mono)" }}>
-              {panelState === "grading" ? "// running 14 tests…" : "// running…"}
+              {panelState === "grading" ? `// running ${totalTests} tests…` : "// running…"}
             </p>
           </div>
         )}

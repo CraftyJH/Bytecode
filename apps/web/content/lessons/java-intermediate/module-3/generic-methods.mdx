@@ -1,0 +1,354 @@
+export const meta = {
+  title: "Generic Methods",
+  duration: 14,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "gm-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.Arrays;
+import java.util.List;
+
+public class Demo {
+    static <T> T first(List<T> list) {
+        return list.get(0);
+    }
+
+    static <T> T last(List<T> list) {
+        return list.get(list.size() - 1);
+    }
+
+    public static void main(String[] args) {
+        List<String> words = Arrays.asList("one", "two", "three");
+        System.out.println(first(words).toUpperCase());
+        System.out.println(last(words));
+        List<Integer> nums = Arrays.asList(10, 20, 30);
+        System.out.println(first(nums) + last(nums));
+    }
+}`,
+    expectedOutput: "ONE\nthree\n40",
+    explanation: "`first(words)` returns `\"one\"` (already typed `String`, so `.toUpperCase()` works). `last(words)` returns `\"three\"`. `first(nums)` is `10` and `last(nums)` is `30`; their sum is `40`. Type inference picks `T = String` or `T = Integer` automatically.",
+  },
+  endQ1: {
+    id: "gm-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.Arrays;
+import java.util.List;
+import java.util.ArrayList;
+
+public class Demo {
+    static <T> List<T> repeat(T item, int times) {
+        List<T> result = new ArrayList<>();
+        for (int i = 0; i < times; i++) result.add(item);
+        return result;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(repeat("ha", 3));
+        System.out.println(repeat(0, 4));
+        System.out.println(repeat(true, 2));
+    }
+}`,
+    expectedOutput: "[ha, ha, ha]\n[0, 0, 0, 0]\n[true, true]",
+    explanation: "`repeat` builds a list of the given item. `List.toString()` formats elements comma-separated inside brackets. Each call infers a different `T` — `String`, `Integer`, and `Boolean` — from the argument type.",
+  },
+  endQ2: {
+    id: "gm-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Where does the type parameter `<T>` appear in a generic method declaration?",
+    options: [
+      { text: "After the return type, before the method name.", correct: false, feedback: "That would be `void <T> swap(...)` — the type parameter list must come before the return type." },
+      { text: "Before the return type, after any modifiers.", correct: true, feedback: "Correct: `static <T> void swap(T[] arr, int i, int j)` — modifiers, then `<T>`, then return type." },
+      { text: "After the method name, before the parameter list.", correct: false, feedback: "That position is used for the parameter list itself, not the type parameter." },
+      { text: "Inside the parameter list, as the first parameter.", correct: false, feedback: "Type parameters are declared in angle brackets before the return type, not as regular parameters." },
+    ],
+    explanation: "The type parameter list `<T>` (or `<T, R>`, etc.) is placed after access modifiers but before the return type: `public static <T> List<T> toList(T item)`. This is different from class-level type parameters, which follow the class name.",
+  },
+  endQ3: {
+    id: "gm-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the signature of a static generic method that accepts two arguments of any type and returns the first one:",
+    code: `static <___> T pickFirst(T a, T b) {
+    return a;
+}`,
+    correctAnswers: ["T"],
+    caseSensitive: true,
+    explanation: "The `<T>` before the return type introduces the type parameter that is then used in the parameter types and return type. Without it, the compiler would not know that `T` is a generic placeholder rather than a concrete class.",
+  },
+  endQ4: {
+    id: "gm-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.List;
+import java.util.ArrayList;
+
+public class Demo {
+    static List<T> wrap(T item) {   // line 5
+        List<T> list = new ArrayList<>();
+        list.add(item);
+        return list;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(wrap("hello"));
+    }
+}`,
+    buggyLine: 5,
+    issue: "The type parameter `<T>` is missing from the method declaration",
+    explanation: "`T` must be introduced with `<T>` before the return type: `static <T> List<T> wrap(T item)`. Without the `<T>` declaration the compiler treats `T` as an unresolvable type name and reports a compile error.",
+  },
+};
+
+You have seen type parameters on classes (`class Box<T>`). Java also lets you place type parameters on individual **methods**, independent of whether the class itself is generic. This makes static utility methods — the kind that live in helper classes — fully type-safe without forcing the entire class to be parameterized.
+
+## Method-level vs class-level type parameters
+
+When a type parameter is on the class, every instance method and field shares it:
+
+```java
+class Box<T> {      // T is the class's parameter
+    T value;
+    T get() { return value; }   // T is in scope here
+}
+```
+
+When a type parameter is on the method, it applies only to that one method call:
+
+```java
+class Utils {                              // not generic
+    static <T> T identity(T value) {      // T is this method's parameter
+        return value;
+    }
+}
+```
+
+The `<T>` in the method signature comes **after any modifiers** and **before the return type**. That position is how the compiler knows you are introducing a new type parameter rather than referring to an existing type named `T`.
+
+## Type inference
+
+In almost all cases you do not have to specify the type argument when calling a generic method. The compiler infers it from the argument types:
+
+```java
+String s  = Utils.identity("hello");   // T inferred as String
+Integer n = Utils.identity(42);        // T inferred as Integer
+```
+
+In rare cases — usually when the inferred type is ambiguous or you want to be explicit for documentation — you can provide it explicitly:
+
+```java
+String s = Utils.<String>identity("hello");  // explicit, rarely needed
+```
+
+Prefer implicit inference; explicit invocation is verbose and mainly used when the compiler cannot resolve the type on its own.
+
+<Note>Type inference became significantly smarter in Java 8. Prior to that, complex call chains sometimes required explicit type witnesses. If you ever see code like `Collections.<String>emptyList()`, that was written for an older compiler — modern Java infers it automatically.</Note>
+
+## Static generic utility methods
+
+The most valuable use of generic methods is building stateless utility functions that work across all types. Consider a `swap` utility:
+
+```java
+import java.util.List;
+
+public class Util {
+    static <T> void swap(List<T> list, int i, int j) {
+        T temp = list.get(i);
+        list.set(i, list.get(j));
+        list.set(j, temp);
+    }
+}
+```
+
+The type parameter `T` exists only to link the list type with the elements being swapped — it carries no other information. The compiler verifies that `list.get(i)` returns a `T` and that `list.set(i, ...)` accepts a `T`. No casts, no `Object` tricks.
+
+## Building useful utilities: contains and zip
+
+```java
+import java.util.List;
+import java.util.ArrayList;
+
+public class Util {
+    // Check membership without casting
+    static <T> boolean contains(List<T> list, T target) {
+        for (T item : list) {
+            if (item.equals(target)) return true;
+        }
+        return false;
+    }
+
+    // Pair up two lists element-by-element
+    static <A, B> List<String> zip(List<A> as, List<B> bs) {
+        int len = Math.min(as.size(), bs.size());
+        List<String> pairs = new ArrayList<>(len);
+        for (int i = 0; i < len; i++) {
+            pairs.add("(" + as.get(i) + ", " + bs.get(i) + ")");
+        }
+        return pairs;
+    }
+}
+```
+
+Usage:
+
+```java
+List<String> fruits = Arrays.asList("apple", "banana", "cherry");
+System.out.println(Util.contains(fruits, "banana"));   // true
+System.out.println(Util.contains(fruits, "mango"));    // false
+
+List<Integer> ids    = Arrays.asList(1, 2, 3);
+List<String>  labels = Arrays.asList("a", "b", "c");
+System.out.println(Util.zip(ids, labels));  // [(1, a), (2, b), (3, c)]
+```
+
+The `zip` method uses **two** type parameters `<A, B>`, allowing the two lists to hold different types. The compiler tracks them independently.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## When to use a generic method vs a generic class
+
+The choice comes down to whether the type parameter is needed by the object's **state** or only by one **operation**:
+
+| Situation | Choose |
+| --------- | ------ |
+| The class stores or remembers values of type `T` across methods | Generic class (`class Foo<T>`) |
+| A single utility operation needs type safety but the class keeps no typed state | Generic method (`static <T> ... method(...)`) |
+| Several related utility methods all share the same `T` | Possibly a generic class, or a generic interface |
+
+`java.util.Collections` is the canonical example of the generic-method pattern: the class itself is not generic, but methods like `sort`, `shuffle`, `unmodifiableList`, and `frequency` are all generic.
+
+## Another example: a typed toArray helper
+
+Because `T[]` arrays are tricky to create generically, a helper method that wraps the unsafe part in one place is a common pattern:
+
+```java
+import java.util.List;
+
+public class Util {
+    @SuppressWarnings("unchecked")
+    static <T> T[] toArray(List<T> list, T[] dummy) {
+        // list.toArray(T[]) already handles the cast internally
+        return list.toArray(dummy);
+    }
+}
+
+// Usage
+List<String> words = Arrays.asList("x", "y", "z");
+String[] arr = Util.toArray(words, new String[0]);
+System.out.println(Arrays.toString(arr));  // [x, y, z]
+```
+
+The `dummy` array of length 0 is passed purely to supply the element type at runtime — a common pattern because of type erasure.
+
+## Try it
+
+```java
+import java.util.Arrays;
+import java.util.List;
+import java.util.ArrayList;
+
+public class Demo {
+    static <T> List<T> filter(List<T> list, java.util.function.Predicate<T> pred) {
+        List<T> result = new ArrayList<>();
+        for (T item : list) {
+            if (pred.test(item)) result.add(item);
+        }
+        return result;
+    }
+
+    public static void main(String[] args) {
+        List<Integer> nums = Arrays.asList(1, 2, 3, 4, 5, 6);
+        List<Integer> evens = filter(nums, n -> n % 2 == 0);
+        System.out.println(evens);  // [2, 4, 6]
+
+        List<String> words = Arrays.asList("ant", "bee", "cat", "deer");
+        List<String> long3 = filter(words, w -> w.length() > 3);
+        System.out.println(long3);  // [deer]
+    }
+}
+```
+
+Expected output:
+```
+[2, 4, 6]
+[deer]
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Missing `<T>` in the signature** — writing `static List<T> wrap(T item)` without `<T>` before the return type is a compile error; the compiler treats `T` as an unrecognized class name.
+- **Shadowing the class type parameter** — inside a generic class, writing `static <T> void helper(T v)` introduces a *new*, unrelated `T`. This compiles but creates confusion; choose a different letter for the method-level parameter.
+- **Overusing generic methods** — if a method only ever needs `Object`-level operations (like `.equals()` or `.toString()`), a simple `Object` parameter often suffices. Add a type parameter only when the caller needs the return type or parameters to be linked.
+- **Explicit type witnesses on obvious calls** — `Utils.<String>identity("hello")` is noisier than `Utils.identity("hello")`. Explicit witnesses are needed only when inference fails, which is rare with Java 8+.
+
+## Recap
+
+Generic methods decouple type safety from class-level design. A plain, non-generic class can contain dozens of generic methods, each with its own type parameter that is inferred at the call site.
+
+- The type parameter list `<T>` appears before the return type in the method signature
+- The compiler infers `T` from argument types — explicit witnesses are rarely needed
+- Use a generic method when the type is needed only for one operation; use a generic class when the type is part of the object's persistent state
+- `java.util.Collections` is the standard-library poster child for the generic-method pattern
+
+**Up next:** Bounded Type Parameters — restrict which types `T` can be so you can call methods on it.
+
+<Exercise>
+Implement three generic utility methods: `min` (return the smaller of two `Comparable` values), `reverse` (reverse a list in place), and `repeat` (build a list with `n` copies of an item).
+
+```java
+import java.util.*;
+
+public class Main {
+    static <T extends Comparable<T>> T min(T a, T b) {
+        // TODO: return the smaller of a and b using compareTo
+        return null;
+    }
+
+    static <T> void reverse(List<T> list) {
+        // TODO: reverse list in-place by swapping elements from outside in
+    }
+
+    static <T> List<T> repeat(T item, int times) {
+        // TODO: return a new List containing item repeated times times
+        return null;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(min(3, 7));
+        System.out.println(min("apple", "banana"));
+
+        List<Integer> nums = new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5));
+        reverse(nums);
+        System.out.println(nums);
+
+        System.out.println(repeat("ha", 3));
+    }
+}
+```
+
+**What the tests check:**
+- `min(3, 7)` returns `3`
+- `min("apple", "banana")` returns `"apple"` (lexicographic order)
+- `reverse` mutates the list to `[5, 4, 3, 2, 1]`
+- `repeat("ha", 3)` returns `["ha", "ha", "ha"]`
+
+<Note>Hint: for `reverse`, use two index variables starting at 0 and `list.size() - 1`, swap elements with a temp variable, and move them toward each other. `compareTo` returns a negative number when the receiver is less than the argument.</Note>
+</Exercise>

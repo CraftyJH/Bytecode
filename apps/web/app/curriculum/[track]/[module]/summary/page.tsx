@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTrack, getModule, curriculum } from "@/lib/curriculum";
+import { getCapstoneForModule } from "@/lib/capstones";
 import { Pill } from "@/components/ui/Pill";
 import { ChevronRight, Trophy, CheckCircle2, BookOpen, Sparkles } from "lucide-react";
 import { FinalQuizSection, FeedbackButton } from "./SummaryClient";
@@ -26,12 +27,15 @@ export async function generateMetadata({ params }: SummaryPageProps) {
   return { title: `${mod.title} — Summary — Bytecode` };
 }
 
-// Module-specific summary quizzes. Generic fallback if no override.
+// ── Summary quiz banks ────────────────────────────────────────────────────────
+
 function getSummaryQuizzes(trackSlug: string, moduleSlug: string): QuizItem[] {
+  // ── Java Beginner ────────────────────────────────────────────────────────────
+
   if (trackSlug === "java-beginner" && moduleSlug === "module-1") {
     return [
       {
-        id: "sum-m1-1",
+        id: "sum-jb1-1",
         type: "multiple_choice",
         difficulty: "easy",
         question: "Which primitive type holds a whole number between roughly −2 billion and +2 billion?",
@@ -45,7 +49,7 @@ function getSummaryQuizzes(trackSlug: string, moduleSlug: string): QuizItem[] {
         hint: "Think about what type you use in a for-loop counter.",
       },
       {
-        id: "sum-m1-2",
+        id: "sum-jb1-2",
         type: "predict_output",
         difficulty: "easy",
         code: `int x = 10;
@@ -56,7 +60,7 @@ System.out.println(x);`,
         explanation: "x starts at 10, += 5 makes it 15, *=2 makes it 30.",
       },
       {
-        id: "sum-m1-3",
+        id: "sum-jb1-3",
         type: "fill_in_blank",
         difficulty: "medium",
         prompt: "What keyword begins a loop that continues as long as a condition is true?",
@@ -65,7 +69,7 @@ System.out.println(x);`,
         explanation: "Both while and for can express 'repeat while condition is true'. The while loop is the most direct expression of that idea.",
       },
       {
-        id: "sum-m1-4",
+        id: "sum-jb1-4",
         type: "multiple_choice",
         difficulty: "medium",
         question: "What does an array's <code>.length</code> property return for <code>int[] a = new int[5];</code>?",
@@ -84,7 +88,7 @@ System.out.println(x);`,
   if (trackSlug === "java-beginner" && moduleSlug === "module-2") {
     return [
       {
-        id: "sum-m2-1",
+        id: "sum-jb2-1",
         type: "multiple_choice",
         difficulty: "easy",
         question: "What is the difference between a class and an object?",
@@ -97,7 +101,7 @@ System.out.println(x);`,
         explanation: "The class defines structure and behavior; new creates an object (instance) following that definition.",
       },
       {
-        id: "sum-m2-2",
+        id: "sum-jb2-2",
         type: "predict_output",
         difficulty: "medium",
         code: `class Counter {
@@ -105,13 +109,10 @@ System.out.println(x);`,
     void increment() { count++; }
     int get() { return count; }
 }
-
 public class Main {
     public static void main(String[] args) {
         Counter c = new Counter();
-        c.increment();
-        c.increment();
-        c.increment();
+        c.increment(); c.increment(); c.increment();
         System.out.println(c.get());
     }
 }`,
@@ -119,7 +120,7 @@ public class Main {
         explanation: "increment() is called three times, each time adding 1 to count which starts at 0.",
       },
       {
-        id: "sum-m2-3",
+        id: "sum-jb2-3",
         type: "fill_in_blank",
         difficulty: "easy",
         prompt: "What keyword is used inside a constructor to refer to the current object's fields?",
@@ -128,7 +129,7 @@ public class Main {
         explanation: "`this` refers to the current instance. It's commonly used in constructors to distinguish `this.name = name` (field vs parameter).",
       },
       {
-        id: "sum-m2-4",
+        id: "sum-jb2-4",
         type: "multiple_choice",
         difficulty: "medium",
         question: "Which access modifier makes a field visible only within its own class?",
@@ -136,10 +137,364 @@ public class Main {
           { text: "<code>public</code>", correct: false, feedback: "public makes the field accessible from anywhere." },
           { text: "<code>protected</code>", correct: false, feedback: "protected allows access from the same package and subclasses." },
           { text: "<code>private</code>", correct: true },
-          { text: "<code>default</code> (no modifier)", correct: false, feedback: "Default (package-private) allows access from the same package." },
+          { text: "(no modifier)", correct: false, feedback: "Default (package-private) allows access from the same package." },
         ],
         explanation: "private is the most restrictive modifier — only code within the same class can see the field.",
         hint: "Encapsulation best practice: make fields as private as possible.",
+      },
+    ];
+  }
+
+  // ── Java Intermediate ────────────────────────────────────────────────────────
+
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-1") {
+    return [
+      {
+        id: "sum-ji1-1",
+        type: "multiple_choice",
+        difficulty: "easy",
+        question: "What does the <code>interface</code> keyword define in Java?",
+        options: [
+          { text: "A class that cannot be instantiated directly.", correct: false, feedback: "That describes an abstract class, not an interface." },
+          { text: "A contract of method signatures that implementing classes must fulfil.", correct: true },
+          { text: "A special type of loop.", correct: false, feedback: "interface has nothing to do with loops." },
+          { text: "A built-in collection type.", correct: false, feedback: "Collection types like List and Map are separate from the interface keyword itself." },
+        ],
+        explanation: "An interface is a pure contract — it lists what a class must be able to do, without specifying how.",
+        hint: "Think about the word 'contract' — what does a class promise when it implements an interface?",
+      },
+      {
+        id: "sum-ji1-2",
+        type: "predict_output",
+        difficulty: "medium",
+        code: `interface Greetable {
+    String greet();
+}
+class Formal implements Greetable {
+    public String greet() { return "Good day."; }
+}
+class Casual implements Greetable {
+    public String greet() { return "Hey!"; }
+}
+public class Main {
+    public static void main(String[] args) {
+        Greetable g = new Casual();
+        System.out.println(g.greet());
+        g = new Formal();
+        System.out.println(g.greet());
+    }
+}`,
+        expectedOutput: "Hey!\nGood day.",
+        explanation: "The variable g holds a Greetable reference. First it points to Casual (greet→\"Hey!\"), then to Formal (greet→\"Good day.\").",
+      },
+      {
+        id: "sum-ji1-3",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "Which statement about abstract classes is correct?",
+        options: [
+          { text: "A class can extend multiple abstract classes.", correct: false, feedback: "Java only allows single inheritance — a class can extend at most one class, abstract or not." },
+          { text: "An abstract class cannot have any concrete (non-abstract) methods.", correct: false, feedback: "Abstract classes can have both abstract and concrete methods." },
+          { text: "An abstract class can have constructors, fields, and concrete methods.", correct: true },
+          { text: "Abstract classes are instantiated with new AbstractClass().", correct: false, feedback: "You cannot instantiate an abstract class directly — you must subclass it." },
+        ],
+        explanation: "Unlike interfaces (before Java 8), abstract classes can contain state (fields), constructors, and fully implemented methods alongside abstract ones.",
+        hint: "Abstract classes are real classes — they just forbid direct instantiation.",
+      },
+      {
+        id: "sum-ji1-4",
+        type: "fill_in_blank",
+        difficulty: "medium",
+        prompt: "To add a concrete method to an interface without breaking existing implementations, use the <code>___</code> keyword before the method.",
+        correctAnswers: ["default"],
+        caseSensitive: true,
+        explanation: "Since Java 8, interface default methods let you add new concrete behaviour to an interface without forcing every implementing class to change.",
+      },
+      {
+        id: "sum-ji1-5",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "What is a functional interface?",
+        options: [
+          { text: "An interface that extends java.util.function.Function.", correct: false, feedback: "A functional interface can be any interface with exactly one abstract method." },
+          { text: "An interface with exactly one abstract method, usable as a lambda target.", correct: true },
+          { text: "An interface with only static methods.", correct: false, feedback: "Only having static methods would make it non-functional in the lambda sense." },
+          { text: "An interface that cannot have default methods.", correct: false, feedback: "A functional interface can have default methods — it just must have exactly one abstract method." },
+        ],
+        explanation: "The @FunctionalInterface annotation enforces the single-abstract-method rule. Common examples: Runnable, Comparator, Predicate.",
+        hint: "Lambda expressions work by standing in for the single abstract method.",
+      },
+      {
+        id: "sum-ji1-6",
+        type: "multiple_choice",
+        difficulty: "hard",
+        question: "A class <code>Bird implements Flyable</code> where <code>Flyable</code> declares <code>fly()</code> and <code>land()</code>, but Bird only defines <code>fly()</code>. What happens at compile time?",
+        options: [
+          { text: "Compiles fine — unimplemented methods default to no-ops.", correct: false, feedback: "Java does not silently provide default implementations for interface methods (unless the interface itself declares them as default)." },
+          { text: "Compile error: Bird must implement land() or be declared abstract.", correct: true },
+          { text: "Compiles but throws UnsupportedOperationException at runtime.", correct: false, feedback: "The failure is at compile time, not runtime." },
+          { text: "Compiles only if Bird extends Object.", correct: false, feedback: "All classes extend Object implicitly; that has no bearing on interface method requirements." },
+        ],
+        explanation: "When a class implements an interface it must provide a body for every abstract method. The fix: add `public void land() { ... }` to Bird, or declare Bird as abstract.",
+      },
+    ];
+  }
+
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-2") {
+    return [
+      {
+        id: "sum-ji2-1",
+        type: "multiple_choice",
+        difficulty: "easy",
+        question: "What is a Java exception?",
+        options: [
+          { text: "A syntax error caught by the compiler.", correct: false, feedback: "Syntax errors are compile-time; exceptions are runtime events." },
+          { text: "An object that represents an abnormal condition during program execution.", correct: true },
+          { text: "A keyword used to end a program.", correct: false, feedback: "return/System.exit end programs; exception is a runtime object." },
+          { text: "A type of comment used to disable code.", correct: false, feedback: "Comments don't affect runtime behaviour at all." },
+        ],
+        explanation: "All Java exceptions are objects — subclasses of Throwable. When something goes wrong at runtime, an exception object is 'thrown' up the call stack.",
+      },
+      {
+        id: "sum-ji2-2",
+        type: "predict_output",
+        difficulty: "medium",
+        code: `public class Main {
+    public static void main(String[] args) {
+        try {
+            System.out.println("A");
+            if (true) throw new RuntimeException("boom");
+            System.out.println("B");
+        } catch (RuntimeException e) {
+            System.out.println("C: " + e.getMessage());
+        } finally {
+            System.out.println("D");
+        }
+    }
+}`,
+        expectedOutput: "A\nC: boom\nD",
+        explanation: "\"A\" prints, then the exception is thrown (skipping \"B\"), caught (printing \"C: boom\"), and finally always runs (printing \"D\").",
+      },
+      {
+        id: "sum-ji2-3",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "What is the key difference between checked and unchecked exceptions?",
+        options: [
+          { text: "Checked exceptions are faster at runtime than unchecked.", correct: false, feedback: "The check/unchecked distinction is about compile-time enforcement, not runtime speed." },
+          { text: "Checked exceptions must be declared or caught at compile time; unchecked exceptions do not.", correct: true },
+          { text: "Unchecked exceptions cannot be caught.", correct: false, feedback: "Unchecked exceptions can absolutely be caught — they just don't have to be." },
+          { text: "Checked exceptions extend RuntimeException.", correct: false, feedback: "It's the opposite: RuntimeException and its subclasses are unchecked; direct subclasses of Exception are checked." },
+        ],
+        explanation: "Checked: compiler forces you to handle or declare (e.g., IOException). Unchecked: extend RuntimeException — caller's choice whether to catch (e.g., NullPointerException).",
+        hint: "Think about what 'checked at compile time' means for the programmer.",
+      },
+      {
+        id: "sum-ji2-4",
+        type: "fill_in_blank",
+        difficulty: "easy",
+        prompt: "To create and signal an exception you use the <code>___</code> keyword followed by a new exception object.",
+        correctAnswers: ["throw"],
+        caseSensitive: true,
+        explanation: "`throw new IllegalArgumentException(\"message\")` creates and immediately throws an exception. Note: `throws` (with an s) is used in method signatures to declare checked exceptions.",
+      },
+      {
+        id: "sum-ji2-5",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "When should you create a custom exception class?",
+        options: [
+          { text: "Whenever you want a shorter exception name.", correct: false, feedback: "Brevity alone is not a good reason — existing exceptions are well understood by readers." },
+          { text: "When a domain-specific error needs a distinct type so callers can catch it selectively.", correct: true },
+          { text: "Custom exceptions are always better than built-in ones.", correct: false, feedback: "Prefer standard exceptions when they fit — they communicate intent without extra classes." },
+          { text: "Only when the error message would be longer than 20 characters.", correct: false, feedback: "Message length has no bearing on whether a custom exception is appropriate." },
+        ],
+        explanation: "Custom exceptions shine when callers need to catch a specific failure mode (e.g., InsufficientFundsException) and differentiate it from unrelated errors.",
+      },
+      {
+        id: "sum-ji2-6",
+        type: "multiple_choice",
+        difficulty: "hard",
+        question: "A method <code>divide(10, 0)</code> is called inside a try block. The catch clause is <code>catch (NullPointerException e)</code>. What happens?",
+        options: [
+          { text: "The catch block runs because NullPointerException is a supertype of ArithmeticException.", correct: false, feedback: "It's the other way around — ArithmeticException does not extend NullPointerException." },
+          { text: "Division by zero is silently ignored and the program continues.", correct: false, feedback: "Uncaught exceptions propagate up and, if unhandled, terminate the program with a stack trace." },
+          { text: "An ArithmeticException propagates unhandled, crashing the program.", correct: true },
+          { text: "Java automatically widens the catch to handle any RuntimeException.", correct: false, feedback: "Java does not auto-widen catch clauses — you catch exactly what you write (or a supertype)." },
+        ],
+        explanation: "The catch clause only intercepts exceptions that are assignment-compatible with the declared type. Fix: catch ArithmeticException (or Exception) to handle division by zero.",
+      },
+    ];
+  }
+
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-3") {
+    return [
+      {
+        id: "sum-ji3-1",
+        type: "multiple_choice",
+        difficulty: "easy",
+        question: "What problem do generics primarily solve in Java?",
+        options: [
+          { text: "They make programs run faster by avoiding method calls.", correct: false, feedback: "Generics have no significant runtime performance benefit — they're erased at runtime." },
+          { text: "They provide compile-time type safety, eliminating the need for casts and preventing ClassCastException.", correct: true },
+          { text: "They allow a class to extend multiple parent classes.", correct: false, feedback: "Multiple inheritance is unrelated to generics; Java still only allows single class inheritance." },
+          { text: "They replace the need for interfaces.", correct: false, feedback: "Generics and interfaces solve different problems and work well together." },
+        ],
+        explanation: "Before generics, collections stored Object, requiring casts everywhere and allowing runtime ClassCastExceptions. Generics move the error to compile time.",
+        hint: "Think about what happens when you add a String to a List<Integer>.",
+      },
+      {
+        id: "sum-ji3-2",
+        type: "predict_output",
+        difficulty: "medium",
+        code: `class Box<T> {
+    private T value;
+    Box(T value) { this.value = value; }
+    T get() { return value; }
+}
+public class Main {
+    public static void main(String[] args) {
+        Box<Integer> b = new Box<>(42);
+        System.out.println(b.get() * 2);
+    }
+}`,
+        expectedOutput: "84",
+        explanation: "Box<Integer> stores 42. get() returns 42 (auto-unboxed from Integer). 42 * 2 = 84.",
+      },
+      {
+        id: "sum-ji3-3",
+        type: "fill_in_blank",
+        difficulty: "medium",
+        prompt: "In the declaration <code>class Pair&lt;A, B&gt;</code>, <code>A</code> and <code>B</code> are called type ___.",
+        correctAnswers: ["parameters", "parameter"],
+        caseSensitive: false,
+        explanation: "Type parameters are placeholders declared in angle brackets. They are replaced by actual types (type arguments) when the class is used, e.g., Pair<String, Integer>.",
+      },
+      {
+        id: "sum-ji3-4",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "What does <code>&lt;T extends Comparable&lt;T&gt;&gt;</code> mean on a generic method?",
+        options: [
+          { text: "T must be a subclass of the Comparable class.", correct: false, feedback: "Comparable is an interface, not a class; and the bound means T must implement it." },
+          { text: "T is restricted to types that implement the Comparable interface, allowing calls to compareTo.", correct: true },
+          { text: "T can only be a primitive type.", correct: false, feedback: "Primitives can't be used as type parameters at all; this bound is about interface implementation." },
+          { text: "The method will be called with a cast to Comparable.", correct: false, feedback: "Bounds eliminate casts — the compiler already knows T has compareTo." },
+        ],
+        explanation: "Upper-bounded type parameters (<T extends X>) restrict the type argument to X or any subtype/implementor of X, making X's methods safely callable on T.",
+      },
+      {
+        id: "sum-ji3-5",
+        type: "multiple_choice",
+        difficulty: "hard",
+        question: "Given <code>List&lt;? extends Number&gt; nums</code>, which operation is allowed?",
+        options: [
+          { text: "<code>nums.add(42);</code>", correct: false, feedback: "You cannot add to a List<? extends Number> because the compiler can't guarantee which specific Number subtype the list holds." },
+          { text: "<code>Number n = nums.get(0);</code>", correct: true },
+          { text: "<code>nums.add(null);</code>", correct: false, feedback: "Adding null is a special case that works, but 'adding' in general is forbidden — this is a common misconception." },
+          { text: "<code>nums.clear(); nums.add(3.14);</code>", correct: false, feedback: "clear() is fine, but add() is still forbidden for the same reason." },
+        ],
+        explanation: "Upper-bounded wildcards (? extends T) support reads (safe to read as T) but forbid writes (unsafe since the actual element type is unknown). This is the Producer-Extends rule (PECS).",
+        hint: "Ask: can the compiler guarantee the list is a List<Double> at this point? If not, can it allow adding a Double?",
+      },
+    ];
+  }
+
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-4") {
+    return [
+      {
+        id: "sum-ji4-1",
+        type: "multiple_choice",
+        difficulty: "easy",
+        question: "Which interface sits at the top of the Java Collections Framework hierarchy for single-element containers?",
+        options: [
+          { text: "<code>List</code>", correct: false, feedback: "List extends Collection — it's one level below the root." },
+          { text: "<code>Collection</code>", correct: true },
+          { text: "<code>Map</code>", correct: false, feedback: "Map is a separate hierarchy — it stores key-value pairs, not single elements." },
+          { text: "<code>Iterable</code>", correct: false, feedback: "Iterable is above Collection in the type hierarchy, but Collection is the root of the collections framework specifically." },
+        ],
+        explanation: "Collection is the root interface for List, Set, and Queue. Map is a separate hierarchy because it stores pairs, not individual elements.",
+      },
+      {
+        id: "sum-ji4-2",
+        type: "predict_output",
+        difficulty: "easy",
+        code: `import java.util.ArrayList;
+public class Main {
+    public static void main(String[] args) {
+        ArrayList<String> list = new ArrayList<>();
+        list.add("A"); list.add("B"); list.add("C");
+        list.remove(1);
+        System.out.println(list);
+    }
+}`,
+        expectedOutput: "[A, C]",
+        explanation: "remove(1) removes by index — index 1 is \"B\". The remaining elements are [\"A\", \"C\"]. ArrayList.toString() formats as [A, C].",
+      },
+      {
+        id: "sum-ji4-3",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "When should you prefer <code>LinkedList</code> over <code>ArrayList</code>?",
+        options: [
+          { text: "When you need fast random access by index.", correct: false, feedback: "ArrayList has O(1) random access; LinkedList is O(n) — the opposite of what you want." },
+          { text: "When insertions and deletions at the front or middle are frequent and random access is rare.", correct: true },
+          { text: "When memory is a concern — LinkedList uses less memory.", correct: false, feedback: "LinkedList uses more memory due to node overhead (two pointers per element)." },
+          { text: "LinkedList is always faster, so prefer it by default.", correct: false, feedback: "ArrayList is usually faster in practice due to cache locality." },
+        ],
+        explanation: "LinkedList shines for queue/deque scenarios (addFirst/addLast/removeFirst) where you don't need index-based access. For general use, ArrayList wins.",
+      },
+      {
+        id: "sum-ji4-4",
+        type: "fill_in_blank",
+        difficulty: "medium",
+        prompt: "A <code>HashSet</code> guarantees ___ duplicate elements.",
+        correctAnswers: ["no", "zero"],
+        caseSensitive: false,
+        explanation: "Sets enforce uniqueness. HashSet uses hashCode() and equals() to detect duplicates — adding an element that already exists is silently ignored.",
+        hint: "Think about the mathematical definition of a 'set'.",
+      },
+      {
+        id: "sum-ji4-5",
+        type: "predict_output",
+        difficulty: "medium",
+        code: `import java.util.HashMap;
+public class Main {
+    public static void main(String[] args) {
+        HashMap<String, Integer> map = new HashMap<>();
+        map.put("a", 1); map.put("b", 2); map.put("a", 99);
+        System.out.println(map.get("a"));
+        System.out.println(map.size());
+    }
+}`,
+        expectedOutput: "99\n2",
+        explanation: "put(\"a\", 99) replaces the value for key \"a\" — the map has 2 entries (\"a\"→99 and \"b\"→2). get(\"a\") returns 99.",
+      },
+      {
+        id: "sum-ji4-6",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "How does <code>TreeMap</code> differ from <code>HashMap</code>?",
+        options: [
+          { text: "TreeMap allows null keys; HashMap does not.", correct: false, feedback: "It's the opposite — HashMap allows one null key; TreeMap does not (it compares keys, and null can't be compared)." },
+          { text: "TreeMap stores keys in sorted order; HashMap provides no ordering guarantee.", correct: true },
+          { text: "TreeMap has O(1) get/put; HashMap is O(log n).", correct: false, feedback: "The complexities are reversed: HashMap is O(1) average; TreeMap is O(log n) due to the red-black tree." },
+          { text: "TreeMap can only hold String keys.", correct: false, feedback: "TreeMap can hold any key type that implements Comparable (or takes a Comparator)." },
+        ],
+        explanation: "TreeMap is backed by a red-black tree and iterates keys in natural (or custom) sorted order. Use it when sorted iteration matters; use HashMap for fastest lookups.",
+      },
+      {
+        id: "sum-ji4-7",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "You need a collection that stores unique course names and lets you instantly check whether a given name exists. Which is the best choice?",
+        options: [
+          { text: "<code>ArrayList</code>", correct: false, feedback: "ArrayList.contains() is O(n) — it scans the whole list every time." },
+          { text: "<code>LinkedList</code>", correct: false, feedback: "LinkedList.contains() is also O(n) and adds node overhead." },
+          { text: "<code>HashSet</code>", correct: true },
+          { text: "<code>TreeMap</code>", correct: false, feedback: "TreeMap stores key-value pairs; you only need a set of unique names here." },
+        ],
+        explanation: "HashSet.contains() is O(1) average and automatically rejects duplicates — the ideal combination for this use case.",
       },
     ];
   }
@@ -162,6 +517,78 @@ public class Main {
   ];
 }
 
+// ── What-you-covered highlights ───────────────────────────────────────────────
+
+function getHighlights(trackSlug: string, moduleSlug: string, fallbackLessons: string[]): string[] {
+  if (trackSlug === "java-beginner" && moduleSlug === "module-1") {
+    return [
+      "Setting up and running your first Java program",
+      "Primitive types: int, double, boolean, char, and String",
+      "Arithmetic, comparison, and logical operators",
+      "Making decisions with if / else if / else",
+      "Repeating code with for and while loops",
+      "Organising logic into reusable methods",
+      "Storing and iterating over fixed-size data with arrays",
+      "Working with text using String methods",
+    ];
+  }
+  if (trackSlug === "java-beginner" && moduleSlug === "module-2") {
+    return [
+      "Defining classes and creating objects with new",
+      "Writing constructors and using this to initialise fields",
+      "Instance methods that read and modify object state",
+      "Encapsulating data with private fields and getters/setters",
+      "Sharing state across all instances with static fields and methods",
+      "Reusing code through inheritance and super",
+      "Writing flexible code with polymorphism and dynamic dispatch",
+      "Overriding toString, equals, and hashCode correctly",
+    ];
+  }
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-1") {
+    return [
+      "Defining interfaces and the contract they represent",
+      "Implementing multiple interfaces in a single class",
+      "Abstract classes — state, constructors, and partial implementation",
+      "Choosing between an interface and an abstract class",
+      "Extending interfaces with default and static methods (Java 8+)",
+      "Functional interfaces as lambda targets",
+    ];
+  }
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-2") {
+    return [
+      "Understanding exceptions as runtime objects that signal failure",
+      "Writing try-catch-finally to handle and clean up after errors",
+      "Distinguishing checked exceptions from unchecked (RuntimeException) ones",
+      "Throwing exceptions intentionally with throw",
+      "Creating domain-specific custom exception classes",
+      "Applying best practices: specific catches, meaningful messages, not swallowing errors",
+    ];
+  }
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-3") {
+    return [
+      "Understanding why generics eliminate unsafe Object casts",
+      "Writing generic classes with type parameters",
+      "Writing generic methods that infer their type from arguments",
+      "Bounding type parameters with extends to unlock interface methods",
+      "Using wildcards (?, ? extends T, ? super T) for flexible APIs",
+    ];
+  }
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-4") {
+    return [
+      "Navigating the Collection / Map interface hierarchy",
+      "ArrayList — dynamic arrays with O(1) random access",
+      "LinkedList — doubly-linked nodes for efficient front/middle insertions",
+      "HashSet and TreeSet — duplicate-free collections (unordered vs sorted)",
+      "HashMap — O(1) average key-value lookup",
+      "TreeMap — sorted key-value map backed by a red-black tree",
+      "Choosing the right collection for access patterns, ordering, and uniqueness needs",
+    ];
+  }
+  return fallbackLessons;
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default async function SummaryPage({ params }: SummaryPageProps) {
   const { track: trackSlug, module: moduleSlug } = await params;
   const track = getTrack(trackSlug);
@@ -171,38 +598,10 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
   const trackModules = track.modules;
   const modIndex = trackModules.findIndex((m) => m.slug === moduleSlug);
   const nextMod = modIndex < trackModules.length - 1 ? trackModules[modIndex + 1] : null;
-  const hasCapstone = trackSlug === "java-beginner" && moduleSlug === "module-1";
+  const capstone = getCapstoneForModule(trackSlug, moduleSlug);
 
   const summaryQuizzes = getSummaryQuizzes(trackSlug, moduleSlug);
-
-  // Build what-you-covered bullets by module
-  const highlights: string[] = (() => {
-    if (trackSlug === "java-beginner" && moduleSlug === "module-1") {
-      return [
-        "Setting up and running your first Java program",
-        "Primitive types: int, double, boolean, char, and String",
-        "Arithmetic, comparison, and logical operators",
-        "Making decisions with if / else if / else",
-        "Repeating code with for and while loops",
-        "Organising logic into reusable methods",
-        "Storing and iterating over fixed-size data with arrays",
-        "Working with text using String methods",
-      ];
-    }
-    if (trackSlug === "java-beginner" && moduleSlug === "module-2") {
-      return [
-        "Defining classes and creating objects with new",
-        "Writing constructors and using this to initialise fields",
-        "Instance methods that read and modify object state",
-        "Encapsulating data with private fields and getters/setters",
-        "Sharing state across all instances with static fields and methods",
-        "Reusing code through inheritance and super",
-        "Writing flexible code with polymorphism and dynamic dispatch",
-        "Overriding toString, equals, and hashCode correctly",
-      ];
-    }
-    return mod.lessons.map((l) => l.title);
-  })();
+  const highlights = getHighlights(trackSlug, moduleSlug, mod.lessons.map((l) => l.title));
 
   return (
     <div className="mx-auto max-w-3xl px-6 pb-20 pt-10">
@@ -316,7 +715,7 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
       <section>
         <h2 className="text-lg font-semibold text-prose mb-4">Next steps</h2>
         <div className="space-y-3">
-          {hasCapstone && (
+          {capstone && (
             <a
               href={`/curriculum/${trackSlug}/${moduleSlug}/capstone`}
               className="flex items-center justify-between gap-4 px-5 py-4 rounded-lg border transition-colors duration-100 hover:border-[var(--border-default)] group"
@@ -329,10 +728,10 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
                 <Trophy size={15} className="text-accent shrink-0" />
                 <div>
                   <p className="text-sm font-semibold text-prose-muted group-hover:text-prose transition-colors duration-100">
-                    Capstone — Number Guessing Game
+                    Capstone — {capstone.title}
                   </p>
                   <p className="text-xs text-prose-faint mt-0.5" style={{ fontFamily: "var(--font-mono)" }}>
-                    ~30 min · fully graded · badge &amp; certificate
+                    {capstone.duration} · fully graded · badge &amp; certificate
                   </p>
                 </div>
               </div>

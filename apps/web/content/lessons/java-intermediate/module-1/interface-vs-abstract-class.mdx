@@ -1,0 +1,303 @@
+export const meta = {
+  title: "Interface vs Abstract Class",
+  duration: 12,
+  order: 4,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ivsa-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "You are designing a `Logger` hierarchy where all loggers share a `formatMessage(String msg)` helper that formats timestamps. Should you use an interface or an abstract class?",
+    options: [
+      { text: "Interface, because logging is a capability.", correct: false, feedback: "While 'logging is a capability' points toward an interface, the shared implementation of `formatMessage` cannot live in an interface without making it a `default` method. An abstract class is more natural here." },
+      { text: "Abstract class, because there is shared implementation to inherit.", correct: true, feedback: "Correct — shared concrete implementation (`formatMessage`) is the primary reason to choose an abstract class over a plain interface." },
+      { text: "Neither — use a concrete base class.", correct: false, feedback: "If `Logger` itself should not be instantiated (you always want a `FileLogger` or `ConsoleLogger`), declaring it `abstract` prevents accidental direct instantiation." },
+      { text: "Interface, because Java allows `default` methods anyway.", correct: false, feedback: "`default` methods are a workaround for backward compatibility. When designing from scratch with shared state and constructor logic, an abstract class is the cleaner, more idiomatic choice." },
+    ],
+    explanation: "Choose an abstract class when subclasses share concrete implementation or state (fields). Choose an interface when you only need a contract that unrelated classes can adopt. Here, `formatMessage` is shared implementation, so an abstract class wins.",
+    hint: "What does 'shared implementation' tell you about which construct to use?",
+  },
+  endQ1: {
+    id: "ivsa-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which of the following is possible with an interface but NOT with an abstract class?",
+    options: [
+      { text: "Declaring abstract methods.", correct: false, feedback: "Both interfaces and abstract classes can declare abstract methods." },
+      { text: "Being implemented by multiple unrelated classes to achieve multiple-type membership.", correct: true, feedback: "A class can implement many interfaces simultaneously but can only extend one class. This makes interfaces the right tool for cross-cutting 'capability' contracts." },
+      { text: "Providing concrete method implementations.", correct: false, feedback: "Both can provide concrete methods — abstract classes always could; interfaces can via `default` methods since Java 8." },
+      { text: "Holding instance fields.", correct: false, feedback: "Interfaces cannot hold instance fields (only `public static final` constants). Abstract classes can hold instance fields." },
+    ],
+    explanation: "The key unique capability of interfaces is enabling a class to be simultaneously of multiple distinct types. Abstract classes are limited by single inheritance — a class can only extend one. Interfaces sidestep this by not carrying implementation that could conflict.",
+  },
+  endQ2: {
+    id: "ivsa-end-2",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `interface Speakable {
+    default String lang() { return "Java"; }
+}
+abstract class Base {
+    abstract String lang();
+}
+class Impl extends Base implements Speakable {
+    public String lang() { return "Kotlin"; }
+}
+public class Main {
+    public static void main(String[] args) {
+        Impl i = new Impl();
+        System.out.println(i.lang());
+        Speakable s = i;
+        System.out.println(s.lang());
+    }
+}`,
+    expectedOutput: "Kotlin\nKotlin",
+    explanation: "When a class provides its own `lang()`, that implementation wins over both the abstract declaration in `Base` and the `default` in `Speakable`. Both `i.lang()` and `s.lang()` dispatch to `Impl.lang()` at runtime, producing 'Kotlin' twice.",
+    hint: "Which takes priority: a class's own method, an abstract obligation, or an interface default?",
+  },
+  endQ3: {
+    id: "ivsa-end-3",
+    type: "order_the_steps",
+    difficulty: "medium",
+    question: "Order these design steps when deciding between an interface and an abstract class:",
+    steps: [
+      "Ask: does the contract need to be adopted by unrelated classes?",
+      "Ask: is there concrete implementation or state to share?",
+      "If yes to unrelated classes and no to shared state → choose interface.",
+      "If yes to shared state or constructor logic → choose abstract class.",
+      "Consider combining both: abstract class implements an interface.",
+    ],
+    correctOrder: [0, 1, 2, 3, 4],
+    explanation: "The decision starts with the breadth of the contract (interface wins for cross-cutting concerns) and then inspects whether shared implementation demands an abstract class. The best designs often use both: an interface defines the public API and an abstract class provides the common implementation skeleton.",
+  },
+  endQ4: {
+    id: "ivsa-end-4",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `interface Flyable {
+    void fly();
+}
+abstract class Machine {
+    abstract void powerOn();
+}
+class Drone extends Machine implements Flyable {
+    public void fly() { System.out.println("Drone flying"); }
+    // powerOn not implemented
+}`,
+    buggyLine: 7,
+    issue: "Drone is a concrete class that extends Machine but does not implement the abstract method powerOn()",
+    explanation: "Extending an abstract class carries the same obligation as implementing an interface: every abstract method must be provided. `Drone` implements `fly()` from `Flyable` correctly but leaves `powerOn()` from `Machine` unimplemented. Either add `public void powerOn() { ... }` or declare `Drone` as `abstract`.",
+    hint: "Check every inherited abstract method — from both the interface and the abstract class.",
+  },
+};
+
+You now know both tools. The question every Java developer faces is: **which one should I use?** The answer is not arbitrary — there are clear principles that guide the choice, and in practice the two constructs are often combined.
+
+## The core difference
+
+| | Interface | Abstract Class |
+|---|---|---|
+| Instance fields | No (only `static final` constants) | Yes |
+| Constructor | No | Yes |
+| Concrete methods | Only `default`/`static` (Java 8+) | Yes, any |
+| Multiple "inheritance" | A class can implement many | A class extends exactly one |
+| Keyword | `implements` | `extends` |
+| Best for | *Capability* contracts across unrelated types | *Shared implementation* within a family |
+
+## When to choose an interface
+
+Prefer an interface when:
+
+- The contract cuts across unrelated types. A `Comparable` duck and a `Comparable` integer have nothing else in common — the interface is the only sensible choice.
+- You want a class to be of multiple types simultaneously without forcing it into a hierarchy.
+- You are defining an API others will implement and you don't want to lock callers into your class hierarchy.
+
+```java
+interface Serializable {
+    byte[] serialize();
+}
+
+// Totally unrelated classes can all become Serializable:
+class UserProfile   implements Serializable { ... }
+class GameSaveState implements Serializable { ... }
+class InvoicePDF    implements Serializable { ... }
+```
+
+None of these classes share a useful superclass. The interface binds them to a common capability without forcing a hierarchy.
+
+## When to choose an abstract class
+
+Prefer an abstract class when:
+
+- Subclasses share **concrete implementation** — fields, methods, or constructor setup that would be copied otherwise.
+- You need to **enforce initialization** — constructors with required parameters guarantee that every subclass provides the data the template needs.
+- The subclasses form a true **IS-A family** with a meaningful shared identity (not just a shared capability).
+
+```java
+abstract class Report {
+    protected String title;
+    protected String author;
+
+    Report(String title, String author) {
+        this.title = title;
+        this.author = author;
+    }
+
+    // Shared implementation
+    void printHeader() {
+        System.out.println("=== " + title + " by " + author + " ===");
+    }
+
+    // Abstract obligation
+    abstract void printBody();
+
+    // Template method: fixed skeleton
+    final void print() {
+        printHeader();
+        printBody();
+        System.out.println("=== END ===");
+    }
+}
+```
+
+`printHeader()` would be duplicated in every report type without the abstract class. The `final print()` method locks the order of operations — subclasses can only customise `printBody()`.
+
+<Note>The `final` modifier on a concrete method in an abstract class prevents subclasses from overriding it. This is a key technique in the Template Method pattern: you permit variation only in the designated abstract "hooks."</Note>
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Combining both: the best-of-both-worlds pattern
+
+The most powerful pattern is to declare a public interface (the contract the whole world sees) and then provide an abstract class that implements common behaviour:
+
+```java
+// Public contract — anyone can implement it
+interface Shape {
+    double area();
+    double perimeter();
+}
+
+// Abstract helper — provides shared logic for shape families
+abstract class AbstractShape implements Shape {
+    protected String color;
+
+    AbstractShape(String color) { this.color = color; }
+
+    // Concrete shared method
+    void printInfo() {
+        System.out.println(color + " shape: area=" + area() + ", perim=" + perimeter());
+    }
+}
+
+// Concrete leaf class — only implements the geometry
+class Circle extends AbstractShape {
+    private double radius;
+
+    Circle(String color, double radius) {
+        super(color);
+        this.radius = radius;
+    }
+
+    public double area()      { return Math.PI * radius * radius; }
+    public double perimeter() { return 2 * Math.PI * radius; }
+}
+```
+
+`Circle` is a `Shape` (via the interface) and an `AbstractShape` (via the abstract class). External code programs to `Shape`; internal subclasses extend `AbstractShape`. This pattern is used extensively in the Java Collections Framework (`List` → `AbstractList` → `ArrayList`).
+
+## Try it
+
+Run the starter code. `sing()`, `fly()`, and `swim()` are all empty. Fill them in so the output is:
+
+```
+Mallard: Quack!
+Mallard flies with wings
+Mallard paddles
+```
+
+Notice that `fly()` calls `getMode()` — a `default` method from the `Flyable` interface. You don't implement it; you just call it.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Using an abstract class when an interface would suffice** — if you have no shared implementation and no shared state, an abstract class wastes the single inheritance slot. Prefer the interface; leave the superclass slot open for the future.
+- **Using an interface when you need shared state** — interfaces cannot hold instance fields. If you find yourself writing the same field initialization in five `default` methods, you need an abstract class.
+- **Forgetting that `extends` comes before `implements`** — `class Duck extends Bird implements Flyable` is correct; `class Duck implements Flyable extends Bird` is a syntax error. Extend first, then implement.
+- **Not calling `super(...)` when the abstract class has a mandatory constructor** — if an abstract class has no no-arg constructor, every concrete subclass constructor must explicitly call `super(args)` as its very first line.
+- **Overlooking the interface+abstract class combination** — many developers treat this as an advanced trick, but it is the standard pattern in Java's own libraries. Knowing it lets you design APIs that are both flexible (interface) and DRY (abstract class).
+
+## Recap
+
+The choice between interface and abstract class is one of the most important design decisions in Java. Getting it right keeps code flexible, testable, and maintainable.
+
+- **Interface**: maximum flexibility, multiple adoption, no state — ideal for cross-cutting capability contracts
+- **Abstract class**: shared implementation and state, enforced initialization — ideal for families of related types
+- **Both together**: declare the public contract as an interface; provide shared implementation in an abstract class that implements it
+- A class can `extend` one abstract class and `implement` many interfaces simultaneously
+- `final` methods in abstract classes lock algorithmic skeletons while leaving designated hooks open to subclasses
+
+**Up next:** Default and Static Interface Methods — how Java 8 added implementation to interfaces and why it matters.
+
+<Exercise>
+Fill in `sing()`, `fly()`, and `swim()` in the `Duck` class. Use `getMode()` (a default method from `Flyable`) inside `fly()`.
+
+```java
+interface Flyable {
+    void fly();
+    default String getMode() { return "wings"; }
+}
+
+interface Swimmable {
+    void swim();
+}
+
+abstract class Bird {
+    protected String species;
+    Bird(String species) { this.species = species; }
+    abstract void sing();
+}
+
+class Duck extends Bird implements Flyable, Swimmable {
+    Duck() { super("Mallard"); }
+
+    public void sing() {
+        // TODO: print species + ": Quack!"
+    }
+
+    public void fly() {
+        // TODO: print species + " flies with " + getMode()
+    }
+
+    public void swim() {
+        // TODO: print species + " paddles"
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Duck d = new Duck();
+        d.sing();
+        d.fly();
+        d.swim();
+    }
+}
+```
+
+**What the tests check:**
+- `sing()` prints `Mallard: Quack!`
+- `fly()` prints `Mallard flies with wings`
+- `swim()` prints `Mallard paddles`
+
+<Note>Hint: `getMode()` is already implemented in the `Flyable` interface as a `default` method. Call it directly inside `fly()` with just `getMode()` — no object qualifier needed from within the implementing class.</Note>
+</Exercise>

@@ -1,0 +1,302 @@
+export const meta = {
+  title: "What Is an Interface?",
+  duration: 12,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "wii-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which keyword does a class use to commit to fulfilling an interface contract?",
+    options: [
+      { text: "extends", correct: false, feedback: "`extends` is for inheriting from a class or another interface, not for a class adopting an interface." },
+      { text: "implements", correct: true, feedback: "Correct — `class Foo implements Bar` tells the compiler Foo will provide every method declared in Bar." },
+      { text: "interface", correct: false, feedback: "`interface` is used to *declare* the interface itself, not to connect a class to it." },
+      { text: "uses", correct: false, feedback: "There is no `uses` keyword in Java for this purpose." },
+    ],
+    explanation: "A class signs a contract with an interface by writing `implements InterfaceName`. The compiler then enforces that every abstract method in the interface is present in the class.",
+    hint: "Think about which keyword appears between the class name and the interface name.",
+  },
+  endQ1: {
+    id: "wii-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `interface Greetable {
+    String greet();
+}
+
+class Person implements Greetable {
+    String name;
+    Person(String name) { this.name = name; }
+    public String greet() { return "Hello, I am " + name; }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Greetable g = new Person("Alice");
+        System.out.println(g.greet());
+    }
+}`,
+    expectedOutput: "Hello, I am Alice",
+    explanation: "Even though `g` is typed as `Greetable`, it holds a `Person` at runtime, so `g.greet()` dispatches to `Person`'s implementation. The return value is then printed.",
+  },
+  endQ2: {
+    id: "wii-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "An interface method declared without `default` or `static` is automatically:",
+    options: [
+      { text: "private and final", correct: false, feedback: "Private interface methods exist in Java 9+ but must be explicitly marked `private`. Unannotated methods are public and abstract." },
+      { text: "public and abstract", correct: true, feedback: "Interface methods without a body are implicitly `public abstract`. You don't need to write those modifiers — the compiler adds them." },
+      { text: "protected and abstract", correct: false, feedback: "Interfaces cannot have `protected` members — all non-private interface members are public." },
+      { text: "public and final", correct: false, feedback: "`final` would prevent overriding, which is the whole purpose of abstract interface methods." },
+    ],
+    explanation: "The Java Language Specification states that interface methods without a body are implicitly `public` and `abstract`. Writing those modifiers is legal but redundant.",
+    hint: "Consider what 'abstract' means — and what access level an interface contract should have.",
+  },
+  endQ3: {
+    id: "wii-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the class declaration so that `Lamp` promises to fulfil the `Switchable` interface:",
+    code: "class Lamp ___ Switchable { ... }",
+    correctAnswers: ["implements"],
+    caseSensitive: true,
+    explanation: "`implements` is the keyword that connects a class to an interface. Unlike `extends` (used for class-to-class or interface-to-interface inheritance), `implements` always crosses from class to interface.",
+  },
+  endQ4: {
+    id: "wii-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `interface Printable {
+    void print();
+}
+
+class Document implements Printable {
+    String content;
+    Document(String content) { this.content = content; }
+    void print() {
+        System.out.println(content);
+    }
+}`,
+    buggyLine: 8,
+    issue: "The `print()` method is missing the `public` modifier required by the interface",
+    explanation: "Interface methods are implicitly `public`. When a class implements an interface, each overriding method must be at least as accessible as the interface declared — meaning it must be `public`. Writing `void print()` gives package-private access, which is more restrictive, so the compiler will reject it.",
+    hint: "Interface methods carry an implicit access level. What is it?",
+  },
+};
+
+Programs rarely work with just one kind of thing. A payment system processes credit cards, PayPal, and crypto. A notification service sends emails, SMS, and push alerts. In each case, the callers don't want to know the details — they just need a guarantee that every option supports the same operations. That guarantee is what an **interface** provides.
+
+An interface is a pure contract: it names methods that any conforming class must provide, but provides none of the implementation itself. When a class *implements* an interface, it promises the compiler "I have every method you listed, with exactly these signatures."
+
+## Declaring an interface
+
+An interface looks like a class, but uses the `interface` keyword, and its methods have no bodies:
+
+```java
+interface Drawable {
+    void draw();          // abstract — no body, no braces
+    String getColor();    // also abstract
+}
+```
+
+Every method without a body is implicitly `public abstract`. You don't have to write those words; the compiler infers them.
+
+<Note>An interface can also hold constants (`public static final` fields) and, since Java 8, `default` and `static` methods with bodies. We'll explore those in a later lesson. For now, think of interfaces as pure abstract contracts.</Note>
+
+## Implementing an interface
+
+A class wires itself to an interface with the `implements` keyword:
+
+```java
+class Circle implements Drawable {
+    private String color;
+
+    Circle(String color) {
+        this.color = color;
+    }
+
+    @Override
+    public void draw() {
+        System.out.println("Drawing a " + color + " circle");
+    }
+
+    @Override
+    public String getColor() {
+        return color;
+    }
+}
+```
+
+If `Circle` omits either `draw()` or `getColor()`, the compiler issues an error — the contract is not fulfilled. The `@Override` annotation is optional but strongly recommended: it makes the compiler verify the method signature really does match one from the interface.
+
+## Using the interface type
+
+Once a class implements an interface, you can store the object in a variable typed as the interface:
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Drawable shape = new Circle("red");
+        shape.draw();          // Drawing a red circle
+        System.out.println(shape.getColor());  // red
+    }
+}
+```
+
+`shape` is declared as `Drawable`, not `Circle`. Through that variable you can only call the two methods the interface declares — the compiler enforces the contract. But at runtime, every call dispatches to the `Circle` implementation. This separation is the essence of **programming to an interface**.
+
+<Note>Why declare the variable as `Drawable` instead of `Circle`? Because code that only uses the `Drawable` type works with *any* `Drawable` — Triangle, Rectangle, or Circle — without needing to change. The caller is decoupled from the specific class.</Note>
+
+## Real-world analogy: electrical sockets
+
+Think of an interface as an electrical socket standard. The socket specifies the shape and voltage — it's the contract. Any device that conforms to the standard (three-prong, 120 V) can plug in: a lamp, a phone charger, a toaster. The socket doesn't know or care which device is plugged in; it just guarantees the interface is met. In software terms, the "socket standard" is the interface, and the "device" is the class.
+
+## A second example: sortable items
+
+```java
+interface Sortable {
+    int getPriority();
+}
+
+class Task implements Sortable {
+    private String name;
+    private int priority;
+
+    Task(String name, int priority) {
+        this.name = name;
+        this.priority = priority;
+    }
+
+    public int getPriority() { return priority; }
+
+    @Override
+    public String toString() { return name + " [" + priority + "]"; }
+}
+
+public class Demo {
+    static Task highestPriority(Sortable[] items) {
+        // Works for ANY Sortable, not just Task
+        Task best = null;
+        int max = Integer.MIN_VALUE;
+        for (Sortable s : items) {
+            if (s.getPriority() > max) {
+                max = s.getPriority();
+                best = (Task) s;
+            }
+        }
+        return best;
+    }
+}
+```
+
+The `highestPriority` method accepts `Sortable[]`, so tomorrow you could add a `Bug` class that also implements `Sortable` and pass it in without touching the method at all.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run** on the starter code below. You should see two blank lines because `describe()` returns an empty string. Your job is to fill in the implementation so you see:
+
+```
+Book costs $9.99
+Pen costs $1.49
+```
+
+## Interfaces enforce a uniform API
+
+Notice how `main` only knows about `Describable` — it never refers to `Product` directly. If tomorrow you add a `Service` class that also implements `Describable`, the same loop or print logic will work unchanged. This is the payoff of coding to an interface: **your callers are insulated from what class is actually behind the variable**.
+
+```java
+class Service implements Describable {
+    private String serviceName;
+    private double hourlyRate;
+
+    Service(String serviceName, double hourlyRate) {
+        this.serviceName = serviceName;
+        this.hourlyRate = hourlyRate;
+    }
+
+    public String describe() {
+        return serviceName + " costs $" + hourlyRate + "/hr";
+    }
+}
+
+// No changes needed to main — it still just calls .describe()
+Describable s = new Service("Consulting", 150.00);
+System.out.println(s.describe());  // Consulting costs $150.0/hr
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Missing `public` on overriding methods** — Interface methods are implicitly `public`. If you forget `public` on the implementing method, Java sees a weaker access level and refuses to compile. Always write `public` explicitly when implementing interface methods.
+- **Confusing `implements` with `extends`** — `extends` is for class-to-class (or interface-to-interface) inheritance. `implements` is always a class adopting an interface. Mixing them up produces a compiler error.
+- **Not overriding every method** — Forgetting even one abstract method leaves the class "incomplete." The compiler will tell you the class must be declared `abstract` or implement the remaining methods. Read the error message carefully — it names the missing method.
+- **Calling non-interface methods through an interface reference** — If `Circle` has a `getRadius()` method not in `Drawable`, you cannot call it through a `Drawable` variable without casting. The variable type determines what the compiler allows. This is by design: it enforces the contract boundary.
+- **Treating the interface as an object** — `new Drawable()` is illegal because interfaces have no constructor. You can only instantiate a concrete class that implements the interface.
+
+## Recap
+
+Interfaces are the primary tool Java gives you for defining *what* a class can do without saying *how* it does it. This is the foundation of virtually every design pattern, framework, and API in the Java ecosystem.
+
+- An **interface** declares method signatures — the contract
+- A class **implements** an interface and must provide a body for every abstract method
+- Variables typed as the interface can hold any conforming object — this is **polymorphism**
+- Interface methods without a body are implicitly `public abstract`
+- Coding to interfaces makes your code flexible, testable, and open to extension without modification
+
+**Up next:** Implementing Multiple Interfaces — a class can sign more than one contract at the same time.
+
+<Exercise>
+Implement the `describe()` method inside `Product` so it returns the product's name followed by `" costs $"` and the price. For example, a product named `"Book"` with price `9.99` should return `"Book costs $9.99"`.
+
+```java
+interface Describable {
+    String describe();
+}
+
+class Product implements Describable {
+    private String name;
+    private double price;
+
+    Product(String name, double price) {
+        this.name = name;
+        this.price = price;
+    }
+
+    public String describe() {
+        // TODO: return name + " costs $" + price
+        return "";
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Describable p1 = new Product("Book", 9.99);
+        Describable p2 = new Product("Pen", 1.49);
+        System.out.println(p1.describe());
+        System.out.println(p2.describe());
+    }
+}
+```
+
+**What the tests check:**
+- `p1.describe()` returns `"Book costs $9.99"`
+- `p2.describe()` returns `"Pen costs $1.49"`
+- The method is `public` and has the correct return type `String`
+
+<Note>Hint: string concatenation with `+` converts a `double` to its string representation automatically — `"$" + 9.99` produces `"$9.99"`.</Note>
+</Exercise>

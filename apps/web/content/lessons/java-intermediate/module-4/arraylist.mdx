@@ -1,0 +1,322 @@
+export const meta = {
+  title: "ArrayList",
+  duration: 14,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "al-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "When an ArrayList's internal array is full and you call add(), what happens?",
+    options: [
+      { text: "The add() call throws an IndexOutOfBoundsException.", correct: false, feedback: "ArrayList handles growth internally — it never throws because the internal array is full." },
+      { text: "A new array roughly twice the size is allocated and the old elements are copied over.", correct: true, feedback: "Correct! This is called capacity doubling. The copy is O(n), but it happens so rarely that the amortized cost per add is still O(1)." },
+      { text: "The element is dropped and add() returns false.", correct: false, feedback: "add() always returns true for ArrayList. Elements are never silently dropped." },
+      { text: "The internal array grows by exactly one element.", correct: false, feedback: "Growing by one would make every add O(n) — the whole point of doubling is to keep the amortized cost O(1)." },
+    ],
+    explanation: "ArrayList maintains a `capacity` separate from `size`. When `size == capacity`, it allocates a new array (Java's implementation grows by ~50%, not exactly 2×) and copies all elements. This occasional O(n) cost is spread over many adds, giving O(1) amortized.",
+  },
+  endQ1: {
+    id: "al-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> animals = new ArrayList<>(Arrays.asList("cat", "dog", "bird"));
+        animals.remove(1);
+        animals.add(0, "fish");
+        System.out.println(animals);
+    }
+}`,
+    expectedOutput: "[fish, cat, bird]",
+    explanation: "`remove(1)` removes the element at index 1 (`\"dog\"`), leaving `[cat, bird]`. `add(0, \"fish\")` inserts at the front, shifting the rest right: `[fish, cat, bird]`.",
+  },
+  endQ2: {
+    id: "al-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why should you avoid removing elements from the middle of an ArrayList inside a regular for-index loop?",
+    options: [
+      { text: "ArrayList doesn't support remove() at all.", correct: false, feedback: "ArrayList fully supports remove() — the problem is what happens to indices after removal." },
+      { text: "After removal the indices shift, so the loop can skip elements or go out of bounds.", correct: true, feedback: "Correct! Removing element at index i shifts everything after it left by one. Your loop counter still increments, so the element now at i gets skipped." },
+      { text: "The list becomes immutable after the first remove.", correct: false, feedback: "ArrayList doesn't become immutable — the issue is with index shifting, not immutability." },
+      { text: "Collections.sort() must be called before any removal.", correct: false, feedback: "Sorting has nothing to do with this problem." },
+    ],
+    explanation: "When you `remove(i)`, all elements at indices > i shift left by one. If you then do `i++`, you land on the element that was previously at `i+1`, skipping the element that slid into position `i`. Use an `Iterator` or iterate **backwards** (`i--`) when removing during traversal.",
+  },
+  endQ3: {
+    id: "al-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the method that returns the number of times element e appears in a List:",
+    code: "int count = Collections.___(list, e);",
+    correctAnswers: ["frequency"],
+    caseSensitive: true,
+    explanation: "`Collections.frequency(collection, element)` counts how many times the element appears. It uses `equals()` for comparison and runs in O(n).",
+  },
+  endQ4: {
+    id: "al-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> items = new ArrayList<>(Arrays.asList("a", "b", "c", "d"));
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).equals("b")) {
+                items.remove(i);
+            }
+        }
+        System.out.println(items);
+    }
+}`,
+    buggyLine: 6,
+    issue: "Removing at index i without adjusting i causes the next element to be skipped",
+    explanation: "After `remove(1)` (removing `\"b\"`), `\"c\"` slides to index 1. But the loop increments i to 2, skipping `\"c\"`. Fix by adding `i--` after the remove, or use `Iterator.remove()`, or use `items.removeIf(s -> s.equals(\"b\"))`.",
+  },
+};
+
+`ArrayList` is the workhorse of the Java Collections Framework. In most programs, when you need a `List`, `ArrayList` is the right choice. This lesson explains **why**: what it looks like internally, what each operation actually costs, and the pitfalls that catch new Java developers off guard.
+
+## How ArrayList works internally
+
+An `ArrayList` is a **resizable array**. Internally it holds a plain `Object[]` array and an integer `size` that tracks how many logical elements are in the list (which may be less than the array's physical length).
+
+```
+ArrayList<String>
+  Object[] elementData = ["cat", "dog", "bird", null, null]
+  int size = 3
+  int capacity = 5   (elementData.length — not directly visible)
+```
+
+This is different from `capacity`: `size` is how many elements you've added; `capacity` is how large the backing array currently is. When `size` reaches `capacity`, the list **grows**.
+
+## Capacity doubling
+
+When the backing array is full and you call `add()`, `ArrayList` allocates a new, larger array (roughly 1.5× the current capacity in OpenJDK), copies all existing elements into it, and then appends the new element:
+
+```
+Before:  [a, b, c, d, e]   capacity=5, size=5
+add("f") → new array of length ~8, copy a–e, append f
+After:   [a, b, c, d, e, f, _, _]   capacity=8, size=6
+```
+
+Each individual resize is O(n), but it happens so rarely (the list has to fill up first) that if you average the cost across all the `add()` calls that preceded it, each `add` costs O(1) **amortized**. This is the same analysis as a bank account: make small deposits regularly, occasionally make one big withdrawal — average cost per transaction is still small.
+
+<Note>If you **know** in advance how many elements you'll add, construct the list with an initial capacity to avoid any resize at all: `new ArrayList<>(1000)`. This is a micro-optimisation — only worth it for very large lists in tight loops.</Note>
+
+## Operation complexity
+
+| Operation | Time complexity | Why |
+|-----------|----------------|-----|
+| `get(i)` | O(1) | Direct array index |
+| `set(i, e)` | O(1) | Direct array write |
+| `add(e)` (end) | O(1) amortized | Occasional resize |
+| `add(i, e)` (middle) | O(n) | Must shift elements right |
+| `remove(i)` (middle) | O(n) | Must shift elements left |
+| `remove(Object o)` | O(n) | Linear scan to find it, then shift |
+| `contains(o)` / `indexOf(o)` | O(n) | Linear scan |
+| `size()` | O(1) | Stored field |
+
+The critical insight: `ArrayList` is **fast at the tail** (add/remove last) and **slow in the middle** (insert/remove forces a shift of all subsequent elements).
+
+## Core operations
+
+```java
+import java.util.*;
+
+public class ArrayListOps {
+    public static void main(String[] args) {
+        List<String> list = new ArrayList<>();
+
+        // Adding
+        list.add("apple");              // appends at end
+        list.add("banana");
+        list.add(0, "mango");           // insert at index 0 — shifts others right
+        System.out.println(list);       // [mango, apple, banana]
+
+        // Reading
+        System.out.println(list.get(1));           // apple
+        System.out.println(list.indexOf("banana")); // 2
+        System.out.println(list.contains("kiwi"));  // false
+
+        // Updating
+        list.set(1, "pear");
+        System.out.println(list);                   // [mango, pear, banana]
+
+        // Removing
+        list.remove("mango");           // by value — O(n)
+        list.remove(0);                 // by index — O(n) due to shift
+        System.out.println(list);       // [banana]
+    }
+}
+```
+
+## subList and bulk operations
+
+`subList(from, to)` returns a **live view** of a portion of the list — not a copy. Modifying the sublist modifies the original, and modifying the original after taking a sublist causes a `ConcurrentModificationException` if you touch the sublist:
+
+```java
+List<Integer> nums = new ArrayList<>(Arrays.asList(10, 20, 30, 40, 50));
+List<Integer> middle = nums.subList(1, 4);  // view of [20, 30, 40]
+middle.set(0, 99);
+System.out.println(nums);   // [10, 99, 30, 40, 50] — original changed!
+
+// To get an independent copy:
+List<Integer> copy = new ArrayList<>(nums.subList(1, 4));
+```
+
+<Note>`subList` is a view, not a copy. This is intentional — it avoids allocating a new array. But it means you must be careful: if you need an independent copy, wrap the sublist in `new ArrayList<>()`.</Note>
+
+## The Collections utility class with ArrayList
+
+`java.util.Collections` provides powerful static helpers that work on any `List`:
+
+```java
+import java.util.*;
+
+public class UtilMethods {
+    public static void main(String[] args) {
+        List<Integer> nums = new ArrayList<>(Arrays.asList(3, 7, 1, 9, 4, 1, 7));
+
+        Collections.sort(nums);
+        System.out.println("Sorted: " + nums);           // [1, 1, 3, 4, 7, 7, 9]
+
+        Collections.reverse(nums);
+        System.out.println("Reversed: " + nums);         // [9, 7, 7, 4, 3, 1, 1]
+
+        System.out.println("Min: " + Collections.min(nums));   // 1
+        System.out.println("Max: " + Collections.max(nums));   // 9
+        System.out.println("Freq of 7: " + Collections.frequency(nums, 7)); // 2
+
+        Collections.shuffle(nums);   // random order
+        System.out.println("Shuffled: " + nums);
+    }
+}
+```
+
+`Collections.sort()` uses a Timsort algorithm — O(n log n) — and is stable (equal elements keep their relative order). For custom ordering, pass a `Comparator`: `Collections.sort(list, Comparator.reverseOrder())`.
+
+## Iterator invalidation
+
+A critical rule: **do not modify an `ArrayList` structurally while iterating over it with an iterator or for-each loop**. Doing so throws `ConcurrentModificationException`:
+
+```java
+List<String> words = new ArrayList<>(Arrays.asList("keep", "remove", "keep", "remove"));
+
+// BAD — ConcurrentModificationException
+for (String w : words) {
+    if (w.equals("remove")) words.remove(w);  // throws!
+}
+
+// GOOD — use removeIf (Java 8+)
+words.removeIf(w -> w.equals("remove"));
+System.out.println(words);  // [keep, keep]
+
+// GOOD — use an explicit Iterator
+Iterator<String> it = words.iterator();
+while (it.hasNext()) {
+    if (it.next().equals("keep")) it.remove();  // safe
+}
+```
+
+`ArrayList` uses a **modCount** counter. Every structural change (add, remove, clear) increments it. When an iterator sees that the modCount changed since it was created, it throws `ConcurrentModificationException` as a fail-fast safety mechanism.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+```java
+import java.util.*;
+
+public class Demo {
+    public static void main(String[] args) {
+        List<String> names = new ArrayList<>(Arrays.asList("Charlie", "Alice", "Bob", "Diana", "Alice"));
+
+        // Frequency
+        System.out.println("Alice count: " + Collections.frequency(names, "Alice")); // 2
+
+        // Sort alphabetically
+        Collections.sort(names);
+        System.out.println("Sorted: " + names);  // [Alice, Alice, Bob, Charlie, Diana]
+
+        // Remove all duplicates via LinkedHashSet
+        List<String> unique = new ArrayList<>(new LinkedHashSet<>(names));
+        System.out.println("Unique: " + unique); // [Alice, Bob, Charlie, Diana]
+
+        // Unmodifiable view
+        List<String> locked = Collections.unmodifiableList(unique);
+        System.out.println("First: " + locked.get(0)); // Alice
+        // locked.add("Eve");  // would throw UnsupportedOperationException
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Removing by index vs by value** — `remove(int i)` removes the element *at* index `i`; `remove(Object o)` removes the *first element equal to* `o`. With a `List<Integer>`, `remove(2)` removes index 2, but `remove(Integer.valueOf(2))` removes the value 2. If in doubt, be explicit and box the value.
+- **Removing inside a for-each loop** — this always throws `ConcurrentModificationException`. Use `removeIf()` or an explicit `Iterator.remove()`.
+- **Forgetting subList is a live view** — modifications through the sublist change the original. If you want an independent slice, copy it: `new ArrayList<>(list.subList(a, b))`.
+- **Pre-allocating with `new ArrayList<>(n)`** — confusingly, passing an integer to the constructor sets the *initial capacity*, not the *size*. The list is still empty; `get(0)` would throw. Pre-sizing avoids resizes but doesn't pre-fill.
+- **Using ArrayList when frequent middle-insertions are needed** — if your code mostly inserts/removes near the beginning or middle, reconsider whether a different structure (a `LinkedList` or a different algorithm) is more appropriate.
+
+## Recap
+
+`ArrayList` is the right default `List` in the vast majority of situations because random access (get/set) and end-append are both O(1). Its internal capacity-doubling mechanism ensures you rarely pay the resize cost in practice.
+
+- Backed by a **resizable array**; capacity doubles (roughly) when full
+- **O(1)** for `get`, `set`, and end-`add`; **O(n)** for insertions and removals anywhere except the end
+- Use `Collections.sort/reverse/shuffle/frequency/min/max` for list-level operations
+- Never structurally modify while iterating — use `removeIf()` or `Iterator.remove()`
+- `subList()` returns a **view**, not a copy
+
+**Up next:** LinkedList and When to Use It — understanding when the doubly-linked structure beats the array, and when it loses.
+
+<Exercise>
+Manipulate a list of integers using add, remove, sort, indexOf, and subList.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> numbers = new ArrayList<>(Arrays.asList(5, 2, 8, 1, 9, 3));
+        System.out.println("Original: " + numbers);
+
+        // TODO: add 7 to the list
+        // TODO: remove the element at index 2
+        // TODO: sort the list with Collections.sort
+        System.out.println("Sorted: " + numbers);
+        System.out.println("Index of 9: " + numbers.indexOf(9));
+        System.out.println("Slice [1,4): " + numbers.subList(1, 4));
+    }
+}
+```
+
+**What the tests check:**
+- After adding 7: list has 7 elements
+- After removing index 2 (`8`): list has 6 elements
+- After sort: list equals `[1, 2, 3, 5, 7, 9]`
+- `indexOf(9)` returns `5`
+- `subList(1, 4)` returns `[2, 3, 5]`
+
+<Note>Hint: `add(value)` appends to the end; `remove(index)` takes an `int` argument representing the position to remove (not the value).</Note>
+</Exercise>

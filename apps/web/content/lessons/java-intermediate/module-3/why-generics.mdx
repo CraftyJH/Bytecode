@@ -1,0 +1,353 @@
+export const meta = {
+  title: "Why Generics Exist",
+  duration: 12,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "wg-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.ArrayList;
+import java.util.List;
+
+public class Demo {
+    public static void main(String[] args) {
+        List<String> names = new ArrayList<>();
+        names.add("Ada");
+        names.add("Grace");
+        String first = names.get(0);
+        System.out.println(first.toUpperCase());
+        System.out.println(names.size());
+    }
+}`,
+    expectedOutput: "ADA\n2",
+    explanation: "Because the list is typed `List<String>`, `get(0)` returns a `String` directly — no cast needed. `.toUpperCase()` is available without any conversion, and `size()` returns the number of elements added.",
+  },
+  endQ1: {
+    id: "wg-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.ArrayList;
+import java.util.List;
+
+public class Demo {
+    public static void main(String[] args) {
+        List<Integer> nums = new ArrayList<>();
+        nums.add(10);
+        nums.add(20);
+        int sum = nums.get(0) + nums.get(1);
+        System.out.println(sum);
+        System.out.println(nums.get(0).getClass().getSimpleName());
+    }
+}`,
+    expectedOutput: "30\nInteger",
+    explanation: "`nums.get(0)` returns an `Integer` without a cast. Auto-unboxing adds the two Integers as ints. `.getClass().getSimpleName()` confirms the runtime type is still `Integer` — type erasure removes the generic info from the list itself, but individual objects retain their actual class.",
+  },
+  endQ2: {
+    id: "wg-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What exception is thrown when you cast an Object to the wrong type at runtime?",
+    options: [
+      { text: "NullPointerException", correct: false, feedback: "NullPointerException is thrown when you dereference a null reference, not when a cast fails." },
+      { text: "ClassCastException", correct: true, feedback: "Correct — the JVM throws ClassCastException when a cast to an incompatible type is attempted at runtime." },
+      { text: "IllegalArgumentException", correct: false, feedback: "IllegalArgumentException is for bad method arguments, not type cast failures." },
+      { text: "ArrayIndexOutOfBoundsException", correct: false, feedback: "That exception is specific to array index violations." },
+    ],
+    explanation: "Before generics, all collections stored `Object`. Retrieving and casting to the wrong type compiled fine but blew up at runtime with `ClassCastException`. Generics move that error to compile time where it is caught immediately.",
+  },
+  endQ3: {
+    id: "wg-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the generic list declaration so it holds Strings without requiring a cast on retrieval:",
+    code: `List<___> words = new ArrayList<>();
+words.add("hello");
+String s = words.get(0);  // no cast needed`,
+    correctAnswers: ["String"],
+    caseSensitive: true,
+    explanation: "Replacing `Object` with `String` as the type argument tells the compiler the list only holds Strings. `get()` then returns `String` directly, eliminating both the explicit cast and the risk of `ClassCastException`.",
+  },
+  endQ4: {
+    id: "wg-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.ArrayList;
+import java.util.List;
+
+public class Demo {
+    public static void main(String[] args) {
+        List<String> labels = new ArrayList<String>();
+        labels.add("alpha");
+        labels.add("beta");
+        String first = (String) labels.get(0);
+        System.out.println(first);
+    }
+}`,
+    buggyLine: 9,
+    issue: "The explicit `(String)` cast is redundant when the list is already typed `List<String>`",
+    explanation: "When a list is declared as `List<String>`, `get()` already returns `String`. The cast `(String)` is unnecessary and clutters the code. Remove it: `String first = labels.get(0);`. This is exactly the boilerplate generics were designed to eliminate.",
+  },
+};
+
+Before Java 5, there were no generics. Every collection stored `Object`, and retrieving anything required an explicit cast. That one missing feature created a whole class of bugs that compiled without complaint and detonated at runtime. Generics were added specifically to catch those errors earlier — at compile time — while also eliminating the noisy casts that littered every data-structure interaction.
+
+## The world before generics
+
+Imagine a simple list of names in Java 1.4:
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class OldStyle {
+    public static void main(String[] args) {
+        List names = new ArrayList();   // raw type — stores Object
+        names.add("Alice");
+        names.add("Bob");
+        names.add(42);                  // compiles fine!
+
+        for (int i = 0; i < names.size(); i++) {
+            String name = (String) names.get(i);  // cast required
+            System.out.println(name.toUpperCase());
+        }
+    }
+}
+```
+
+This compiles cleanly, then crashes with:
+
+```
+Exception in thread "main" java.lang.ClassCastException:
+    class java.lang.Integer cannot be cast to class java.lang.String
+```
+
+The problem is that `names.add(42)` was perfectly legal: the list accepted anything as `Object`. The mistake was only discovered at the cast on line 11 — potentially in production, potentially on an edge case that is rarely exercised.
+
+<Note>The pre-generics cast pattern was not just ugly — it was a maintenance trap. Every `get()` call was an undocumented contract that could break silently whenever someone stored an unexpected type.</Note>
+
+## Type safety at compile time
+
+With generics, you declare the intended element type inside angle brackets `< >`:
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class GenericStyle {
+    public static void main(String[] args) {
+        List<String> names = new ArrayList<>();
+        names.add("Alice");
+        names.add("Bob");
+        // names.add(42);  // COMPILE ERROR: incompatible types
+
+        for (String name : names) {          // no cast
+            System.out.println(name.toUpperCase());
+        }
+    }
+}
+```
+
+Three improvements:
+1. `names.add(42)` is rejected at compile time — the mistake never reaches the user.
+2. `names.get(i)` returns `String` directly — no cast.
+3. The enhanced for-loop variable is already `String` — `.toUpperCase()` is available immediately.
+
+The type information is part of the source code contract, not a hidden runtime assumption.
+
+## Type erasure — what generics are at runtime
+
+Java generics are implemented via **type erasure**. The compiler uses the type arguments during compilation to enforce type safety and insert casts automatically, then strips them away. At runtime, `List<String>` and `List<Integer>` are both just `List` (more precisely, `List<Object>` internally). The byte code contains no trace of `String` or `Integer`.
+
+This is why you cannot do `new T()` inside a generic class, write `instanceof List<String>`, or create a `T[]` array directly — the JVM has no knowledge of `T` once the program is running.
+
+```java
+List<String> strings = new ArrayList<>();
+List<Integer> ints   = new ArrayList<>();
+System.out.println(strings.getClass() == ints.getClass()); // true — both are ArrayList
+```
+
+Type erasure was a deliberate trade-off: it allowed generics to be added without changing the JVM and kept full backward compatibility with pre-generic code.
+
+<Note>Because of type erasure, generic type information is sometimes called a "compile-time phantom" — it exists in source code and `.class` file metadata (Signature attributes), but the JVM's runtime type system sees only the erased types.</Note>
+
+## The diamond operator `<>`
+
+Before Java 7 you had to repeat the type argument on both sides:
+
+```java
+Map<String, List<Integer>> map = new HashMap<String, List<Integer>>();
+```
+
+The diamond operator `<>` tells the compiler to infer the type arguments from context:
+
+```java
+Map<String, List<Integer>> map = new HashMap<>();  // cleaner
+```
+
+This is purely a readability aid. The compiler infers the same type as without the diamond; the resulting byte code is identical. Use `<>` whenever you have the full type on the left — there is no reason to repeat it.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## How generics eliminate boilerplate
+
+Consider a simple container that holds two values — a pair. Without generics:
+
+```java
+class RawPair {
+    Object first;
+    Object second;
+
+    RawPair(Object first, Object second) {
+        this.first  = first;
+        this.second = second;
+    }
+}
+
+// Usage:
+RawPair p = new RawPair("Alice", 30);
+String  name = (String)  p.first;   // cast — fragile
+int     age  = (Integer) p.second;  // cast — fragile
+```
+
+With generics:
+
+```java
+class Pair<A, B> {
+    final A first;
+    final B second;
+
+    Pair(A first, B second) {
+        this.first  = first;
+        this.second = second;
+    }
+}
+
+// Usage:
+Pair<String, Integer> p = new Pair<>("Alice", 30);
+String  name = p.first;    // no cast
+int     age  = p.second;   // auto-unboxing, but no manual cast
+```
+
+The generic version is shorter, safer, and documents the intended types right at the point of declaration. A reader knows immediately that the first element is a `String` and the second is an `Integer` — no hunting through usages to figure it out.
+
+## A real-world example: Map lookups
+
+Maps are the most common place where the pre-generic cast problem manifested:
+
+```java
+// Pre-generics
+Map scores = new HashMap();
+scores.put("Alice", 95);
+scores.put("Bob", 88);
+int aliceScore = (Integer) scores.get("Alice");  // cast, and could NPE on unboxing
+
+// With generics
+Map<String, Integer> scores = new HashMap<>();
+scores.put("Alice", 95);
+scores.put("Bob", 88);
+int aliceScore = scores.get("Alice");  // clean auto-unboxing, no cast
+```
+
+The generic map makes the key and value types part of the contract. The compiler will refuse `scores.put(42, "wrong")` before the program ever runs.
+
+## Try it
+
+```java
+import java.util.HashMap;
+import java.util.Map;
+
+public class Demo {
+    public static void main(String[] args) {
+        Map<String, Double> prices = new HashMap<>();
+        prices.put("apple", 0.99);
+        prices.put("banana", 0.59);
+        prices.put("cherry", 2.49);
+
+        // No cast needed — get() returns Double directly
+        double apple = prices.get("apple");
+        System.out.println("Apple: $" + apple);
+        System.out.println("Entries: " + prices.size());
+    }
+}
+```
+
+Expected output:
+```
+Apple: $0.99
+Entries: 3
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Using raw types** — writing `List names = new ArrayList()` instead of `List<String>` silently opts out of type checking. The compiler will warn you with an "unchecked" warning. Always provide the type argument unless you are intentionally working with legacy code.
+- **Thinking type erasure means generics have no cost** — the compiler inserts casts automatically at every generic retrieval site. Those casts exist in the byte code; they are just no longer your responsibility to write or get right.
+- **Forgetting the diamond operator** — writing `new ArrayList<String>()` instead of `new ArrayList<>()` is not wrong, just unnecessarily verbose. Prefer the diamond whenever the full type is stated on the left.
+- **Confusing `List<Object>` with a raw `List`** — `List<Object>` is a generic type that explicitly holds Objects; a raw `List` entirely bypasses generic checks. They behave differently when passed to methods that expect specific parameterized types.
+
+## Recap
+
+Generics were Java's solution to the fragile cast-everything approach that pre-5 collections required. They shift type errors from runtime surprises to compile-time failures, remove the visual noise of explicit casts, and make collection intent self-documenting. Understanding why they exist makes the syntax intuitive rather than ceremonial.
+
+- **Raw types** stored `Object`, required manual casts, and allowed `ClassCastException` at runtime
+- **Generic types** parameterize with `<T>` to let the compiler enforce correctness
+- **Type erasure** means generics exist only at compile time — the JVM sees only the erased base types
+- **The diamond `<>`** lets the compiler infer type arguments to avoid repetition
+- Every Java standard library collection, map, and optional relies on generics
+
+**Up next:** Generic Classes — write your own reusable, type-safe data structures.
+
+<Exercise>
+Implement the `toString()` method of the `Pair<A, B>` class so it returns the pair's values wrapped in parentheses, then verify that type safety works end-to-end by running `main`.
+
+```java
+public class Main {
+    static class Pair<A, B> {
+        final A first;
+        final B second;
+        Pair(A first, B second) { this.first = first; this.second = second; }
+
+        @Override
+        public String toString() {
+            // TODO: return "(" + first + ", " + second + ")"
+            return "";
+        }
+    }
+
+    public static void main(String[] args) {
+        Pair<String, Integer> person = new Pair<>("Alice", 30);
+        Pair<Integer, Boolean> status = new Pair<>(404, false);
+        Pair<String, String>   coords = new Pair<>("40.7N", "74.0W");
+
+        System.out.println(person);
+        System.out.println(person.first.toUpperCase());
+        System.out.println(status);
+        System.out.println(status.second);
+        System.out.println(coords);
+    }
+}
+```
+
+**What the tests check:**
+- `person.toString()` returns `"(Alice, 30)"`
+- `person.first.toUpperCase()` compiles and returns `"ALICE"` (proves the field is typed `String`)
+- `status.second` is `false` without a cast (proves the field is typed `Boolean`)
+- `coords.toString()` returns `"(40.7N, 74.0W)"`
+
+<Note>Hint: string concatenation with `+` calls `toString()` on each operand automatically, so you can just write `"(" + first + ", " + second + ")"` directly.</Note>
+</Exercise>

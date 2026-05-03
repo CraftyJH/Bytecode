@@ -1,0 +1,419 @@
+export const meta = {
+  title: "Creating Custom Exceptions",
+  duration: 12,
+  order: 5,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ce-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "You are building an inventory system. `ItemNotFoundException` should force callers to handle it. Which class should it extend?",
+    options: [
+      { text: "RuntimeException", correct: false, feedback: "`RuntimeException` produces an unchecked exception — the compiler will not force callers to handle it." },
+      { text: "Exception", correct: true },
+      { text: "Error", correct: false, feedback: "`Error` is for JVM-level failures. Application domain exceptions should always extend `Exception` or `RuntimeException`." },
+      { text: "Throwable", correct: false, feedback: "Extending `Throwable` directly is legal but very unusual and bypasses the checked/unchecked distinction entirely. Always extend `Exception` or `RuntimeException`." },
+    ],
+    explanation: "Extending `Exception` (but not `RuntimeException`) makes the exception checked — the compiler will require callers to either catch `ItemNotFoundException` or declare `throws ItemNotFoundException`. This is appropriate when callers are expected to handle a missing item gracefully.",
+  },
+  endQ1: {
+    id: "ce-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `class AppException extends RuntimeException {
+    private final int code;
+
+    AppException(int code, String message) {
+        super(message);
+        this.code = code;
+    }
+
+    int getCode() { return code; }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        try {
+            throw new AppException(404, "not found");
+        } catch (AppException e) {
+            System.out.println(e.getCode() + ": " + e.getMessage());
+        }
+    }
+}`,
+    expectedOutput: "404: not found",
+    explanation: "`AppException` stores a numeric code alongside the message. Calling `super(message)` stores it in the parent `RuntimeException` so `getMessage()` works normally. The catch block can access both the code and message.",
+  },
+  endQ2: {
+    id: "ce-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why do custom exception classes often include `super(message)` in their constructors?",
+    options: [
+      { text: "It is required by the compiler for all classes that extend Exception.", correct: false, feedback: "The compiler doesn't require it; if you omit it the no-arg `Exception()` constructor is called, giving a null message." },
+      { text: "It stores the message in the parent class so that `getMessage()` returns it correctly.", correct: true },
+      { text: "It causes the exception to print its message automatically.", correct: false, feedback: "Automatic printing happens via the stack trace mechanism, not `super(message)`. `super(message)` just stores the string." },
+      { text: "It initializes the `cause` field.", correct: false, feedback: "The cause is set by passing a `Throwable` as a second argument: `super(message, cause)`. A bare string only sets the message." },
+    ],
+    explanation: "`Exception`'s constructor stores the message string so `getMessage()` can return it. Without `super(message)`, `getMessage()` returns null and stack traces print no detail.",
+  },
+  endQ3: {
+    id: "ce-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the constructor to store the exception message in the parent class:",
+    code: `class NotFoundException extends Exception {
+    NotFoundException(String message) {
+        ___(message);
+    }
+}`,
+    correctAnswers: ["super"],
+    caseSensitive: true,
+    explanation: "`super(message)` calls the parent class constructor (`Exception(String message)`) which stores the message internally. Without this call, `getMessage()` would return null.",
+  },
+  endQ4: {
+    id: "ce-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class InsufficientFundsException extends Exception {
+    private double amount;
+
+    InsufficientFundsException(double amount) {
+        this.amount = amount;
+    }
+
+    double getAmount() { return amount; }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        try {
+            throw new InsufficientFundsException(50.0);
+        } catch (InsufficientFundsException e) {
+            System.out.println("Short by: " + e.getAmount());
+            System.out.println("Message: " + e.getMessage());
+        }
+    }
+}`,
+    buggyLine: 5,
+    issue: "super(message) is never called, so getMessage() returns null",
+    explanation: "The constructor assigns `amount` but never calls `super(...)`. `Exception`'s no-arg constructor is invoked implicitly, leaving the message as null. `e.getMessage()` will print 'Message: null'. Fix by adding `super(\"Insufficient funds, short by: \" + amount)` or a similar message.",
+  },
+};
+
+Standard exception types cover many cases, but real applications have domain-specific failure modes that deserve their own names and structure. A `ValidationException` that carries the name of the invalid field is far more useful than a bare `IllegalArgumentException`. Custom exceptions let you encode rich failure information while keeping your API clean.
+
+## When to create a custom exception
+
+Ask three questions:
+1. Does this failure mode have a name that is meaningful in your domain? (`InsufficientFundsException`, `DuplicateUserException`)
+2. Does the caller need structured data beyond a message string? (field name, error code, rejected value)
+3. Does the exception need to sit in a hierarchy specific to your application? (`AppException` → `ServiceException` → `DatabaseException`)
+
+If the answer to any of these is yes, a custom exception is worth the small amount of extra code.
+
+## Extending Exception vs RuntimeException
+
+The choice of parent class determines whether the exception is checked or unchecked:
+
+```java
+// Checked — caller must handle or declare
+class InsufficientFundsException extends Exception {
+    InsufficientFundsException(String message) {
+        super(message);
+    }
+}
+
+// Unchecked — caller is not forced to handle
+class ConfigurationException extends RuntimeException {
+    ConfigurationException(String message) {
+        super(message);
+    }
+}
+```
+
+Use `extends Exception` (checked) when the failure is a foreseeable, recoverable condition that callers should be forced to address — insufficient funds is a perfect example, because a well-written banking app must handle it.
+
+Use `extends RuntimeException` (unchecked) for programming errors, configuration mistakes, or conditions from which the application genuinely cannot recover at runtime.
+
+## Adding fields for extra context
+
+A custom exception shines when it carries structured data. Here's a checked exception that records both the field that failed and why:
+
+```java
+class ValidationException extends Exception {
+    private final String field;
+
+    ValidationException(String field, String message) {
+        super(message);
+        this.field = field;
+    }
+
+    String getField() { return field; }
+}
+```
+
+Usage:
+
+```java
+static void validateEmail(String email) throws ValidationException {
+    if (email == null || !email.contains("@")) {
+        throw new ValidationException("email", "Must contain @, got: " + email);
+    }
+}
+```
+
+The catch block can now route the error correctly without parsing the message string:
+
+```java
+try {
+    validateEmail(input);
+} catch (ValidationException e) {
+    System.out.println("Field '" + e.getField() + "': " + e.getMessage());
+}
+```
+
+<Note>Keep extra fields `final` when possible. An exception object should be immutable — its state represents a moment in time when something went wrong.</Note>
+
+## Constructor chaining
+
+Provide multiple constructors so callers can choose how much information to supply. Use `this(...)` to chain them and avoid duplication:
+
+```java
+class ApiException extends RuntimeException {
+    private final int statusCode;
+
+    ApiException(int statusCode, String message) {
+        super(message);
+        this.statusCode = statusCode;
+    }
+
+    ApiException(int statusCode, String message, Throwable cause) {
+        super(message, cause);           // stores message AND cause
+        this.statusCode = statusCode;
+    }
+
+    int getStatusCode() { return statusCode; }
+}
+```
+
+Always provide a constructor that accepts a `Throwable cause` — it lets callers wrap lower-level exceptions without losing the original stack trace.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Building a mini exception hierarchy
+
+In larger projects, you often define a base application exception and extend it for specific cases:
+
+```java
+// Base — all application-level exceptions extend this
+class AppException extends RuntimeException {
+    AppException(String message) { super(message); }
+    AppException(String message, Throwable cause) { super(message, cause); }
+}
+
+// Specific sub-types
+class NotFoundException extends AppException {
+    private final String resourceType;
+    private final Object id;
+
+    NotFoundException(String resourceType, Object id) {
+        super(resourceType + " not found: " + id);
+        this.resourceType = resourceType;
+        this.id = id;
+    }
+
+    String getResourceType() { return resourceType; }
+    Object getId() { return id; }
+}
+
+class PermissionException extends AppException {
+    PermissionException(String action) {
+        super("Permission denied: " + action);
+    }
+}
+```
+
+A global error handler can now catch `AppException` to handle all application errors uniformly, while individual catch blocks can still catch `NotFoundException` specifically when needed.
+
+## The `serialVersionUID` note
+
+Custom exception classes that extend `Exception` or `RuntimeException` are `Serializable` (because `Throwable` implements `Serializable`). IDEs will often warn that a `serialVersionUID` field is missing:
+
+```java
+class MyException extends Exception {
+    private static final long serialVersionUID = 1L;  // suppresses the warning
+    // ...
+}
+```
+
+For most application code you will never actually serialize exceptions. Adding `serialVersionUID = 1L` is fine and silences the warning; the exact value doesn't matter as long as you don't change it after serializing instances to disk.
+
+## A realistic domain-level example
+
+Here is a small user-registration service using a checked validation exception:
+
+```java
+class RegistrationException extends Exception {
+    private final String field;
+    private final Object rejectedValue;
+
+    RegistrationException(String field, Object rejectedValue, String message) {
+        super(message);
+        this.field = field;
+        this.rejectedValue = rejectedValue;
+    }
+
+    String getField() { return field; }
+    Object getRejectedValue() { return rejectedValue; }
+}
+
+class AccountService {
+    static void createAccount(String username, int age) throws RegistrationException {
+        if (username == null || username.length() < 3) {
+            throw new RegistrationException("username", username,
+                "Username must be at least 3 characters");
+        }
+        if (age < 13) {
+            throw new RegistrationException("age", age,
+                "Must be at least 13 years old");
+        }
+        System.out.println("Account created: " + username);
+    }
+}
+```
+
+The exception carries `field` and `rejectedValue`, which a UI layer could use to highlight the offending input field directly — impossible with a bare string message.
+
+## Try it
+
+```java
+class RangeException extends RuntimeException {
+    private final int value;
+    private final int min;
+    private final int max;
+
+    RangeException(int value, int min, int max) {
+        super(value + " is outside [" + min + ", " + max + "]");
+        this.value = value;
+        this.min = min;
+        this.max = max;
+    }
+
+    int getValue() { return value; }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        int[] tests = {-5, 0, 50, 101};
+        for (int t : tests) {
+            try {
+                System.out.println(checkRange(t, 0, 100));
+            } catch (RangeException e) {
+                System.out.println("Out of range: " + e.getMessage() +
+                    " (got " + e.getValue() + ")");
+            }
+        }
+    }
+
+    static int checkRange(int value, int min, int max) {
+        if (value < min || value > max) throw new RangeException(value, min, max);
+        return value;
+    }
+}
+```
+
+Notice that the catch block can call `e.getValue()` for the structured data, and `e.getMessage()` for the human-readable description.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting `super(message)`** — the constructor runs but the message is never stored. `getMessage()` returns null, stack traces print no detail, and debugging becomes significantly harder. Always chain `super(message)`.
+- **Mutable fields in exceptions** — making an exception's extra fields `public` and non-final allows callers to modify them after the exception is created, undermining the integrity of the error report. Keep fields `private final`.
+- **Over-creating exception types** — not every error needs its own class. If `IllegalArgumentException` with a clear message conveys the failure adequately, a custom class adds ceremony without value. Create custom exceptions when callers need to distinguish them programmatically or when structured data is needed.
+- **Omitting the cause constructor** — always provide a `(String message, Throwable cause)` overload so your exception can wrap lower-level failures. Losing the original cause is one of the hardest bugs to diagnose in production.
+
+## Recap
+
+Custom exceptions extend Java's type system into your own domain. They make failure modes first-class concepts, carry structured information, and build exception hierarchies that reflect your application's architecture.
+
+- Extend `Exception` for checked (caller must handle); extend `RuntimeException` for unchecked
+- Add `private final` fields for structured data and expose them through getters
+- Always call `super(message)` in every constructor to store the message
+- Provide a `(message, cause)` constructor overload so wrapping is always possible
+- Build hierarchies (`AppException` → specific subtypes) when you need uniform global handling plus specific local handling
+- Add `serialVersionUID = 1L` to silence the serialization warning; the exact value doesn't matter for most code
+
+**Up next:** Best Practices and Common Mistakes — try-with-resources, avoiding silent swallowing, and when NOT to use exceptions.
+
+<Exercise>
+Complete the three TODO comments in `UserRegistration.register` to throw `ValidationException` for each invalid field.
+
+```java
+class ValidationException extends Exception {
+    private final String field;
+
+    ValidationException(String field, String message) {
+        super(message);
+        this.field = field;
+    }
+
+    String getField() { return field; }
+}
+
+class UserRegistration {
+    static void register(String username, String email, int age)
+            throws ValidationException {
+        if (username == null || username.length() < 3)
+            // TODO: throw new ValidationException("username", "Must be at least 3 characters")
+            ;
+        if (email == null || !email.contains("@"))
+            // TODO: throw new ValidationException("email", "Must contain @")
+            ;
+        if (age < 13)
+            // TODO: throw new ValidationException("age", "Must be 13 or older")
+            ;
+        System.out.println("Registered: " + username);
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        attempt("alice", "alice@example.com", 20);
+        attempt("ab",    "alice@example.com", 20);
+        attempt("alice", "notanemail",        20);
+        attempt("alice", "alice@example.com", 10);
+    }
+
+    static void attempt(String u, String e, int age) {
+        try {
+            UserRegistration.register(u, e, age);
+        } catch (ValidationException ex) {
+            System.out.println("Field '" + ex.getField() + "': " + ex.getMessage());
+        }
+    }
+}
+```
+
+**What the tests check:**
+- `attempt("alice", "alice@example.com", 20)` prints `Registered: alice`
+- `attempt("ab", ...)` prints `Field 'username': Must be at least 3 characters`
+- `attempt("alice", "notanemail", ...)` prints `Field 'email': Must contain @`
+- `attempt("alice", "alice@example.com", 10)` prints `Field 'age': Must be 13 or older`
+- The `getField()` method returns the correct field name in each case
+
+<Note>Hint: replace each `// TODO: ...` comment with the `throw` statement that follows it. The semicolon after the comment is a placeholder — remove it and write `throw new ValidationException(...)` instead.</Note>
+</Exercise>

@@ -1,0 +1,412 @@
+export const meta = {
+  title: "Choosing the Right Collection",
+  duration: 14,
+  order: 7,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "cc-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which collection would you use to process HTTP requests in the order they arrive, handling one at a time?",
+    options: [
+      { text: "TreeSet<Request>", correct: false, feedback: "A Set deduplates — two identical requests would be merged. You also need ordering by arrival, not by key value." },
+      { text: "HashMap<Integer, Request>", correct: false, feedback: "A Map is for key-value lookup. You don't need to look up requests by key; you need FIFO processing." },
+      { text: "Queue<Request> (e.g. LinkedList or ArrayDeque)", correct: true, feedback: "Correct! A Queue models first-in-first-out. Incoming requests enqueue at the tail; the handler dequeues from the head." },
+      { text: "ArrayList<Request> with removeFirst()", correct: false, feedback: "ArrayList.remove(0) is O(n) because every remaining element shifts left. A Queue's `poll()` is O(1)." },
+    ],
+    explanation: "FIFO (first-in-first-out) processing is the defining use case for `Queue`. Use `ArrayDeque` for a general-purpose FIFO in single-threaded code, or `LinkedList` when you also need `List` operations.",
+  },
+  endQ1: {
+    id: "cc-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> list = Collections.unmodifiableList(
+            new ArrayList<>(Arrays.asList("a", "b", "c"))
+        );
+        System.out.println(list.get(1));
+        try {
+            list.add("d");
+        } catch (UnsupportedOperationException e) {
+            System.out.println("Cannot modify");
+        }
+        System.out.println(list.size());
+    }
+}`,
+    expectedOutput: "b\nCannot modify\n3",
+    explanation: "`unmodifiableList` wraps the original and throws `UnsupportedOperationException` on any mutating operation. Read methods like `get()` and `size()` still work normally.",
+  },
+  endQ2: {
+    id: "cc-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "You have a list of 10 million integers and frequently ask 'does the list contain X?' What change would most improve performance?",
+    options: [
+      { text: "Sort the list and use Collections.binarySearch.", correct: false, feedback: "Binary search is O(log n), which is much better than O(n), but a HashSet gives O(1) average — even faster for repeated lookups." },
+      { text: "Switch to a HashSet<Integer>.", correct: true, feedback: "Correct! HashSet.contains() is O(1) average. For 10 million elements this means ~1 hash computation vs ~5 million comparisons on average for a linear scan." },
+      { text: "Use a LinkedList instead.", correct: false, feedback: "LinkedList.contains() is also O(n), just like ArrayList — you still have to scan every element." },
+      { text: "Use a TreeSet<Integer>.", correct: false, feedback: "TreeSet.contains() is O(log n), which is better than O(n) but still slower than HashSet's O(1)." },
+    ],
+    explanation: "When membership testing is the dominant operation and insertion order doesn't matter, `HashSet` is the right tool. Its O(1) `contains` makes it orders of magnitude faster than any list for large datasets.",
+  },
+  endQ3: {
+    id: "cc-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the method that returns a read-only view of a list:",
+    code: "List<String> safe = Collections.___(original);",
+    correctAnswers: ["unmodifiableList"],
+    caseSensitive: true,
+    explanation: "`Collections.unmodifiableList(list)` returns a view that delegates reads to the original but throws `UnsupportedOperationException` on any mutating call. The original list is still modifiable — the view just prevents callers from changing it through that reference.",
+  },
+  endQ4: {
+    id: "cc-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> allowed = Arrays.asList("read", "write", "delete");
+        String action = "write";
+        // Check if the action is permitted quickly
+        if (allowed.contains(action)) {   // bug for large lists
+            System.out.println("Permitted");
+        }
+    }
+}`,
+    buggyLine: 6,
+    issue: "List.contains() is O(n); for repeated membership tests a HashSet should be used instead",
+    explanation: "For a three-element list this barely matters, but the pattern is the bug: if `allowed` grows to thousands or millions of entries and this check runs in a hot loop, it becomes O(n) per check. Convert to `Set<String> allowed = new HashSet<>(Arrays.asList(...))` for O(1) `contains`.",
+  },
+};
+
+You've now seen every major collection class in the Java Collections Framework. The last skill is the practical one: **knowing which to reach for**. This lesson provides decision frameworks, a full performance table, patterns for common real-world scenarios, and tools for protecting collections from accidental modification.
+
+## The decision flowchart
+
+When you need a collection, work through these questions in order:
+
+```
+1. Do you need key-value pairs?
+   YES → Map
+         Do you need sorted keys or range queries?
+           YES → TreeMap
+           NO  → HashMap (default)
+                 Do you need insertion order?
+                   YES → LinkedHashMap
+
+   NO → continue...
+
+2. Do you need to prevent duplicates automatically?
+   YES → Set
+         Do you need sorted order?
+           YES → TreeSet
+           NO  → HashSet (default)
+                 Do you need insertion order?
+                   YES → LinkedHashSet
+
+   NO → continue...
+
+3. Do you need FIFO/LIFO processing (queue or stack)?
+   YES → Queue / Deque
+         Large volume, single-threaded?
+           YES → ArrayDeque (default)
+         Need List + Deque in one?
+           YES → LinkedList
+
+   NO → continue...
+
+4. You need an ordered sequence (duplicates OK, index access).
+   → List
+     Mostly appending / reading by index?
+       YES → ArrayList (default)
+     Mostly inserting/removing at head or via iterator in middle?
+       YES → LinkedList
+```
+
+When in doubt, **ArrayList and HashMap are the defaults**. They're correct, fast, and readable. Optimise only when profiling shows a bottleneck.
+
+## Full complexity comparison table
+
+| Operation | ArrayList | LinkedList | HashSet | TreeSet | HashMap | TreeMap |
+|-----------|-----------|------------|---------|---------|---------|---------|
+| `add(e)` / `put(k,v)` (end/tail) | O(1) amort | O(1) | O(1) avg | O(log n) | O(1) avg | O(log n) |
+| `add(i, e)` (middle insert) | O(n) | O(n) seek + O(1) link | — | — | — | — |
+| `get(i)` / `get(k)` | O(1) | O(n) | — | — | O(1) avg | O(log n) |
+| `contains(o)` / `containsKey(k)` | O(n) | O(n) | O(1) avg | O(log n) | O(1) avg | O(log n) |
+| `remove(i/o)` (middle) | O(n) | O(n) seek | O(1) avg | O(log n) | O(1) avg | O(log n) |
+| `remove(head/tail)` | O(n)/O(1) | O(1) | — | — | — | — |
+| Sorted iteration | No | No | No | Yes | No | Yes |
+| Insertion-order iteration | Yes | Yes | No | No | No | No |
+| Range queries | No | No | No | Yes | No | Yes |
+| Memory overhead | Low | High (2 ptrs/node) | Medium | High (tree nodes) | Medium | High (tree nodes) |
+
+"avg" = amortized average; all hash-based structures are O(1) average, O(n) worst case (or O(log n) since Java 8's tree-bins).
+
+## Common real-world patterns
+
+### Pattern 1: frequency counting (histogram)
+
+```java
+import java.util.*;
+
+public class Histogram {
+    public static void main(String[] args) {
+        String[] votes = {"Alice", "Bob", "Alice", "Carol", "Bob", "Alice"};
+        Map<String, Integer> tally = new HashMap<>();
+        for (String v : votes) tally.merge(v, 1, Integer::sum);
+
+        // Print in sorted order
+        new TreeMap<>(tally).forEach((name, count) ->
+            System.out.println(name + ": " + count));
+        // Alice: 3
+        // Bob: 2
+        // Carol: 1
+    }
+}
+```
+
+### Pattern 2: deduplication while preserving order
+
+```java
+List<String> raw = Arrays.asList("css", "html", "js", "html", "css", "react");
+// LinkedHashSet preserves insertion order AND removes duplicates
+Set<String> unique = new LinkedHashSet<>(raw);
+System.out.println(unique); // [css, html, js, react]
+```
+
+### Pattern 3: grouping (multi-map)
+
+```java
+Map<String, List<String>> byDept = new HashMap<>();
+String[][] employees = {
+    {"Engineering", "Alice"}, {"Marketing", "Bob"},
+    {"Engineering", "Carol"}, {"Marketing", "Diana"}
+};
+for (String[] row : employees) {
+    byDept.computeIfAbsent(row[0], k -> new ArrayList<>()).add(row[1]);
+}
+new TreeMap<>(byDept).forEach((dept, names) -> {
+    Collections.sort(names);
+    System.out.println(dept + ": " + names);
+});
+// Engineering: [Alice, Carol]
+// Marketing: [Bob, Diana]
+```
+
+### Pattern 4: nearest-neighbour / range (sorted map)
+
+```java
+TreeMap<Integer, String> errors = new TreeMap<>();
+errors.put(400, "Bad Request");
+errors.put(401, "Unauthorised");
+errors.put(404, "Not Found");
+errors.put(500, "Internal Server Error");
+
+// All 4xx errors
+System.out.println(errors.subMap(400, 500)); // {400=..., 401=..., 404=...}
+```
+
+<Note>When you find yourself writing `Collections.sort(list)` every time you need sorted output, consider whether a `TreeSet` or `TreeMap` would be cleaner — they maintain order automatically, trading O(log n) per insert for never needing a sort.</Note>
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Unmodifiable views
+
+Once a collection is built and handed to other code, you often want to prevent accidental mutation. `Collections` provides read-only wrappers for every interface:
+
+```java
+import java.util.*;
+
+public class Immutable {
+    public static void main(String[] args) {
+        List<String> mutable = new ArrayList<>(Arrays.asList("a", "b", "c"));
+        List<String> readOnly = Collections.unmodifiableList(mutable);
+
+        System.out.println(readOnly.get(0));  // a — reads work
+        try {
+            readOnly.add("d");                // writes throw
+        } catch (UnsupportedOperationException e) {
+            System.out.println("Blocked: " + e.getClass().getSimpleName());
+        }
+
+        // Note: the original is still mutable!
+        mutable.add("d");
+        System.out.println(readOnly.size()); // 4 — view reflects changes to original
+    }
+}
+```
+
+Analogous methods exist for all collection types: `unmodifiableSet`, `unmodifiableMap`, `unmodifiableSortedMap`, etc.
+
+<Note>For a **truly immutable** collection that doesn't reflect changes to any backing list, use `List.of(...)`, `Set.of(...)`, or `Map.of(...)` (introduced in Java 9). Unlike `unmodifiableList`, these factory methods create collections with no mutable original. They also throw `NullPointerException` on any `null` element, which can be desirable as a contract enforcer.</Note>
+
+## Java 9+ immutable factory methods
+
+```java
+// Immutable list — no backing mutable list
+List<String> days = List.of("Mon", "Tue", "Wed", "Thu", "Fri");
+
+// Immutable set
+Set<String> vowels = Set.of("a", "e", "i", "o", "u");
+
+// Immutable map
+Map<String, Integer> http = Map.of(
+    "OK", 200,
+    "Not Found", 404,
+    "Server Error", 500
+);
+
+System.out.println(days.get(2));    // Wed
+System.out.println(vowels.contains("e")); // true
+System.out.println(http.get("OK")); // 200
+```
+
+For maps with more than 10 entries, use `Map.ofEntries(Map.entry("k1", v1), Map.entry("k2", v2), ...)`.
+
+## Concurrent collections preview
+
+All standard `ArrayList`, `HashMap`, etc. are **not thread-safe**. Concurrent modification from multiple threads produces silent data corruption. When you need collections shared across threads, use `java.util.concurrent`:
+
+| Standard | Concurrent alternative | Notes |
+|----------|------------------------|-------|
+| `ArrayList` | `CopyOnWriteArrayList` | Snapshot-on-write; best for rarely-modified, frequently-iterated lists |
+| `HashMap` | `ConcurrentHashMap` | Fine-grained locking; high throughput |
+| `LinkedList` (queue) | `LinkedBlockingQueue`, `ArrayBlockingQueue` | Thread-safe FIFO with blocking `take()` |
+| `TreeMap` | `ConcurrentSkipListMap` | Sorted, thread-safe, O(log n) |
+
+```java
+import java.util.concurrent.*;
+
+ConcurrentHashMap<String, Integer> sharedMap = new ConcurrentHashMap<>();
+sharedMap.put("requests", 0);
+sharedMap.merge("requests", 1, Integer::sum); // thread-safe increment
+```
+
+This is just a preview — concurrent programming deserves its own module. The key point: **never share standard collections across threads without synchronisation**.
+
+## Choosing between List.of and Collections.unmodifiableList
+
+| | `List.of(...)` | `Collections.unmodifiableList(list)` |
+|---|---|---|
+| Allows null elements | No | Yes |
+| Reflects changes to original | n/a (no original) | Yes |
+| Truly immutable | Yes | No (original can still change) |
+| When to use | Known-at-compile-time constants | Defensive copy of a mutable list |
+
+## Try it
+
+```java
+import java.util.*;
+
+public class Demo {
+    public static void main(String[] args) {
+        // 1. Frequency count with merge
+        String[] words = "the quick brown fox jumps over the lazy dog the".split(" ");
+        Map<String, Integer> freq = new HashMap<>();
+        for (String w : words) freq.merge(w, 1, Integer::sum);
+        System.out.println("'the' appears: " + freq.get("the")); // 3
+
+        // 2. Sorted unique words
+        Set<String> sorted = new TreeSet<>(Arrays.asList(words));
+        System.out.println("Unique sorted: " + sorted);
+
+        // 3. Safe API response
+        List<String> results = new ArrayList<>(Arrays.asList("Alice", "Bob"));
+        List<String> safe = Collections.unmodifiableList(results);
+        System.out.println("Safe list: " + safe);
+
+        // 4. Queue draining
+        Queue<Integer> q = new LinkedList<>(Arrays.asList(10, 20, 30));
+        int sum = 0;
+        while (!q.isEmpty()) sum += q.poll();
+        System.out.println("Sum: " + sum); // 60
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Defaulting to `LinkedList` for queues** — `ArrayDeque` is almost always faster for pure queue or stack patterns. Use `LinkedList` only when you need the combined `List`+`Deque` API.
+- **Using `List` for membership tests in hot code** — `list.contains(x)` is O(n). If you run this in a loop, switch to a `Set`. The pattern `new HashSet<>(list).contains(x)` inside a loop is still O(n) per call — build the set once, outside the loop.
+- **Sharing `Collections.unmodifiableList` and thinking the original is protected** — the wrapper blocks mutations through the read-only reference, but the original list is still mutable. If you want true immutability, use `List.of()` or copy into `new ArrayList<>(original)` before wrapping.
+- **Using `List.of()` when the list might grow** — `List.of()` and `Set.of()` are structurally immutable; you cannot add, remove, or set elements. Use them only for constants, not for collections that may be modified.
+- **Ignoring thread safety** — passing a `HashMap` or `ArrayList` between threads without synchronisation causes race conditions. Even reads can be unsafe if another thread is concurrently writing. Always use `java.util.concurrent` types or explicit synchronisation.
+
+## Recap
+
+Choosing the right collection is a matter of asking three questions: do you need key-value pairs, do you need uniqueness, and do you need ordering? The answers map directly to a concrete implementation.
+
+- **Default choices**: `ArrayList` for lists, `HashMap` for maps, `HashSet` for sets, `ArrayDeque` for queues
+- Upgrade to a **Tree variant** when you need sorted order or range queries (O(log n) trade-off)
+- Use **`LinkedHashMap` / `LinkedHashSet`** for insertion-order with hash-speed
+- Protect shared collections with **`Collections.unmodifiableX`** or the **`List.of` / `Set.of` / `Map.of`** factory methods
+- Never use **legacy classes** (`Vector`, `Hashtable`, `Stack`) in new code
+- For **multithreaded** access, use `java.util.concurrent` classes
+
+**Up next:** Module 4 Capstone — Inventory System, where you'll combine all six collection types in a realistic application.
+
+<Exercise>
+Demonstrate the four major collection patterns in a single program: indexed list, unique sorted set, word-frequency map, and FIFO queue.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Fast index access
+        List<Double> readings = new ArrayList<>();
+        for (int i = 1; i <= 5; i++) readings.add(i * 0.5);
+        System.out.println("Reading at index 3: " + readings.get(3));
+
+        // Unique sorted items
+        Set<String> tags = new TreeSet<>(
+            Arrays.asList("java", "backend", "api", "java", "rest"));
+        System.out.println("Unique tags: " + tags);
+
+        // Word frequency with sorted keys
+        Map<String, Integer> freq = new TreeMap<>();
+        for (String w : "to be or not to be that is the question".split(" "))
+            freq.merge(w, 1, Integer::sum);
+        System.out.println("'be' count: " + freq.get("be"));
+        System.out.println("Sorted keys: " + freq.keySet());
+
+        // FIFO queue
+        Queue<String> requests = new LinkedList<>();
+        requests.offer("GET /api/users");
+        requests.offer("POST /api/login");
+        requests.offer("DELETE /api/session");
+        System.out.println("Processing: " + requests.poll());
+        System.out.println("Queue size: " + requests.size());
+    }
+}
+```
+
+**What the tests check:**
+- `readings.get(3)` returns `2.0` (0.5 × 4)
+- `tags` is `[api, backend, java, rest]` — duplicate `"java"` removed, alphabetical
+- `freq.get("be")` is `2`
+- `freq.keySet()` is `[be, is, not, or, question, that, the, to]`
+- First `poll()` returns `"GET /api/users"`; remaining `size()` is `2`
+
+<Note>Hint: `TreeMap` combined with `merge` is a clean one-pass frequency counter that also keeps keys sorted — no separate sort step needed.</Note>
+</Exercise>

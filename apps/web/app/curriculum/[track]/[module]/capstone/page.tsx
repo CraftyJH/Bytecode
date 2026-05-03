@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTrack, getModule } from "@/lib/curriculum";
-import { CAPSTONE_STARTER_CODE, HINTS, REFERENCE_SOLUTION, TOTAL_TESTS } from "@/lib/capstone";
+import { getCapstoneForModule } from "@/lib/capstones";
 import { CapstonePanel } from "@/components/capstone/CapstonePanel";
 import { Pill } from "@/components/ui/Pill";
 import { Clock, Trophy } from "lucide-react";
@@ -17,11 +17,10 @@ export default async function CapstonePage({ params }: Props) {
   const mod = getModule(trackSlug, moduleSlug);
   if (!track || !mod) notFound();
 
-  // Only Module 1 of java-beginner has a capstone for now
-  if (trackSlug !== "java-beginner" || moduleSlug !== "module-1") notFound();
+  const capstone = getCapstoneForModule(trackSlug, moduleSlug);
+  if (!capstone) notFound();
 
   // TODO (Sprint 5): replace with real entitlement check via subscriptions table.
-  // For now, authenticated users are treated as Premium so the capstone is testable.
   let isPremium = false;
   if (
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -63,18 +62,18 @@ export default async function CapstonePage({ params }: Props) {
                 style={{ fontFamily: "var(--font-mono)" }}
               >
                 <Clock size={11} />
-                ~30 min
+                {capstone.duration}
               </span>
               <span
                 className="flex items-center gap-1 text-xs text-prose-faint"
                 style={{ fontFamily: "var(--font-mono)" }}
               >
                 <Trophy size={11} />
-                {TOTAL_TESTS} tests
+                {capstone.totalTests} tests
               </span>
             </div>
             <h1 className="text-xl lg:text-2xl font-semibold text-prose tracking-tight">
-              Capstone: Number Guessing Game
+              Capstone: {capstone.title}
             </h1>
             <p className="text-sm text-prose-muted mt-1">
               {mod.title} · {track.title}
@@ -92,33 +91,25 @@ export default async function CapstonePage({ params }: Props) {
           <section className="mb-8">
             <h2 className="text-base font-semibold text-prose mb-3 tracking-tight">What you&apos;ll build</h2>
             <p className="text-sm text-prose-muted leading-relaxed mb-4">
-              A classic number guessing game engine. You&apos;ll write two methods:
+              {capstone.description}
             </p>
             <div className="space-y-3">
-              <div className="px-4 py-3 rounded-md border text-sm" style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--color-elevated)" }}>
-                <code className="font-semibold text-prose" style={{ fontFamily: "var(--font-mono)" }}>getHint(int guess, int secret)</code>
-                <p className="text-prose-muted mt-1">Returns <code style={{ fontFamily: "var(--font-mono)" }}>&quot;Too low!&quot;</code>, <code style={{ fontFamily: "var(--font-mono)" }}>&quot;Too high!&quot;</code>, or <code style={{ fontFamily: "var(--font-mono)" }}>&quot;Correct!&quot;</code></p>
-              </div>
-              <div className="px-4 py-3 rounded-md border text-sm" style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--color-elevated)" }}>
-                <code className="font-semibold text-prose" style={{ fontFamily: "var(--font-mono)" }}>countGuesses(int[] guesses, int secret)</code>
-                <p className="text-prose-muted mt-1">Returns the 1-indexed position of the first matching guess, or <code style={{ fontFamily: "var(--font-mono)" }}>-1</code> if not found.</p>
-              </div>
+              {capstone.methods.map((m) => (
+                <div key={m.signature} className="px-4 py-3 rounded-md border text-sm" style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--color-elevated)" }}>
+                  <code className="font-semibold text-prose" style={{ fontFamily: "var(--font-mono)" }}>{m.signature}</code>
+                  <p className="text-prose-muted mt-1">{m.description}</p>
+                </div>
+              ))}
             </div>
           </section>
 
           <section className="mb-8">
             <h2 className="text-base font-semibold text-prose mb-3 tracking-tight">Why this challenge</h2>
             <p className="text-sm text-prose-muted leading-relaxed mb-3">
-              This brings together everything from Module 1:
+              This brings together everything from {mod.title}:
             </p>
             <ul className="space-y-1.5 text-sm text-prose-muted">
-              {[
-                "Methods with parameters and return values",
-                "Conditionals to decide the hint",
-                "Loops to walk the array of guesses",
-                "Arrays as inputs",
-                "Strings as return values",
-              ].map((item) => (
+              {capstone.whyBullets.map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="text-accent mt-0.5 shrink-0">→</span>
                   {item}
@@ -131,9 +122,9 @@ export default async function CapstonePage({ params }: Props) {
             <h2 className="text-base font-semibold text-prose mb-3 tracking-tight">How it works</h2>
             <ol className="space-y-2 text-sm text-prose-muted">
               {[
-                "Write your two methods in the editor.",
+                "Write your solution in the editor.",
                 "Click Run to test with the demo inputs.",
-                "Click Submit to run all 14 hidden tests.",
+                `Click Submit to run all ${capstone.totalTests} hidden tests.`,
                 "Up to 5 progressive hints are available after failed submissions.",
                 "The reference solution unlocks after 3 failed submissions.",
               ].map((step, i) => (
@@ -158,8 +149,8 @@ export default async function CapstonePage({ params }: Props) {
             >
               <Trophy size={18} className="text-accent shrink-0" />
               <div>
-                <p className="text-sm font-medium text-prose">Java Beginner — Module 1 Mastery</p>
-                <p className="text-xs text-prose-faint mt-0.5">Badge · Certificate · Unlocks Module 2</p>
+                <p className="text-sm font-medium text-prose">{capstone.badgeTitle}</p>
+                <p className="text-xs text-prose-faint mt-0.5">{capstone.badgeSubtitle}</p>
               </div>
             </div>
           </section>
@@ -168,14 +159,15 @@ export default async function CapstonePage({ params }: Props) {
         {/* Right — editor panel */}
         <div className="flex-1 min-w-0">
           <CapstonePanel
-            capstoneId="capstone-java-beginner-1"
-            starterCode={CAPSTONE_STARTER_CODE}
-            hints={HINTS}
-            referenceSolution={REFERENCE_SOLUTION}
-            totalTests={TOTAL_TESTS}
+            capstoneId={capstone.id}
+            starterCode={capstone.starterCode}
+            hints={capstone.hints}
+            referenceSolution={capstone.referenceSolution}
+            totalTests={capstone.totalTests}
             isPremium={isPremium}
             nextPath={`/curriculum/${trackSlug}/${moduleSlug}`}
             certificatePath={`/curriculum/${trackSlug}/${moduleSlug}/capstone/certificate`}
+            badgeTitle={capstone.badgeTitle}
           />
         </div>
       </div>

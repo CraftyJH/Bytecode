@@ -1,0 +1,349 @@
+export const meta = {
+  title: "Checked vs Unchecked Exceptions",
+  duration: 12,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "cvu-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which of the following is a checked exception?",
+    options: [
+      { text: "NullPointerException", correct: false, feedback: "`NullPointerException` extends `RuntimeException`, making it unchecked. The compiler doesn't force you to handle it." },
+      { text: "IllegalArgumentException", correct: false, feedback: "`IllegalArgumentException` is a `RuntimeException` subtype — unchecked." },
+      { text: "IOException", correct: true },
+      { text: "ArrayIndexOutOfBoundsException", correct: false, feedback: "`ArrayIndexOutOfBoundsException` is a `RuntimeException` subtype — unchecked." },
+    ],
+    explanation: "`IOException` extends `Exception` directly (not through `RuntimeException`), so the compiler enforces that callers either catch it or declare `throws IOException`. This is the definition of a checked exception.",
+  },
+  endQ1: {
+    id: "cvu-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.io.IOException;
+
+public class Main {
+    public static void main(String[] args) {
+        try {
+            riskyOp();
+        } catch (IOException e) {
+            System.out.println("Caught: " + e.getMessage());
+        }
+        System.out.println("After try");
+    }
+
+    static void riskyOp() throws IOException {
+        throw new IOException("disk full");
+    }
+}`,
+    expectedOutput: "Caught: disk full\nAfter try",
+    explanation: "`riskyOp` declares `throws IOException` and throws it. `main` catches it and prints the message. Execution then continues normally after the try-catch block.",
+  },
+  endQ2: {
+    id: "cvu-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What does declaring `throws IOException` on a method do?",
+    options: [
+      { text: "It causes the method to throw an IOException every time it's called.", correct: false, feedback: "The declaration says the method *might* throw — it doesn't guarantee it will." },
+      { text: "It tells callers that this method might throw an IOException and they must handle it.", correct: true },
+      { text: "It catches the IOException inside the method automatically.", correct: false, feedback: "`throws` in the signature is a declaration, not a catch. Catching is done with `try-catch` inside the method body." },
+      { text: "It converts the IOException into an unchecked exception.", correct: false, feedback: "`throws` propagates the checked exception to callers; it doesn't change its type." },
+    ],
+    explanation: "`throws` in a method signature is a contract: it warns callers that this checked exception may escape the method. Callers must then either catch it or declare it themselves with `throws`, propagating responsibility up the call chain.",
+  },
+  endQ3: {
+    id: "cvu-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the method signature so that it can throw a checked IOException without catching it:",
+    code: `static void loadFile(String path) ___ IOException {
+    // may throw IOException
+}`,
+    correctAnswers: ["throws"],
+    caseSensitive: true,
+    explanation: "The `throws` keyword in the method signature declares that the method may propagate one or more checked exceptions to its caller. Multiple exceptions are comma-separated: `throws IOException, SQLException`.",
+  },
+  endQ4: {
+    id: "cvu-end-4",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.io.IOException;
+
+public class Main {
+    public static void main(String[] args) {
+        readData();
+    }
+
+    static void readData() {
+        throw new IOException("failed to read");
+    }
+}`,
+    buggyLine: 9,
+    issue: "IOException is checked but the method neither catches it nor declares throws IOException",
+    explanation: "`IOException` is a checked exception. Any method that throws one must either surround the throw with `try-catch (IOException e)` or declare `throws IOException` in its signature. Without either, the code will not compile.",
+  },
+};
+
+Java divides exceptions into two camps: **checked** and **unchecked**. The distinction is enforced at compile time and shapes every API you write. Understanding it prevents compile errors and helps you design methods that are honest about the failures they can produce.
+
+## The rule in one sentence
+
+If an exception is a subtype of `RuntimeException` (or `Error`), it is **unchecked** — the compiler lets you ignore it. Every other `Exception` subtype is **checked** — the compiler forces you to either handle it or declare it.
+
+```
+Throwable
+├── Error                     ← unchecked (JVM-level, don't catch)
+└── Exception
+    ├── RuntimeException      ← unchecked (bugs, programming errors)
+    │   ├── NullPointerException
+    │   ├── IllegalArgumentException
+    │   └── ArrayIndexOutOfBoundsException
+    └── (everything else)     ← CHECKED (external failures)
+        ├── IOException
+        ├── SQLException
+        └── ParseException
+```
+
+## Checked exceptions: compiler-enforced contracts
+
+A checked exception represents a failure mode that is **external to your code and reasonably foreseeable** — a file might not exist, a network connection might drop, a database might be unavailable. The designer of `IOException` decided callers should be forced to think about this.
+
+If you call a method that declares `throws IOException` and you neither catch it nor propagate it yourself, the code will not compile:
+
+```java
+import java.io.*;
+
+// COMPILE ERROR — unhandled IOException
+static void readFile(String path) {
+    FileReader fr = new FileReader(path);  // throws FileNotFoundException (checked)
+    // ...
+}
+```
+
+You have exactly two options: **catch it** or **declare it**:
+
+```java
+// Option 1: catch it here
+static void readFile(String path) {
+    try {
+        FileReader fr = new FileReader(path);
+        // ...
+    } catch (FileNotFoundException e) {
+        System.out.println("File missing: " + e.getMessage());
+    }
+}
+
+// Option 2: declare it (let the caller decide)
+static void readFile(String path) throws FileNotFoundException {
+    FileReader fr = new FileReader(path);
+    // ...
+}
+```
+
+<Note>When you choose "declare it," you are pushing responsibility to your caller. That caller must then make the same choice: catch or declare. Eventually some method at the top of the stack must catch it, or the thread will terminate.</Note>
+
+## The `throws` clause
+
+`throws` in a method signature is a **contract**: it warns callers that this checked exception may escape. Multiple exceptions are comma-separated:
+
+```java
+static String loadUser(int id) throws IOException, SQLException {
+    // talks to a file and a database — both can fail
+}
+```
+
+Reading a method signature that says `throws IOException` tells you immediately: "prepare to handle a file or network failure." This is documentation enforced by the compiler.
+
+## Unchecked exceptions: programmer errors
+
+`RuntimeException` and its subtypes signal **bugs** — conditions that shouldn't occur if the code is written correctly:
+
+- `NullPointerException` — you dereferenced null; fix your code to not do that
+- `ArrayIndexOutOfBoundsException` — you computed the wrong index; fix your bounds check
+- `IllegalArgumentException` — caller passed a value that violates your method's contract; fix the caller
+
+Requiring `throws` declarations for these would add noise everywhere. Imagine declaring `throws NullPointerException` on every method — it would appear in virtually every method in the codebase and convey nothing useful.
+
+```java
+// unchecked — no throws needed, compiler doesn't care
+static void requirePositive(int n) {
+    if (n <= 0) throw new IllegalArgumentException("Expected positive, got: " + n);
+}
+```
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## The checked-exception controversy
+
+The Java community is genuinely divided on checked exceptions, and it's worth understanding both sides.
+
+**Arguments for checked exceptions:**
+- The compiler forces you to think about failure modes you might otherwise forget.
+- The method signature serves as documentation: callers know what can go wrong.
+- Important APIs like file I/O use them, so you must understand them regardless.
+
+**Arguments against (and the modern trend):**
+- Checked exceptions pollute call chains — every layer must either catch or re-declare them.
+- They encourage bad habits like empty catch blocks (`catch (Exception e) {}`) just to make the compiler happy.
+- Modern frameworks (Spring, Guava, Kotlin, newer Java libraries) prefer unchecked exceptions for this reason.
+- `RuntimeException` wrappers end up being used anyway.
+
+The pragmatic view: use checked exceptions for **recoverable external failures** where the caller genuinely has something useful to do. Use unchecked exceptions for **programming errors** the caller probably cannot recover from.
+
+## A realistic example: wrapping checked in unchecked
+
+Sometimes you want the convenience of unchecked propagation but still need to handle a checked exception inside a lambda or stream:
+
+```java
+import java.io.*;
+
+static String readFirstLine(String path) {
+    try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+        return br.readLine();
+    } catch (IOException e) {
+        // Wrap in unchecked so stream pipelines can use this method
+        throw new RuntimeException("Could not read " + path, e);
+    }
+}
+```
+
+The original `IOException` is preserved as the *cause* — accessible via `e.getCause()` — so you don't lose diagnostic information.
+
+## Another realistic example: propagating up a service layer
+
+```java
+import java.sql.*;
+
+class UserRepository {
+    // Declares the checked exception — caller must handle
+    User findById(int id) throws SQLException {
+        // ... execute query ...
+        throw new SQLException("Connection lost");
+    }
+}
+
+class UserService {
+    private UserRepository repo = new UserRepository();
+
+    // Catches and converts to domain exception
+    User getUser(int id) {
+        try {
+            return repo.findById(id);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to fetch user " + id, e);
+        }
+    }
+}
+```
+
+`UserRepository` is honest about the SQL failure. `UserService` converts it to an unchecked exception so higher-level code stays clean.
+
+## Try it
+
+```java
+import java.io.*;
+
+public class Demo {
+    public static void main(String[] args) {
+        // Checked: must handle
+        try {
+            String line = readLine("missing.txt");
+            System.out.println(line);
+        } catch (IOException e) {
+            System.out.println("File error: " + e.getMessage());
+        }
+
+        // Unchecked: no try-catch required (but good to have)
+        System.out.println(Integer.parseInt("123"));
+    }
+
+    static String readLine(String path) throws IOException {
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            return br.readLine();
+        }
+    }
+}
+```
+
+Change `"missing.txt"` to a file that exists on your system, or keep it missing and observe the IOException message.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Empty catch block to silence the compiler** — `catch (IOException e) {}` is almost never right. You've told the compiler "yes, I handle this" but you've actually discarded the error entirely. If nothing should happen on failure, at least log the message so future-you can debug it.
+- **Catching `Exception` broadly as a shortcut** — it shuts the compiler up but catches far too much, including `NullPointerException` and `IllegalArgumentException` that should crash loudly so you notice the bug. Catch the specific type you actually expect.
+- **Forgetting `throws` in a chain** — if method A calls method B which calls method C, and C declares `throws IOException`, then B and A must also declare it (or catch it). Students often fix the immediate compile error in B but forget A.
+- **Confusing `throws` (declaration) with `throw` (action)** — `throws IOException` in the signature is a declaration; `throw new IOException(...)` in the body is the actual action. Both are needed when you're throwing a checked exception you don't catch yourself.
+
+## Recap
+
+The checked/unchecked split is one of Java's most distinctive — and most debated — design decisions. Understanding it helps you navigate legacy APIs and make intentional choices in your own code.
+
+- **Checked** exceptions (`IOException`, `SQLException`, etc.) represent external, recoverable failures; the compiler forces callers to handle or declare them
+- **Unchecked** exceptions (`RuntimeException` subtypes) represent programming errors; no compiler enforcement
+- `throws TypeName` in a method signature is a contract advertising which checked exceptions may propagate
+- Modern Java style leans toward unchecked, but checked exceptions remain important in I/O, database, and parsing APIs
+- When wrapping checked exceptions in unchecked ones, always preserve the original as the cause
+
+**Up next:** Throwing Exceptions — the `throw` statement, guard clauses, and how to choose the right exception type for your situation.
+
+<Exercise>
+Complete the two TODO comments: make `fetchData` throw a checked `IOException`, and make `validateAge` throw an unchecked `IllegalArgumentException` for negative ages.
+
+```java
+import java.io.IOException;
+
+public class Main {
+    public static void main(String[] args) {
+        try {
+            String data = fetchData("server.txt");
+            System.out.println("Got: " + data);
+        } catch (IOException e) {
+            System.out.println("IO error: " + e.getMessage());
+        }
+
+        validateAge(25);
+        validateAge(-3);
+    }
+
+    static String fetchData(String source) throws IOException {
+        // TODO: throw new IOException("source not found: " + source)
+        return "";
+    }
+
+    static void validateAge(int age) {
+        try {
+            if (age < 0) {
+                // TODO: throw new IllegalArgumentException("age must be non-negative")
+            }
+            System.out.println("Valid age: " + age);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Bad age: " + e.getMessage());
+        }
+    }
+}
+```
+
+**What the tests check:**
+- `fetchData` always throws `IOException` with message `"source not found: server.txt"`
+- The caught `IOException` prints `IO error: source not found: server.txt`
+- `validateAge(25)` prints `Valid age: 25`
+- `validateAge(-3)` throws `IllegalArgumentException` which is caught and prints `Bad age: age must be non-negative`
+
+<Note>Hint: `fetchData` already has `throws IOException` in its signature — you just need to add the `throw` statement in the body. The `return ""` at the end is unreachable once you add the throw, but leave it so the code compiles without the `throws` clause change.</Note>
+</Exercise>

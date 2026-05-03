@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
+import { getCapstone, parseGradeOutput } from "@/lib/capstones";
 
 export const maxDuration = 30;
-import { SENTINEL, TEST_HARNESS, parseGradeOutput } from "@/lib/capstone";
 
 const JUDGE0_URL = process.env.JUDGE0_URL ?? "https://ce.judge0.com";
 const JAVA_LANGUAGE_ID = 62;
 
 export async function POST(request: Request) {
-  const { code } = await request.json();
+  const body = await request.json();
+  const { code, capstoneId } = body as { code?: string; capstoneId?: string };
+
   if (!code || typeof code !== "string") {
     return NextResponse.json({ error: "code required" }, { status: 400 });
   }
 
-  // Split at the sentinel and inject the test harness in place of the demo main
-  const sentinelIndex = code.indexOf(SENTINEL);
+  const capstone = getCapstone(capstoneId ?? "capstone-java-beginner-1");
+  if (!capstone) {
+    return NextResponse.json({ error: "Unknown capstone" }, { status: 400 });
+  }
+
+  const sentinelIndex = code.indexOf(capstone.sentinel);
   if (sentinelIndex === -1) {
     return NextResponse.json(
       { error: "Starter code structure not recognised — please reset the editor and try again." },
@@ -22,8 +28,7 @@ export async function POST(request: Request) {
   }
 
   const studentMethods = code.slice(0, sentinelIndex).trimEnd();
-  // studentMethods ends with the closing of the method bodies but the class brace is still open
-  const gradingCode = `${studentMethods}\n\n${TEST_HARNESS}`;
+  const gradingCode = `${studentMethods}\n\n${capstone.testHarness}`;
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (process.env.JUDGE0_API_KEY) {
@@ -54,5 +59,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ compileError: stderr.trim() });
   }
 
-  return NextResponse.json(parseGradeOutput(stdout));
+  return NextResponse.json(parseGradeOutput(stdout, capstone.totalTests));
 }

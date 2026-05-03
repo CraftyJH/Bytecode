@@ -1,0 +1,312 @@
+export const meta = {
+  title: "Abstract Classes",
+  duration: 14,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "absc-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which statement about abstract classes is TRUE?",
+    options: [
+      { text: "An abstract class can be instantiated with `new`.", correct: false, feedback: "`new AbstractClass()` is a compile error. Abstract classes exist only as base types; you must extend them with a concrete subclass." },
+      { text: "An abstract class may contain both abstract methods and concrete methods.", correct: true, feedback: "Correct — this is the defining advantage of abstract classes over interfaces. You can provide shared implementation alongside abstract obligations." },
+      { text: "A subclass that extends an abstract class does not need to implement abstract methods.", correct: false, feedback: "A concrete subclass must implement every inherited abstract method, or it must also be declared `abstract`." },
+      { text: "Abstract methods must have a body.", correct: false, feedback: "Abstract methods are declared *without* a body. They end with a semicolon, not `{ ... }`. The body belongs in the subclass." },
+    ],
+    explanation: "Abstract classes sit between interfaces (no implementation) and concrete classes (full implementation). They can carry concrete helper methods alongside abstract obligations, making them ideal for expressing a partial template.",
+    hint: "Think about what makes abstract classes different from both interfaces and regular classes.",
+  },
+  endQ1: {
+    id: "absc-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `abstract class Shape {
+    abstract double area();
+    void describe() {
+        System.out.println("Area: " + area());
+    }
+}
+class Square extends Shape {
+    double side;
+    Square(double side) { this.side = side; }
+    public double area() { return side * side; }
+}
+public class Main {
+    public static void main(String[] args) {
+        Shape s = new Square(4);
+        s.describe();
+    }
+}`,
+    expectedOutput: "Area: 16.0",
+    explanation: "`describe()` is a concrete method in the abstract class; it calls `area()`, which is overridden in `Square`. At runtime, `area()` dispatches to `Square.area()`, returning 16.0. The abstract class supplies the template (`describe`); the subclass supplies the specific piece (`area`).",
+  },
+  endQ2: {
+    id: "absc-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `abstract class Vehicle {
+    abstract void startEngine();
+    void honk() { System.out.println("Beep!"); }
+}
+
+class Bicycle extends Vehicle {
+    // No startEngine() implementation
+    public void honk() { System.out.println("Ring ring!"); }
+}`,
+    buggyLine: 7,
+    issue: "Bicycle extends the abstract class Vehicle but does not implement the abstract method startEngine()",
+    explanation: "A concrete class that extends an abstract class must implement all inherited abstract methods. `Bicycle` leaves `startEngine()` unimplemented and is not declared `abstract`, so the compiler will refuse to compile it. Either add `public void startEngine() { ... }` or declare `abstract class Bicycle extends Vehicle`.",
+    hint: "What obligation does a concrete subclass have toward every abstract method it inherits?",
+  },
+  endQ3: {
+    id: "absc-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the keyword that prevents a class from being instantiated directly and allows abstract method declarations:",
+    code: "___ class Creature {\n    ___ String sound();\n}",
+    correctAnswers: ["abstract"],
+    caseSensitive: true,
+    explanation: "Both the class and each unimplemented method are marked `abstract`. The class-level `abstract` prevents `new Creature()`, and the method-level `abstract` declares an obligation without providing a body.",
+  },
+  endQ4: {
+    id: "absc-end-4",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Abstract class `Appliance` has a constructor `Appliance(String brand)`. Subclass `Washer` extends it. Which line correctly calls the superclass constructor from `Washer`'s constructor?",
+    options: [
+      { text: "Appliance(brand);", correct: false, feedback: "This looks like a method call to `Appliance`, not a superclass constructor call. The correct form uses the `super` keyword." },
+      { text: "super(brand);", correct: true, feedback: "Correct — `super(...)` calls the direct superclass constructor. It must be the first statement in the subclass constructor." },
+      { text: "this.Appliance(brand);", correct: false, feedback: "`this.ClassName(...)` is not valid Java syntax for any purpose." },
+      { text: "new Appliance(brand);", correct: false, feedback: "`new Appliance(brand)` would try to instantiate `Appliance` directly, which is forbidden for abstract classes." },
+    ],
+    explanation: "`super(args)` invokes the superclass constructor and must appear as the very first line of the subclass constructor. For abstract classes that declare constructors with parameters, every concrete subclass must call `super(...)` explicitly because Java won't insert a default no-arg call when no no-arg constructor exists.",
+    hint: "Which keyword refers to the parent class in Java?",
+  },
+};
+
+Between a plain interface (pure contract, zero implementation) and a concrete class (full implementation) lies a useful middle ground: the **abstract class**. It can declare obligations that subclasses must fulfil — just like an interface — but it can also provide concrete methods and fields shared by all subclasses.
+
+The real-world analogy is a template or a partially-filled form. An "Employee" template might already specify how payslips are formatted and how vacation days accumulate, while leaving "calculateBonus()" blank for each department to fill in their own formula.
+
+## Declaring an abstract class
+
+Add the `abstract` modifier to the `class` keyword:
+
+```java
+abstract class Shape {
+    String color;  // concrete field — all shapes have a color
+
+    Shape(String color) {
+        this.color = color;
+    }
+
+    // Concrete method — shared by all subclasses
+    void printColor() {
+        System.out.println("Color: " + color);
+    }
+
+    // Abstract method — each subclass must provide its own formula
+    abstract double area();
+}
+```
+
+Two rules follow immediately:
+1. You cannot write `new Shape()` — the compiler forbids instantiating abstract classes.
+2. Any class that `extends Shape` must implement `area()` — or itself be declared `abstract`.
+
+## Extending an abstract class
+
+```java
+class Rectangle extends Shape {
+    double width, height;
+
+    Rectangle(String color, double width, double height) {
+        super(color);   // call the abstract class's constructor
+        this.width = width;
+        this.height = height;
+    }
+
+    @Override
+    public double area() {
+        return width * height;
+    }
+}
+
+class Triangle extends Shape {
+    double base, height;
+
+    Triangle(String color, double base, double height) {
+        super(color);
+        this.base = base;
+        this.height = height;
+    }
+
+    @Override
+    public double area() {
+        return 0.5 * base * height;
+    }
+}
+```
+
+Both subclasses inherit `color`, the constructor logic, and `printColor()` for free. They only need to supply the unique piece: the area formula.
+
+<Note>Abstract classes *can* have constructors, even though you can't call them directly via `new`. Subclass constructors call them with `super(...)`, which must be the first line. If an abstract class declares a constructor with parameters, every subclass constructor must explicitly call it — Java will not insert a no-arg call automatically.</Note>
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Polymorphism with abstract classes
+
+Because all subclasses share the `Shape` type, you can write generic code that works for any shape:
+
+```java
+public class Main {
+    static void printInfo(Shape s) {
+        s.printColor();                    // concrete — inherited
+        System.out.println("Area: " + s.area());  // dispatches to subclass
+    }
+
+    public static void main(String[] args) {
+        Shape[] shapes = {
+            new Rectangle("blue", 3, 5),
+            new Triangle("red", 6, 4)
+        };
+        for (Shape s : shapes) {
+            printInfo(s);
+        }
+    }
+}
+// Output:
+// Color: blue
+// Area: 15.0
+// Color: red
+// Area: 12.0
+```
+
+`printInfo` never knows whether it received a `Rectangle` or a `Triangle`. It only knows the `Shape` API. This is the **Template Method pattern**: the abstract class defines the algorithm skeleton (`printColor` then `area`), and subclasses fill in the variable step.
+
+## Try it
+
+Run the starter code. `speak()` returns an empty string in both `Dog` and `Cat`, so `introduce()` prints ` and I say: ` with no sound. Implement `speak()` in both classes so the output becomes:
+
+```
+I am Rex and I say: Woof!
+I am Whiskers and I say: Meow!
+I am Buddy and I say: Woof!
+```
+
+Notice that `introduce()` in the abstract class calls `speak()` — a method it doesn't implement itself. This works because at runtime the actual object is always a `Dog` or `Cat`, so the right `speak()` is always found.
+
+## When abstract classes shine
+
+Abstract classes are best when:
+
+- You want to share **fields and state** across subclasses (interfaces cannot hold instance fields).
+- Subclasses share significant **common behaviour** that shouldn't be duplicated.
+- You need to **control construction** — abstract classes can enforce initialization through constructors.
+
+```java
+abstract class DatabaseConnection {
+    private final String url;
+
+    // Every subclass must supply a URL at construction time
+    DatabaseConnection(String url) {
+        this.url = url;
+        connect();  // run shared startup logic
+    }
+
+    abstract void connect();
+    abstract void disconnect();
+
+    String getUrl() { return url; }
+}
+```
+
+No subclass can skip the `url` — it's baked into the constructor chain.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Trying to instantiate an abstract class** — `new Animal("Rex")` where `Animal` is abstract is a compile error. Always instantiate a concrete subclass and assign it to the abstract type variable if needed.
+- **Forgetting `super(...)` in the subclass constructor** — when the abstract class has a parameterized constructor and no no-arg constructor, the compiler requires an explicit `super(...)` call as the very first statement. Omitting it gives "constructor Animal in class Animal cannot be applied to given types."
+- **Leaving an abstract method unimplemented in a concrete subclass** — a subclass that doesn't override every abstract method must itself be declared `abstract`. The compiler will point out which methods are missing.
+- **Confusing abstract methods with concrete methods** — abstract methods end with a semicolon: `abstract void speak();`. A concrete method has braces: `void speak() { return "Hi"; }`. Accidentally adding a body to an abstract method (or leaving off the body from a concrete one) produces a compile error.
+- **Overusing abstract classes when an interface suffices** — if you don't need shared fields or implemented methods, prefer an interface. Using an abstract class consumes the single inheritance slot every Java class has, closing off future options.
+
+## Recap
+
+Abstract classes let you express partial templates: concrete shared behaviour combined with abstract obligations that subclasses must fulfil. They are fundamental to the Template Method pattern and any design where a family of related classes share a common algorithmic skeleton.
+
+- Declared with `abstract class ClassName`
+- Cannot be instantiated with `new` — only concrete subclasses can
+- May contain any mix of concrete fields, concrete methods, and abstract methods
+- Abstract methods — `abstract returnType methodName();` — have no body; subclasses must override them
+- `super(...)` in the subclass constructor calls the abstract class's constructor
+- Polymorphism through the abstract type works exactly as with interfaces
+
+**Up next:** Interface vs Abstract Class — when to choose which, and how to combine them.
+
+<Exercise>
+Fill in the `speak()` method in both `Dog` and `Cat`. `Dog.speak()` should return `"Woof!"` and `Cat.speak()` should return `"Meow!"`. The abstract class's `introduce()` will automatically use your return value.
+
+```java
+abstract class Animal {
+    protected String name;
+
+    Animal(String name) {
+        this.name = name;
+    }
+
+    abstract String speak();
+
+    void introduce() {
+        System.out.println("I am " + name + " and I say: " + speak());
+    }
+}
+
+class Dog extends Animal {
+    Dog(String name) { super(name); }
+
+    public String speak() {
+        // TODO: return "Woof!"
+        return "";
+    }
+}
+
+class Cat extends Animal {
+    Cat(String name) { super(name); }
+
+    public String speak() {
+        // TODO: return "Meow!"
+        return "";
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Animal[] animals = { new Dog("Rex"), new Cat("Whiskers"), new Dog("Buddy") };
+        for (Animal a : animals) {
+            a.introduce();
+        }
+    }
+}
+```
+
+**What the tests check:**
+- `Dog.speak()` returns `"Woof!"`
+- `Cat.speak()` returns `"Meow!"`
+- `introduce()` prints the correct full line for each animal
+
+<Note>Hint: `speak()` in the abstract class is declared with return type `String` — your overrides must also return a `String`. Make sure to add `public` to match the implicit interface contract.</Note>
+</Exercise>

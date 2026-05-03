@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTrack, getModule, curriculum } from "@/lib/curriculum";
+import { getCapstoneForModule } from "@/lib/capstones";
 import { Pill } from "@/components/ui/Pill";
 import {
   Clock,
@@ -56,7 +57,7 @@ export default async function ModulePage({ params }: ModulePageProps) {
   const prevMod = modIndex > 0 ? trackModules[modIndex - 1] : null;
   const nextMod = modIndex < trackModules.length - 1 ? trackModules[modIndex + 1] : null;
 
-  const hasCapstone = trackSlug === "java-beginner" && moduleSlug === "module-1";
+  const capstone = getCapstoneForModule(trackSlug, moduleSlug);
 
   return (
     <div className="mx-auto max-w-3xl px-6 pb-20 pt-10">
@@ -209,7 +210,7 @@ export default async function ModulePage({ params }: ModulePageProps) {
               <> Every lesson in this module is free. Enjoy.</>
             )}
           </p>
-          {hasCapstone && (
+          {capstone && (
             <p>
               The <strong className="font-semibold text-prose">Capstone Challenge</strong> at the end of this module is premium. It&rsquo;s a fully graded project that earns you a badge and certificate — the kind of thing worth putting in a portfolio.
             </p>
@@ -357,7 +358,7 @@ export default async function ModulePage({ params }: ModulePageProps) {
       )}
 
       {/* ── Capstone ─────────────────────────────────────────────────── */}
-      {hasCapstone && (
+      {capstone && (
         <div className="mt-4">
           <p
             className="text-prose-faint text-xs mb-3"
@@ -377,13 +378,13 @@ export default async function ModulePage({ params }: ModulePageProps) {
               <Trophy size={14} className="text-accent shrink-0" />
               <div>
                 <p className="text-sm font-medium text-prose-muted group-hover:text-prose transition-colors duration-100">
-                  Number Guessing Game
+                  {capstone.title}
                 </p>
                 <p
                   className="text-xs text-prose-faint mt-0.5"
                   style={{ fontFamily: "var(--font-mono)" }}
                 >
-                  ~30 min · 14 tests · badge + certificate
+                  {capstone.duration} · {capstone.totalTests} tests · badge + certificate
                 </p>
               </div>
             </div>
