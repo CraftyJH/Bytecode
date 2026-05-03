@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
+import { Lock, Code2 } from "lucide-react";
 
 const tracks = [
   { num: "01", title: "Java Beginner", progress: 0, total: 8, variant: "free" as const },
@@ -57,6 +58,36 @@ export default async function DashboardPage() {
             <Button as="a" href="/curriculum/java-beginner/module-1/lesson/hello-java" variant="primary" size="sm">
               Start lesson →
             </Button>
+          </Card>
+
+          {/* Playground card */}
+          <Card padding="lg">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <p
+                  className="text-prose-faint text-xs mb-3"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  // coding playground
+                </p>
+                <h2 className="text-lg font-semibold text-prose mb-1 tracking-tight">
+                  Playground
+                </h2>
+                <p className="text-sm text-prose-muted mb-5">
+                  Write and run any Java code freely — no lesson, no constraints.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button as="a" href="/dashboard/playground" variant="secondary" size="sm">
+                    <Code2 size={13} className="mr-1.5" />
+                    Open playground
+                  </Button>
+                  <span className="flex items-center gap-1 text-xs text-prose-faint">
+                    <Lock size={11} />
+                    Premium
+                  </span>
+                </div>
+              </div>
+            </div>
           </Card>
 
           {/* Path progress */}

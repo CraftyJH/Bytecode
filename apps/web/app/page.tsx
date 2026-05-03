@@ -8,6 +8,7 @@ import { Pricing } from "@/components/home/Pricing";
 import { ForumPreview } from "@/components/home/ForumPreview";
 import { FAQ } from "@/components/home/FAQ";
 import { FinalCTA } from "@/components/home/FinalCTA";
+import { AppDownload } from "@/components/home/AppDownload";
 
 export default function HomePage() {
   return (
@@ -18,6 +19,7 @@ export default function HomePage() {
         <WhyBytecode />
         <ThePath />
         <HowItWorks />
+        <AppDownload />
         <Pricing />
         <ForumPreview />
         <FAQ />

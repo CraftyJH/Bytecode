@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/Button";
 import { UserMenu } from "@/components/layout/UserMenu";
+import { MobileNav } from "@/components/layout/MobileNav";
 
 interface NavbarProps {
   user?: User | null;
@@ -49,20 +50,24 @@ export function Navbar({ user }: NavbarProps) {
           ))}
         </ul>
 
-        {/* Auth actions */}
+        {/* Right side */}
         <div className="flex items-center gap-3">
+          {/* Auth actions — hidden on mobile (handled by MobileNav drawer) */}
           {user ? (
             <UserMenu user={user} />
           ) : (
-            <>
+            <div className="hidden md:flex items-center gap-3">
               <Button as="a" href="/signin" variant="ghost" size="sm">
                 Sign in
               </Button>
               <Button as="a" href="/signup" variant="primary" size="sm">
                 Start free
               </Button>
-            </>
+            </div>
           )}
+
+          {/* Mobile hamburger */}
+          <MobileNav user={user} />
         </div>
       </nav>
     </header>

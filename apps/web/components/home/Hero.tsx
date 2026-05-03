@@ -118,8 +118,8 @@ export function Hero() {
             </div>
           </div>
 
-          {/* Right — live code block */}
-          <div className="lg:pl-4">
+          {/* Right — live code block (desktop only) */}
+          <div className="hidden lg:block lg:pl-4">
             <CodeBlock
               lines={heroCode}
               output={"Espresso — 2oz"}
