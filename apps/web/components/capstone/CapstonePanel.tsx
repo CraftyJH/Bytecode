@@ -7,7 +7,10 @@ import { PremiumGate } from "@/components/capstone/PremiumGate";
 import { Play, Send, ChevronDown, ChevronRight, Trophy, RotateCcw, Lightbulb } from "lucide-react";
 import type { GradeResult } from "@/lib/capstone";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+const CodeEditor = dynamic(
+  () => import("@/components/lesson/CodeEditor").then((m) => m.CodeEditor),
+  { ssr: false },
+);
 
 interface Props {
   capstoneId: string;
@@ -176,43 +179,10 @@ export function CapstonePanel({
 
       {/* Editor */}
       <div className="flex-1 min-h-0 relative">
-        <MonacoEditor
-          height="100%"
-          language="java"
+        <CodeEditor
           value={code}
-          onChange={(v) => setCode(v ?? "")}
-          theme="bytecode-dark"
-          options={{
-            fontSize: 13,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
-            lineNumbers: "on",
-            renderLineHighlight: "line",
-            padding: { top: 12, bottom: 12 },
-            readOnly: panelState === "passed",
-          }}
-          beforeMount={(monaco) => {
-            if (monaco.editor.getModel(monaco.Uri.parse("inmemory://bytecode-dark"))) return;
-            monaco.editor.defineTheme("bytecode-dark", {
-              base: "vs-dark",
-              inherit: true,
-              rules: [
-                { token: "keyword", foreground: "C77B3A", fontStyle: "bold" },
-                { token: "string", foreground: "A8C77B" },
-                { token: "comment", foreground: "4A5568", fontStyle: "italic" },
-                { token: "number", foreground: "79B8FF" },
-                { token: "type", foreground: "E8C77B" },
-              ],
-              colors: {
-                "editor.background": "#14141A",
-                "editor.foreground": "#CDD6E0",
-                "editor.lineHighlightBackground": "#1E1E28",
-                "editorLineNumber.foreground": "#3A3A4A",
-                "editorLineNumber.activeForeground": "#6B7280",
-              },
-            });
-          }}
+          onChange={setCode}
+          readOnly={panelState === "passed"}
         />
 
         {/* Premium gate overlay — shown on top of editor for non-premium users */}

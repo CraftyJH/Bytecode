@@ -43,9 +43,10 @@ function defineTheme(monaco: Monaco) {
 interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
+  readOnly?: boolean;
 }
 
-export function CodeEditor({ value, onChange }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, readOnly = false }: CodeEditorProps) {
   return (
     <Editor
       language="java"
@@ -67,6 +68,7 @@ export function CodeEditor({ value, onChange }: CodeEditorProps) {
         overviewRulerLanes: 0,
         hideCursorInOverviewRuler: true,
         scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
+        readOnly,
       }}
     />
   );
