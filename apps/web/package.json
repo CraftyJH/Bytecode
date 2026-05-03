@@ -9,9 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@codemirror/lang-java": "^6.0.2",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/state": "^6.6.0",
+    "@lezer/highlight": "^1.2.3",
     "@monaco-editor/react": "^4.7.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
+    "codemirror": "^6.0.2",
     "highlight.js": "^11.11.1",
     "lucide-react": "^1.14.0",
     "next": "16.2.4",

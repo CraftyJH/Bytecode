@@ -8,6 +8,7 @@ import { getLesson, getModule, getTrack, getPrevNext } from "@/lib/curriculum";
 import { buildMdxComponents } from "@/components/mdx/MdxComponents";
 import { LessonSidebar } from "@/components/lesson/LessonSidebar";
 import { CodePanel } from "@/components/lesson/CodePanel";
+import { LessonColumns } from "@/components/lesson/LessonColumns";
 import { ModuleProgress } from "@/components/lesson/ModuleProgress";
 import { Pill } from "@/components/ui/Pill";
 import { Clock, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
@@ -71,10 +72,20 @@ export default async function LessonPage({ params }: LessonPageProps) {
       />
 
       {/* ── Main two-column area ── */}
-      <div className="flex-1 flex flex-col lg:flex-row min-w-0">
-
+      <LessonColumns
+        hasCode={true}
+        codePanel={
+          <CodePanel
+            lessonSlug={lessonSlug}
+            trackSlug={trackSlug}
+            moduleSlug={moduleSlug}
+            starterCode={lesson.starterCode ?? "public class Main {\n    public static void main(String[] args) {\n        // write your code here\n    }\n}"}
+            expectedOutput={lesson.expectedOutput}
+          />
+        }
+      >
         {/* Left — lesson prose (60%) */}
-        <article className="flex-1 min-w-0 px-6 lg:px-10 py-10 lg:max-w-[65%]">
+        <article className="flex-1 min-w-0 px-6 lg:px-10 py-10 lg:max-w-[65%] pb-24 lg:pb-10">
 
           {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-1.5 text-xs text-prose-faint flex-wrap"
@@ -155,15 +166,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
             </div>
           </div>
         </article>
-
-        <CodePanel
-          lessonSlug={lessonSlug}
-          trackSlug={trackSlug}
-          moduleSlug={moduleSlug}
-          starterCode={lesson.starterCode ?? "public class Main {\n    public static void main(String[] args) {\n        // write your code here\n    }\n}"}
-          expectedOutput={lesson.expectedOutput}
-        />
-      </div>
+      </LessonColumns>
 
       <ModuleProgress lessons={mod.lessons} trackSlug={trackSlug} moduleSlug={moduleSlug} />
     </div>

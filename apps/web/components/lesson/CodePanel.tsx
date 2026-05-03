@@ -121,7 +121,7 @@ export function CodePanel({ lessonSlug, trackSlug, moduleSlug, starterCode, expe
 
   return (
     <aside
-      className="hidden lg:flex flex-col border-l w-[38%] shrink-0"
+      className="flex flex-col border-l w-full shrink-0"
       style={{
         borderColor: "var(--border-subtle)",
         position: "sticky",
