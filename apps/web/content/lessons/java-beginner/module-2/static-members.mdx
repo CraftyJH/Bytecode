@@ -89,6 +89,8 @@ class Item {
 
 So far every field and method you've written has been per-object: each Dog has its own `name`, each Counter its own `value`. Sometimes you want the opposite — one piece of data or one method that belongs to the **class**, not to any particular instance. That's what `static` is for.
 
+A helpful mental model: imagine a company's HR database. Each employee record holds that person's name, salary, and title — those are instance fields, one per employee. But there's also a single counter of total employees, and a company-wide method for computing tax brackets. Those are static — they belong to the company (class), not to any individual.
+
 ## Static fields
 
 A static field exists once, no matter how many objects you create:
@@ -187,6 +189,8 @@ class Circle {
 
 Convention: name `static final` constants in `UPPER_SNAKE_CASE`. The compiler will refuse any code that tries to reassign `Circle.PI`.
 
+<Note>Java's built-in `Math.PI` is itself a `static final double`. Whenever you see `Math.PI`, `Integer.MAX_VALUE`, or `Double.NaN` in code — those are all `static final` constants following exactly this pattern.</Note>
+
 ## Try it
 
 ```java
@@ -208,8 +212,38 @@ class Page {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Reading an instance field from a static method** → "non-static field cannot be referenced from a static context". The static method has no object to read from — it simply doesn't know which object's field you want.
+- **Accessing static through an instance reference** → `someUser.count` compiles but reads as if it were a per-object field. Always go through the class name: `User.count`. This is the clearest signal to every reader that the field is shared.
+- **Making everything static** → if you find yourself passing the same object repeatedly to static methods, those should probably be instance methods on that class. Static is not "simpler" — it just removes access to object state.
+- **Forgetting `final` on constants** → `static int PI = 3.14` is technically reassignable. Use `static final` (and uppercase the name) so the compiler enforces immutability.
+
+## Recap
+
+Static members are the bridge between procedural and object-oriented code. Utility methods (`Math.abs`, `Arrays.sort`), class-wide state (a running counter), and named constants are all natural uses. Instance members are for everything tied to a specific object's identity.
+
+- `static` makes a field or method belong to the class, not to any one instance
+- Access static members through the class name (`User.count`, `Math.max(...)`)
+- Static methods have no `this` — they can't read instance fields without an explicit object
+- Use static for utilities and class-wide state; use instance for behaviour tied to a specific object
+- `static final UPPER_SNAKE_CASE` is the standard for constants
+
+**Up next:** Inheritance — define one class as an extension of another and reuse its fields and methods.
+
+<Exercise>
 Add a static `count` field to `User` that tracks how many `User`s have been created. Each new `User` should increment it.
 
 ```java
@@ -231,34 +265,4 @@ class User {
 ```
 
 <Note>Hint: declare `static int count = 0;` on the class. Inside the constructor, write `this.name = name;` then `count++;` — the static field is in scope without any prefix.</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endFill} label="question 3 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **Reading an instance field from a static method** → "non-static field cannot be referenced from a static context". The static method has no object to read from.
-- **Accessing static through an instance reference** → `someUser.count` compiles but reads as if it were a per-object field. Always go through the class name: `User.count`.
-- **Making everything static** → if you find yourself passing the same object repeatedly to static methods, those should probably be instance methods on that class.
-- **Forgetting `final` on constants** → `static int PI = 3.14` is technically reassignable. Use `static final` (and uppercase the name).
-
-## Recap
-
-- `static` makes a field or method belong to the class, not to any one instance
-- Access static members through the class name (`User.count`, `Math.max(...)`)
-- Static methods have no `this` — they can't read instance fields without an explicit object
-- Use static for utilities and class-wide state; use instance for behaviour tied to a specific object
-- `static final UPPER_SNAKE_CASE` is the standard for constants
-
-**Up next:** Inheritance — define one class as an extension of another and reuse its fields and methods.
+</Exercise>

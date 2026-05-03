@@ -96,6 +96,8 @@ class Box {
 
 In the previous lesson you created a Dog and then assigned its fields one line at a time. That's tedious, easy to forget, and leaves the object in a half-built state between assignments. **Constructors** solve this: they're special methods that run automatically when an object is created, so you can supply all the data up front.
 
+Think of a constructor like a factory's assembly line. When you order `new Dog("Rex", 4)`, you're placing an order with the factory. The factory (constructor) takes your specifications, runs through the setup steps, and hands you back a fully built Dog — not a box of unassembled parts.
+
 ## A constructor is a method named after the class
 
 A constructor has the same name as the class, no return type, and runs once per object — when `new` is used:
@@ -175,6 +177,30 @@ class Dog {
 
 `new Dog()` calls the first; `new Dog("Rex", 4)` calls the second.
 
+## Constructor chaining with this(...)
+
+To avoid duplicating initialization logic across multiple constructors, one constructor can call another using `this(...)`:
+
+```java
+class Dog {
+    String name;
+    int age;
+    String breed;
+
+    Dog(String name, int age) {
+        this(name, age, "Unknown");   // delegate to the three-arg version
+    }
+
+    Dog(String name, int age, String breed) {
+        this.name = name;
+        this.age = age;
+        this.breed = breed;
+    }
+}
+```
+
+`this(...)` must be the first statement in the constructor body. This pattern keeps all the real initialization in one place and treats the shorter constructors as convenient shorthand.
+
 ## Try it
 
 ```java
@@ -195,8 +221,38 @@ class Point {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 3 of 4" />
+
+<Quiz data={quizzes.endOrder} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Giving the constructor a return type** → `void Dog(...)` is not a constructor; it's a regular method that happens to share the class's name. Constructors have no return type at all — not even `void`.
+- **Assigning a parameter to itself** → without `this.`, `name = name;` is a no-op. The field never gets written. The compiler won't warn you — add `@SuppressWarnings("SelfAssignment")` if you want a lint check.
+- **Forgetting that defining one constructor removes the default** → if you write `Dog(String name)`, then `new Dog()` no longer compiles unless you also write a no-arg constructor.
+- **Calling another constructor with plain `Dog(...)`** → you can chain to another constructor, but the syntax is `this(...)` on the first line, not `Dog(...)`.
+
+## Recap
+
+Constructors make objects self-consistent from the moment they're created. A well-designed class ensures there's no way to construct an object in an invalid state — the constructor validates inputs or sets safe defaults.
+
+- A constructor has the same name as the class and no return type
+- It runs once when `new` is used, and is the right place to initialise fields
+- `this.field = parameter;` is the idiom for writing the field when names collide
+- Java provides a default no-arg constructor only if you define no constructors yourself
+- Multiple constructors with different parameter lists let callers create objects different ways
+
+**Up next:** Instance methods — give your objects behaviour, not just data.
+
+<Exercise>
 Add a constructor to the `Dog` class so that `new Dog("Rex", 4)` creates a Dog with `name = "Rex"` and `age = 4`.
 
 ```java
@@ -216,34 +272,4 @@ class Dog {
 ```
 
 <Note>Hint: name the parameters `name` and `age` to match the fields, then use `this.name = name;` and `this.age = age;` inside the constructor body.</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 3 of 4" />
-
-<Quiz data={quizzes.endOrder} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **Giving the constructor a return type** → `void Dog(...)` is not a constructor; it's a regular method that happens to share the class's name. Constructors have no return type at all.
-- **Assigning a parameter to itself** → without `this.`, `name = name;` is a no-op. The field never gets written.
-- **Forgetting that defining one constructor removes the default** → if you write `Dog(String name)`, then `new Dog()` no longer compiles unless you also write a no-arg constructor.
-- **Calling another constructor with plain `Dog(...)`** → you can chain to another constructor, but the syntax is `this(...)` on the first line, not `Dog(...)`.
-
-## Recap
-
-- A constructor has the same name as the class and no return type
-- It runs once when `new` is used, and is the right place to initialise fields
-- `this.field = parameter;` is the idiom for writing the field when names collide
-- Java provides a default no-arg constructor only if you define no constructors yourself
-- Multiple constructors with different parameter lists let callers create objects different ways
-
-**Up next:** Instance methods — give your objects behaviour, not just data.
+</Exercise>

@@ -106,6 +106,8 @@ class Account {
 
 You've been writing fields as if anyone could touch them directly: `dog.age = -5;` is a perfectly legal assignment. That's a problem when those fields need to follow rules — a balance shouldn't go negative, an email needs an `@`, an age can't be a string. **Encapsulation** is the practice of hiding the fields behind methods so the class can enforce its own rules.
 
+Think of a vending machine. You can't reach inside and grab a snack directly — you interact through a defined interface (insert coin, press button). The machine's internal mechanics are hidden. If the machine needs to track inventory or reject insufficient payment, it does so on its own terms. That's encapsulation: a well-defined public interface, hidden internals.
+
 ## The `private` modifier
 
 Add `private` before a field, and only the class itself can read or write it:
@@ -199,6 +201,8 @@ class Person {
 
 This is **immutability** for a single field. `final` makes the compiler refuse a second assignment, and the lack of a setter prevents anyone from trying.
 
+<Note>In large codebases, blindly generating getters and setters for every field defeats the purpose of encapsulation. Ask: "does the caller legitimately need to change this?" If not, don't add a setter.</Note>
+
 ## Try it
 
 ```java
@@ -221,8 +225,38 @@ class Account {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 3 of 4" />
+
+<Quiz data={quizzes.endOrder} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Public fields with no validation** → if `balance` is public, any caller can write any value, and your invariants are unenforceable. Make fields private by default and add methods only when outside access is genuinely needed.
+- **Exposing every field with a getter and setter** → if a field shouldn't change after construction, leave the setter off. Getters and setters aren't free — each one is part of your class's public contract, and changing it later is a breaking change.
+- **Getter that returns a mutable internal object** → if `getItems()` returns the actual `List` field, callers can call `.clear()` on it and bypass your encapsulation. Return a copy or a read-only view.
+- **Validation in the wrong place** → if every caller has to remember to check `amount > 0`, eventually someone forgets. Put the check inside the setter or mutator method where it's enforced automatically.
+
+## Recap
+
+Encapsulation is the OOP principle that keeps classes manageable as they grow. A well-encapsulated class is a self-contained unit: you can change its internals (how it stores data, what algorithm it uses) without breaking anything outside, because the outside only interacts through the public methods.
+
+- `private` restricts a field or method to the class that declares it
+- `public` exposes a method or field to all code
+- Default to private fields + public methods — let the class be the gatekeeper of its own state
+- A getter exposes a read; a setter exposes a write (often with validation)
+- Omit setters for fields that should be immutable after construction; consider `final` to enforce that
+
+**Up next:** Static fields and methods — when something belongs to the class, not to an object.
+
+<Exercise>
 Make `balance` private, add `getBalance()` that returns it, and add `deposit(int amount)` that adds the amount only when `amount > 0` (otherwise it should do nothing).
 
 ```java
@@ -245,34 +279,4 @@ class BankAccount {
 ```
 
 <Note>Hint: change `int balance = 0;` to `private int balance = 0;`. Then write `public int getBalance()` and `public void deposit(int amount)`. Inside deposit, guard with `if (amount &gt; 0) balance += amount;`.</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 3 of 4" />
-
-<Quiz data={quizzes.endOrder} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **Public fields with no validation** → if `balance` is public, any caller can write any value, and your invariants are unenforceable. Make fields private by default.
-- **Exposing every field with a getter and setter** → if a field shouldn't change after construction, leave the setter off. Getters and setters aren't free — each one is part of your class's public contract.
-- **Getter that returns a mutable internal object** → if `getItems()` returns the actual `List` field, callers can call `.clear()` on it and bypass your encapsulation. Return a copy or a read-only view.
-- **Validation in the wrong place** → if every caller has to remember to check `amount > 0`, eventually someone forgets. Put the check inside the setter / mutator.
-
-## Recap
-
-- `private` restricts a field or method to the class that declares it
-- `public` exposes a method or field to all code
-- Default to private fields + public methods — let the class be the gatekeeper of its own state
-- A getter exposes a read; a setter exposes a write (often with validation)
-- Omit setters for fields that should be immutable after construction; consider `final` to enforce that
-
-**Up next:** Static fields and methods — when something belongs to the class, not to an object.
+</Exercise>

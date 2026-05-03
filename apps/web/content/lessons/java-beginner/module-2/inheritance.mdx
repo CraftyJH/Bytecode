@@ -101,6 +101,8 @@ class Dog extends Animal {
 
 When two classes share most of their data and behaviour, you don't have to copy code between them. **Inheritance** lets you declare one class as an extension of another — a `Dog` is an `Animal`, a `Manager` is an `Employee` — and reuse everything the parent already does.
 
+Think of it like specialization in biology. An Animal defines the general traits: every animal has a name, can make a sound, needs food. A Dog is an Animal with all those general traits, plus specific ones: it barks, fetches, and wags its tail. Inheritance in code mirrors this relationship: the subclass gets the parent's fields and methods automatically, then adds its own.
+
 ## `extends` — declaring a subclass
 
 Use `extends` to say "this class is a kind of that class":
@@ -205,6 +207,8 @@ A subclass inherits everything from its parent **except**:
 
 `public`, `protected`, and package-private members all come along automatically.
 
+<Note>If you need a subclass to access a parent's field directly, declare the field `protected` instead of `private`. `protected` is visible inside the class itself and in all subclasses, making it a middle ground between private and public.</Note>
+
 ## Try it
 
 ```java
@@ -228,8 +232,38 @@ class Cat extends Animal {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 3 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting `super(...)` when the parent has no no-arg constructor** → Java inserts an implicit `super()`. If the parent doesn't have one, you must call `super(args)` explicitly on the first line of the child constructor.
+- **Spelling override wrong** → without `@Override`, a typo creates a *new* method silently. The original inherited version keeps running unchanged. Always annotate intended overrides.
+- **Trying to inherit `private` members** → private is private even from subclasses. Declare the field `protected` if a subclass legitimately needs direct access, or expose a getter/setter.
+- **Inheritance for code reuse alone** → if a Truck isn't really an Engine, don't extend Engine just to share methods. Use composition (a Truck *has* an Engine field) instead. Inheritance should model a genuine "is a" relationship.
+
+## Recap
+
+Inheritance is powerful when used for genuine "is a" relationships. It eliminates duplication and provides a natural place to add shared behaviour. But it creates tight coupling — a change to the parent affects every subclass — so use it judiciously.
+
+- `class B extends A` makes B a subclass of A, inheriting non-private members
+- `super(args)` calls a parent constructor; must be the first statement of a child constructor
+- Override a method by writing the same signature in the subclass; annotate with `@Override`
+- `super.method(...)` calls the parent's version from within an override
+- Use inheritance only when there's a real "is a" relationship, not just for code sharing
+
+**Up next:** Polymorphism — one variable type, many runtime behaviours.
+
+<Exercise>
 Make `Dog` extend `Animal`. Override `speak()` so a Dog prints `<name> says woof!`.
 
 ```java
@@ -253,34 +287,4 @@ class Animal {
 ```
 
 <Note>Hint: `class Dog extends Animal` then a constructor `Dog(String name) { super(name); }`. Annotate the override with `@Override` and use the inherited `name` field.</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 3 of 4" />
-
-<Quiz data={quizzes.endFill} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **Forgetting `super(...)` when the parent has no no-arg constructor** → Java inserts an implicit `super()`. If the parent doesn't have one, you must call `super(args)` explicitly.
-- **Spelling override wrong** → without `@Override`, a typo creates a *new* method silently. Always annotate intended overrides.
-- **Trying to inherit `private` members** → private is private even from subclasses. Use `protected` or expose a getter/setter if a subclass legitimately needs the data.
-- **Inheritance for code reuse alone** → if a Truck isn't really an Engine, don't extend Engine just to share methods. Use composition (a Truck *has* an Engine) instead.
-
-## Recap
-
-- `class B extends A` makes B a subclass of A, inheriting non-private members
-- `super(args)` calls a parent constructor; must be the first statement of a child constructor
-- Override a method by writing the same signature in the subclass; annotate with `@Override`
-- `super.method(...)` calls the parent's version from within an override
-- Use inheritance only when there's a real "is a" relationship, not just for code sharing
-
-**Up next:** Polymorphism — one variable type, many runtime behaviours.
+</Exercise>

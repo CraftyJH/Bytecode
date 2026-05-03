@@ -179,6 +179,8 @@ The contract:
 
 Get this wrong and you'll have bugs that look like memory corruption: you put a key in a HashMap, then `get` returns null even though the equal key is right there.
 
+<Note>A very common error: override `equals` but forget `hashCode`. Everything seems fine until you add the object to a `HashSet` or use it as a `HashMap` key — then it silently fails to find it. Always override both.</Note>
+
 ## When to override the Big Three
 
 Override all three together for any class whose objects you want to compare by value, store in a `Set`, or use as `Map` keys. For purely behavioural classes (a `Logger`, a `RequestHandler`), the defaults are usually fine — there's no meaningful "equal Logger" concept.
@@ -215,8 +217,38 @@ class Point {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **`equals(Point p)` instead of `equals(Object o)`** → that's an overload, not an override. The framework's `equals(Object)` calls won't reach it. `@Override` will catch this mistake immediately — use it on every intended override.
+- **Overriding `equals` but not `hashCode`** → your objects appear equal but vanish into the wrong bucket of any HashMap or HashSet. The rule is simple: if you touch `equals`, touch `hashCode` in the same commit.
+- **Comparing strings with `==` inside `equals`** → for object fields like Strings, use `.equals()`. Only primitives (`int`, `double`, `boolean`, etc.) use `==` for value comparison.
+- **Including transient or derived state in equals** → only compare the fields that define the identity of the value. A cached computation, a logging counter, or a timestamp-of-last-access aren't part of "what makes this object equal to that one".
+
+## Recap
+
+The "Big Three" methods are what make Java objects play nicely with the rest of the ecosystem. Libraries, frameworks, and the JDK itself all call `equals`, `hashCode`, and `toString` — often implicitly. Getting them right is part of making your class a first-class citizen of the Java world.
+
+- Every class inherits `toString`, `equals`, and `hashCode` from `Object`
+- Override `toString` for readable output in logs, debuggers, and println
+- Override `equals(Object)` for value equality — guard with `instanceof` and cast inside
+- Override `hashCode` consistently with `equals` — equal objects must hash to the same value
+- Always annotate overrides with `@Override` so the compiler catches signature mistakes
+
+**End of module.** You now have the OOP foundation needed for collections, generics, interfaces, and most real-world Java code.
+
+<Exercise>
 Override `toString` and `equals` on `Point` so the output is `(1, 2)\ntrue\nfalse`.
 
 ```java
@@ -241,34 +273,4 @@ class Point {
 ```
 
 <Note>Hint: `toString` returns a String. For `equals`, take an Object parameter, check `instanceof Point`, cast to Point, and compare both x and y.</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endFill} label="question 3 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **`equals(Point p)` instead of `equals(Object o)`** → that's an overload, not an override. The framework's `equals(Object)` calls won't reach it. `@Override` will catch it; use it.
-- **Overriding `equals` but not `hashCode`** → your objects appear equal but vanish into the wrong bucket of any HashMap. Always override both together.
-- **Comparing strings with `==` inside `equals`** → for object fields like Strings, use `.equals()`. Only primitives use `==`.
-- **Including transient or derived state in equals** → only compare the fields that define the identity of the value. A cached computation isn't part of "what makes this object equal to that one".
-
-## Recap
-
-- Every class inherits `toString`, `equals`, and `hashCode` from `Object`
-- Override `toString` for readable output in logs, debuggers, and println
-- Override `equals(Object)` for value equality — guard with `instanceof` and cast inside
-- Override `hashCode` consistently with `equals` — equal objects must hash to the same value
-- Always annotate overrides with `@Override` so the compiler catches signature mistakes
-
-**End of module.** You now have the OOP foundation needed for collections, generics, interfaces, and most real-world Java code.
+</Exercise>

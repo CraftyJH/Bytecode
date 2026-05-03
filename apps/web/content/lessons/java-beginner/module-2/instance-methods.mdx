@@ -97,6 +97,8 @@ class Counter {
 
 A class without methods is just a record — somewhere to store data. The point of OOP is that objects also **do things**. An **instance method** is a method that runs in the context of one specific object and has free access to that object's fields through `this`.
 
+Think of a bank account object. The account holds a balance (data), but the balance alone isn't very useful. The account also needs to *do things* — deposit, withdraw, check the balance. Those actions are instance methods. They operate on the account they're called on, not on some generic account.
+
 ## Defining and calling instance methods
 
 Instance methods look like the static methods you already know, but without the `static` keyword:
@@ -161,6 +163,28 @@ System.out.println(r.isSquare());  // false
 
 This pattern — a tiny method that derives one value from the object's fields — is everywhere in Java. It's how you avoid scattering `width * height` across the rest of your code.
 
+## Methods that call other methods on the same object
+
+An instance method can call other instance methods on the same object simply by name:
+
+```java
+class Temperature {
+    double celsius;
+
+    Temperature(double c) { this.celsius = c; }
+
+    double toFahrenheit() {
+        return celsius * 9.0 / 5.0 + 32;
+    }
+
+    void printBoth() {
+        System.out.println(celsius + "°C = " + toFahrenheit() + "°F");
+    }
+}
+```
+
+Inside `printBoth`, the call `toFahrenheit()` is shorthand for `this.toFahrenheit()` — it calls the method on the same object.
+
 ## Static vs instance — when to use which
 
 Instance methods need an object. Static methods don't:
@@ -199,8 +223,37 @@ class Counter {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling an instance method without an object** → `bark();` from outside the class is a compile error. You must write `dog.bark();` so Java knows which Dog's `name` to use.
+- **Adding `static` to an instance method by accident** → static methods can't read instance fields. You'll get "non-static field cannot be referenced from a static context". This is the most common error for beginners adding methods to their classes.
+- **Returning a value from a `void` method** → declared return type and `return` statement must agree. Either change the type or remove the value.
+- **Mutating fields from outside the class when an instance method would be cleaner** → if `birthday()` exists, prefer `dog.birthday()` over `dog.age = dog.age + 1;` from elsewhere. The method centralizes the logic and keeps the change readable.
+
+## Recap
+
+Instance methods are where OOP starts to pay off: instead of scattered functions operating on bare data, you have objects that know how to manage themselves. The `dog.bark()` call reads like English — a specific dog is doing a specific thing.
+
+- Instance methods are defined without `static` and called as `object.method(args)`
+- Inside an instance method, fields are read and written through the implicit `this` reference
+- Static methods belong to the class; instance methods belong to a specific object
+- Methods can return computed values that depend on object state — keep these methods short and focused
+
+**Up next:** Encapsulation — hide your fields behind methods and stop other code from touching them directly.
+
+<Exercise>
 Add two instance methods to the `Dog` class:
 
 - `bark()` — prints `<name> says woof!` (where `<name>` is the dog's name)
@@ -231,33 +284,4 @@ class Dog {
 ```
 
 <Note>Hint: instance methods drop the `static` keyword. Inside the method body, `name` and `age` already refer to the current Dog's fields.</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endFill} label="question 3 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **Calling an instance method without an object** → `bark();` from outside the class is a compile error. You must write `dog.bark();` so Java knows which Dog's `name` to use.
-- **Adding `static` to an instance method by accident** → static methods can't read instance fields. You'll get "non-static field cannot be referenced from a static context".
-- **Returning a value from a `void` method** → declared return type and `return` statement must agree. Either change the type or remove the value.
-- **Mutating fields from outside the class when an instance method would be cleaner** → if `birthday()` exists, prefer `dog.birthday()` over `dog.age = dog.age + 1;` from elsewhere.
-
-## Recap
-
-- Instance methods are defined without `static` and called as `object.method(args)`
-- Inside an instance method, fields are read and written through the implicit `this` reference
-- Static methods belong to the class; instance methods belong to a specific object
-- Methods can return computed values that depend on object state — keep these methods short and focused
-
-**Up next:** Encapsulation — hide your fields behind methods and stop other code from touching them directly.
+</Exercise>

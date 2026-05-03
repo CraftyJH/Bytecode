@@ -131,6 +131,8 @@ String result = sb.toString();
 System.out.print(result);
 ```
 
+<Note>Every `+` between two Strings creates a new String object in memory. In a loop that runs 1000 times, that's 1000 temporary objects. `StringBuilder` reuses a single buffer — much more efficient for iterative construction.</Note>
+
 ## String.format()
 
 `String.format()` builds strings using placeholders — cleaner than chaining `+` for complex output:
@@ -147,6 +149,20 @@ System.out.println(report);
 
 Common format specifiers: `%s` for strings, `%d` for integers, `%f` or `%.2f` for floating-point numbers.
 
+## Useful String methods you'll reach for often
+
+```java
+String text = "  Hello, World!  ";
+System.out.println(text.trim());              // removes leading/trailing whitespace
+System.out.println(text.trim().startsWith("Hello")); // true
+System.out.println(text.trim().endsWith("!"));       // true
+System.out.println(text.indexOf("World"));   // 8
+System.out.println(text.isEmpty());          // false
+System.out.println("".isEmpty());            // true
+```
+
+`trim()` is especially useful when processing user input — it silently discards the accidental spaces that users type.
+
 ## Try it
 
 ```java
@@ -160,8 +176,38 @@ public class StringDemo {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Using `==` to compare strings** → almost always gives wrong results outside the string pool. Use `.equals()` every time, no exceptions.
+- **Expecting string methods to mutate** → `s.toUpperCase()` does not change `s`. Capture the return value: `s = s.toUpperCase();`. Forgetting this produces code that silently does nothing.
+- **Off-by-one in `substring`** → `substring(start, end)` includes the character at `start` but excludes the one at `end`. So `"hello".substring(1, 4)` is `"ell"`, not `"ello"`.
+- **Concatenating in a tight loop** → each `+` creates a new object. Use `StringBuilder.append()` when building strings iteratively. The performance difference is small for short strings but significant for hundreds or thousands of iterations.
+
+## Recap
+
+Strings are used in nearly every Java program, and the immutability model surprises many beginners. Once you understand that every method returns a new String rather than changing the old one, the whole API becomes predictable.
+
+- `String` is an immutable class; every method returns a new `String`
+- Key methods: `length()`, `charAt()`, `substring()`, `contains()`, `toUpperCase()`, `toLowerCase()`, `replace()`, `trim()`
+- Always compare string content with `.equals()`, never with `==`
+- Use `StringBuilder` for efficient loop-based string construction
+- `String.format()` produces readable formatted output using `%s`, `%d`, `%.2f` placeholders
+
+**Up next:** Object-Oriented Programming — Classes and Objects.
+
+<Exercise>
 Write a method `isPalindrome(String s)` that returns `true` if the string reads the same forwards and backwards (ignore case). Test it with at least three strings.
 
 ```java
@@ -181,34 +227,4 @@ public class Main {
 ```
 
 <Note>Hint: use a StringBuilder to reverse the string — new StringBuilder(clean).reverse().toString() — then compare with .equals().</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endFill} label="question 3 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **Using `==` to compare strings** → almost always gives wrong results outside the string pool. Use `.equals()` every time.
-- **Expecting string methods to mutate** → `s.toUpperCase()` does not change `s`. Capture the return value: `s = s.toUpperCase();`
-- **Off-by-one in `substring`** → `substring(start, end)` includes the character at `start` but excludes the one at `end`.
-- **Concatenating in a tight loop** → each `+` creates a new object. Use `StringBuilder.append()` when building strings iteratively.
-
-## Recap
-
-- `String` is an immutable class; every method returns a new `String`
-- Key methods: `length()`, `charAt()`, `substring()`, `contains()`, `toUpperCase()`, `toLowerCase()`, `replace()`, `trim()`
-- Always compare string content with `.equals()`, never with `==`
-- Use `StringBuilder` for efficient loop-based string construction
-- `String.format()` produces readable formatted output using `%s`, `%d`, `%.2f` placeholders
-
-**Up next:** Object-Oriented Programming — Classes and Objects.
+</Exercise>

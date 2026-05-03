@@ -101,6 +101,8 @@ public class Main {
 
 Inheritance gives subclasses their own behaviour. **Polymorphism** — literally "many forms" — is what happens when you write code that doesn't care *which* subclass it's working with: one variable type, multiple actual classes, each behaving as itself.
 
+The payoff is code that stays the same while the world around it grows. You write a loop that processes `Animal` objects. Next month someone adds a `Parrot` class. The loop doesn't change — it still calls `speak()`, and the Parrot speaks in its own way. That's polymorphism at work.
+
 ## A parent reference can hold any subclass
 
 If `Dog` extends `Animal`, a variable of type `Animal` can point to a `Dog`:
@@ -186,6 +188,8 @@ class Circle extends Shape {
 
 An `abstract` class can't be instantiated directly (`new Shape()` is a compile error). It's a contract: any concrete subclass must implement the abstract methods, or the compiler refuses.
 
+<Note>Abstract classes and interfaces (covered later) are how Java enforces contracts at compile time. If you want to guarantee that every Shape has an `area()` method, making it abstract is far more reliable than documentation or convention.</Note>
+
 ## Try it
 
 ```java
@@ -207,8 +211,38 @@ class Cat extends Animal {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endFill} label="question 3 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling a subclass-only method through a parent reference** → the compiler only sees what's declared on the parent type. Either change the variable's type or downcast with an `instanceof` check first. If you're doing this frequently, it's a sign the method should be on the parent.
+- **Casting without checking** → `(Dog) someAnimal` throws ClassCastException at runtime if the object isn't actually a Dog. The `instanceof` guard is not optional — it's the safety net that makes casts safe.
+- **Confusing overloading with overriding** → overloading varies parameters in the same class; overriding replaces an inherited method in a subclass. They're resolved at different times and behave differently. A common pitfall: `equals(MyClass other)` overloads instead of overriding `equals(Object o)`.
+- **Reaching for casts often** → if you find yourself casting all over the place, the design is fighting you. Lift the method up to the parent (or an abstract method) so polymorphism does the work.
+
+## Recap
+
+Polymorphism is the mechanism that lets Java code be open for extension but closed for modification. A loop that processes `Shape` objects works correctly today with Circle and Square, and will work correctly tomorrow when Triangle is added — without a single line of the loop changing.
+
+- A parent-typed variable can hold any subclass instance
+- Method calls are dispatched on the runtime type, not the declared type
+- The declared type controls which methods are *visible* to the compiler
+- `abstract` methods force subclasses to provide their own implementation
+- Polymorphism + a parent-typed collection = one loop, any number of behaviours
+
+**Up next:** `toString`, `equals`, and `hashCode` — the three methods every well-behaved class overrides.
+
+<Exercise>
 Loop through the `zoo` array and call `speak()` on each element. The output should be `Woof\nMeow\nSome sound`.
 
 ```java
@@ -233,34 +267,4 @@ class Cat extends Animal {
 ```
 
 <Note>Hint: a for-each loop is the cleanest tool here. `for (Animal a : zoo) a.speak();` — Java handles the dispatch automatically.</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endFill} label="question 3 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **Calling a subclass-only method through a parent reference** → the compiler only sees what's declared on the parent type. Either change the variable's type or downcast with `instanceof` first.
-- **Casting without checking** → `(Dog) someAnimal` throws ClassCastException at runtime if the object isn't actually a Dog. Always pair the cast with `instanceof`.
-- **Confusing overloading with overriding** → overloading varies parameters in the same class; overriding replaces an inherited method in a subclass. They're resolved at different times and behave differently.
-- **Reaching for casts often** → if you find yourself casting all over the place, the design is fighting you. Lift the method up to the parent (or an abstract method) so polymorphism does the work.
-
-## Recap
-
-- A parent-typed variable can hold any subclass instance
-- Method calls are dispatched on the runtime type, not the declared type
-- The declared type controls which methods are *visible* to the compiler
-- `abstract` methods force subclasses to provide their own implementation
-- Polymorphism + a parent-typed collection = one loop, any number of behaviours
-
-**Up next:** `toString`, `equals`, and `hashCode` — the three methods every well-behaved class overrides.
+</Exercise>

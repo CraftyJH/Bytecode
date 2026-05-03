@@ -72,6 +72,8 @@ System.out.println(nums[1]);`,
 
 An array is a fixed-size, ordered container that holds multiple values of the same type. Instead of declaring ten separate variables for ten scores, you declare one array. That makes your code shorter, and more importantly, it lets you process all the values with a loop.
 
+Think of an array like a row of numbered mailboxes in an apartment building. Each box has an address (the index), holds exactly one item, and the total number of boxes is fixed when the building is constructed. You can look up any box instantly by its number.
+
 ## Declaring and initializing arrays
 
 There are two common ways to create an array:
@@ -124,6 +126,24 @@ System.out.println(data.length); // 10
 
 If you need a resizable collection, you'll want `ArrayList` — that's covered in a later module.
 
+<Note>`array.length` (no parentheses) is a field on arrays. `string.length()` (with parentheses) is a method on Strings. This inconsistency trips up almost every Java beginner — you're not alone if you mix them up.</Note>
+
+## Modifying array elements
+
+Array elements are like regular variables: you can reassign them at any time by index.
+
+```java
+int[] values = {1, 2, 3, 4, 5};
+values[2] = 99;   // replace the third element
+
+for (int v : values) {
+    System.out.print(v + " ");
+}
+// Output: 1 2 99 4 5
+```
+
+Remember that the for-each loop variable is a *copy* — assigning to it does not change the array. You need an index-based loop if you want to modify elements.
+
 ## Try it
 
 ```java
@@ -142,25 +162,6 @@ public class ArrayAverage {
 }
 ```
 
-## Exercise
-
-Given an array of integers, find and print the largest value without using any helper library.
-
-```java
-public class Main {
-    public static void main(String[] args) {
-        int[] numbers = {34, 7, 23, 32, 5, 62};
-        int max = numbers[0];
-        // Loop through the array and update max when you find a larger value
-        System.out.println("Max: " + max);
-    }
-}
-```
-
-<Note>Hint: initialize max to the first element, then loop from index 1 onward — compare each element to max and reassign max if the element is larger.</Note>
-
----
-
 ## End-of-lesson quiz
 
 <Quiz data={quizzes.endQ1} label="question 1 of 4" />
@@ -175,12 +176,14 @@ public class Main {
 
 ## Common mistakes
 
-- **ArrayIndexOutOfBoundsException** → using `<= array.length` instead of `< array.length` in a loop is the most common cause.
-- **Confusing `.length` with `.length()`** → arrays use `.length` (field); Strings use `.length()` (method).
-- **Modifying elements in a for-each** → the loop variable is a copy of the element. Assigning to it does not change the array.
-- **Assuming arrays are initialized to your value** → numeric arrays default to `0`, boolean arrays to `false`, and object arrays to `null`. Verify before reading.
+- **ArrayIndexOutOfBoundsException** → using `<= array.length` instead of `< array.length` in a loop is the most common cause. Valid indices are always `0` through `length - 1`, not `length` itself.
+- **Confusing `.length` with `.length()`** → arrays use `.length` (field, no parentheses); Strings use `.length()` (method, with parentheses). The JVM will tell you clearly when you've mixed them up.
+- **Modifying elements in a for-each** → the loop variable is a copy of the element. `for (int x : arr) { x = 0; }` does nothing to the array. Use `arr[i] = 0` with an index-based loop instead.
+- **Assuming arrays are initialized to your value** → numeric arrays default to `0`, boolean arrays to `false`, and object arrays to `null`. Verify before reading if you need non-default starting values.
 
 ## Recap
+
+Arrays are the simplest way to manage a collection of values in Java. Their fixed size and zero-indexing take a little getting used to, but once they click you'll use them constantly — they underlie most data structures and algorithms you'll encounter.
 
 - Declare with `Type[] name = new Type[size]` or an array literal `{v1, v2, v3}`
 - Arrays are zero-indexed; valid indices are `0` to `length - 1`
@@ -189,3 +192,20 @@ public class Main {
 - Accessing an out-of-bounds index throws `ArrayIndexOutOfBoundsException` at runtime
 
 **Up next:** Strings.
+
+<Exercise>
+Given an array of integers, find and print the largest value without using any helper library.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        int[] numbers = {34, 7, 23, 32, 5, 62};
+        int max = numbers[0];
+        // Loop through the array and update max when you find a larger value
+        System.out.println("Max: " + max);
+    }
+}
+```
+
+<Note>Hint: initialize max to the first element, then loop from index 1 onward — compare each element to max and reassign max if the element is larger.</Note>
+</Exercise>
