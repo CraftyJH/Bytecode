@@ -42,7 +42,10 @@ export function UserMenu({ user }: UserMenuProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const isAdmin = user.app_metadata?.role === "admin";
+
   const items = [
+    ...(isAdmin ? [{ label: "Admin panel", href: "/admin" }] : []),
     { label: "Dashboard", href: "/dashboard" },
     { label: "Profile", href: "/me/profile" },
     { label: "Settings", href: "/me/settings" },
