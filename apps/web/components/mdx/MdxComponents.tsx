@@ -47,6 +47,41 @@ function Note({ children }: { children?: React.ReactNode }) {
   );
 }
 
+// Exercise block — visually distinct coding challenge at the bottom of each lesson
+function Exercise({ children }: { children?: React.ReactNode }) {
+  return (
+    <div
+      className="mt-10 rounded-lg border overflow-hidden"
+      style={{
+        borderColor: "rgba(199,123,58,0.45)",
+        backgroundColor: "var(--color-elevated)",
+      }}
+    >
+      <div
+        className="px-5 py-3 flex items-center gap-3"
+        style={{
+          borderBottom: "1px solid rgba(199,123,58,0.2)",
+          background: "rgba(199,123,58,0.08)",
+        }}
+      >
+        <span
+          className="text-xs font-semibold text-accent tracking-widest uppercase"
+          style={{ fontFamily: "var(--font-mono)" }}
+        >
+          Exercise
+        </span>
+        <span
+          className="text-xs text-prose-faint ml-auto"
+          style={{ fontFamily: "var(--font-mono)" }}
+        >
+          write your solution in the editor →
+        </span>
+      </div>
+      <div className="px-5 py-5">{children}</div>
+    </div>
+  );
+}
+
 type HtmlProps = React.HTMLAttributes<HTMLElement>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,6 +91,7 @@ export function buildMdxComponents(): Record<string, any> {
     pre: Pre,
     Quiz,
     Note,
+    Exercise,
     h1: (p: HtmlProps) => <h1 className="text-2xl font-semibold text-prose mt-8 mb-3 tracking-tight" {...p} />,
     h2: (p: HtmlProps) => <h2 className="text-xl font-semibold text-prose mt-7 mb-2.5 tracking-tight" {...p} />,
     h3: (p: HtmlProps) => <h3 className="text-base font-semibold text-prose mt-5 mb-2 tracking-tight" {...p} />,
