@@ -72,7 +72,7 @@ public class Main {
       { text: "It makes the interface automatically implement a lambda.", correct: false, feedback: "Lambdas implement interfaces — not the other way around. `@FunctionalInterface` does not generate any implementation." },
       { text: "It causes a compile error if the interface has more or fewer than one abstract method.", correct: true, feedback: "Correct — it is a compile-time guard. If you accidentally add a second abstract method, the compiler rejects the file immediately, catching the mistake early." },
       { text: "It prevents the interface from having `default` methods.", correct: false, feedback: "`@FunctionalInterface` interfaces may freely have `default` and `static` methods. Only the count of *abstract* methods is restricted to exactly one." },
-      { text: "It makes all implementing classes automatically serializable.", correct: false, feedback: "`@FunctionalInterface` is purely a design-time annotation with no runtime effect on serialization or anything else." },
+      { text: "It makes all implementing classes automatically serializable.", correct: false, feedback: "`@FunctionalInterface` is purely a design-time annotation with no runtime effect on serialisation or anything else." },
     ],
     explanation: "`@FunctionalInterface` is a documentation and compile-time-safety annotation. It tells both readers and the compiler 'this interface must have exactly one abstract method.' Adding a second abstract method immediately becomes a compile error, guarding the invariant that enables lambdas.",
     hint: "Annotations often enforce compile-time contracts. What contract does this annotation enforce?",

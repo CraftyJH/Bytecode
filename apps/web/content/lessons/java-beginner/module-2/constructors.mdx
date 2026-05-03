@@ -84,13 +84,13 @@ class Box {
     difficulty: "medium",
     prompt: "Put these steps in the correct order for constructing a new object with `new Dog(\"Rex\", 4)`:",
     items: [
-      { id: "a", text: "JVM allocates memory for a new Dog and zero-initializes its fields" },
+      { id: "a", text: "JVM allocates memory for a new Dog and zero-initialises its fields" },
       { id: "b", text: "The constructor runs, assigning name and age via this.name and this.age" },
       { id: "c", text: "The new operator returns a reference to the constructed object" },
       { id: "d", text: "The reference is stored in the variable on the left of `=`" },
     ],
     correctOrder: ["a", "b", "c", "d"],
-    explanation: "`new` first allocates and zero-initializes memory, then the constructor body executes to fill in fields, then the resulting reference is returned and assigned to the variable.",
+    explanation: "`new` first allocates and zero-initialises memory, then the constructor body executes to fill in fields, then the resulting reference is returned and assigned to the variable.",
   },
 };
 

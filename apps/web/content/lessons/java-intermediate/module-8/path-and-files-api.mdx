@@ -52,10 +52,10 @@ public class Main {
     options: [
       { text: "<code>a/b/../c</code> — unchanged.", correct: false, feedback: "normalize() actively rewrites the path to remove redundant elements." },
       { text: "<code>a/c</code>", correct: true },
-      { text: "<code>/a/c</code>", correct: false, feedback: "normalize doesn't add a leading slash; it only removes redundant '..' and '.' segments." },
-      { text: "It throws <code>InvalidPathException</code>.", correct: false, feedback: "The path is syntactically valid; normalize just simplifies it." },
+      { text: "<code>/a/c</code>", correct: false, feedback: "normalize() doesn't add a leading slash; it only removes redundant '..' and '.' segments." },
+      { text: "It throws <code>InvalidPathException</code>.", correct: false, feedback: "The path is syntactically valid; normalize() just simplifies it." },
     ],
-    explanation: "normalize collapses each '..' against the segment before it. So a/b/../c becomes a/c. It does NOT touch the filesystem — purely textual.",
+    explanation: "normalize() collapses each '..' against the segment before it. So a/b/../c becomes a/c. It does NOT touch the filesystem — purely textual.",
     hint: "Think of '..' as 'one step back from where I just was'.",
   },
   endQ4: {

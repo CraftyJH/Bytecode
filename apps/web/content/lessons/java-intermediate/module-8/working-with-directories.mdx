@@ -215,7 +215,7 @@ Files.copy(source, target, StandardCopyOption.COPY_ATTRIBUTES);
 - **Forgetting try-with-resources around `Files.list`/`Files.walk`** — the returned Stream owns an OS handle that must be released. Leaking handles eventually causes "too many open files" errors.
 - **Assuming directory listings are sorted** — they are not. Sort the stream yourself if order matters to you.
 - **Calling `Files.delete` on a non-empty directory** — throws `DirectoryNotEmptyException`. Walk and delete depth-first.
-- **Mixing `createDirectory` with paths that have missing parents** — fails. Use `createDirectories` unless you specifically want the strict behavior.
+- **Mixing `createDirectory` with paths that have missing parents** — fails. Use `createDirectories` unless you specifically want the strict behaviour.
 
 ## Recap
 

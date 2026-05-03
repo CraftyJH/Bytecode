@@ -50,7 +50,7 @@ export const quizzes = {
       { text: "They require the outer class to be instantiated before they can be used.", correct: false, feedback: "That requirement applies only to non-static inner classes. Static nested classes need no outer instance." },
       { text: "They cannot have their own static methods.", correct: false, feedback: "Static nested classes can have static and instance members, just like a regular class." },
     ],
-    explanation: "The keyword `static` removes the link to an enclosing instance. The class is grouped under the outer class for organization (think `Map.Entry`), but is otherwise a normal class.",
+    explanation: "The keyword `static` removes the link to an enclosing instance. The class is grouped under the outer class for organisation (think `Map.Entry`), but is otherwise a normal class.",
   },
   endQ3: {
     id: "sn-end-3",
@@ -125,7 +125,7 @@ The qualifier `Outer.` is only a namespace prefix — like writing `java.util.Li
 
 ## A real-world analogy: nested folders
 
-Picture a folder called `kitchen/` on your computer. Inside it you have a sub-folder called `recipes/`. Files inside `recipes/` are organized under `kitchen/`, but they are independent files — they don't require the `kitchen/` folder to be "open" or "running" to exist. A static nested class is the same idea: it lives inside a parent for grouping, but it is otherwise a self-sufficient unit.
+Picture a folder called `kitchen/` on your computer. Inside it you have a sub-folder called `recipes/`. Files inside `recipes/` are organised under `kitchen/`, but they are independent files — they don't require the `kitchen/` folder to be "open" or "running" to exist. A static nested class is the same idea: it lives inside a parent for grouping, but it is otherwise a self-sufficient unit.
 
 ## When to use a static nested class
 
@@ -247,7 +247,7 @@ If none of these apply, prefer a top-level class — fewer levels of nesting are
 
 ## Recap
 
-Static nested classes are the friendliest member of the nested-class family. They give you namespace organization and access to the outer class's private statics without the runtime overhead of capturing an enclosing instance.
+Static nested classes are the friendliest member of the nested-class family. They give you namespace organisation and access to the outer class's private statics without the runtime overhead of capturing an enclosing instance.
 
 - A **static nested class** is declared with `static` inside another class
 - It does **not** depend on an instance of the outer class

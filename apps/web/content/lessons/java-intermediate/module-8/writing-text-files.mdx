@@ -43,7 +43,7 @@ public class Main {
     prompt: "To append to an existing file instead of overwriting it, pass <code>StandardOpenOption.___</code> as an extra argument to <code>Files.writeString</code>.",
     correctAnswers: ["APPEND", "append"],
     caseSensitive: false,
-    explanation: "StandardOpenOption.APPEND tells the underlying writer to seek to the end of the file before writing. Without it, the default behavior truncates.",
+    explanation: "StandardOpenOption.APPEND tells the underlying writer to seek to the end of the file before writing. Without it, the default behaviour truncates.",
   },
   endQ3: {
     id: "wtf-end-3",
@@ -64,7 +64,7 @@ public class Main {
     difficulty: "medium",
     question: "What's the difference between <code>Files.write(p, lines)</code> (where <code>lines</code> is a <code>List&lt;String&gt;</code>) and <code>Files.writeString(p, content)</code>?",
     options: [
-      { text: "There is no difference — they're aliases.", correct: false, feedback: "They have different signatures and behaviors." },
+      { text: "There is no difference — they're aliases.", correct: false, feedback: "They have different signatures and behaviours." },
       { text: "<code>Files.write</code> writes each list element as its own line, adding line separators between them.", correct: true },
       { text: "<code>Files.write</code> only handles binary data.", correct: false, feedback: "There's an overload that takes byte[] for binary, but the List<String> version is text." },
       { text: "<code>Files.writeString</code> requires a Charset argument; <code>Files.write</code> does not.", correct: false, feedback: "Both default to UTF-8; both accept an optional Charset." },
@@ -73,7 +73,7 @@ public class Main {
   },
 };
 
-Writing text to a file is symmetric to reading it: one method call, no resource management, one important option to know about. This lesson covers `writeString`, `write`, and the open options that change their behavior.
+Writing text to a file is symmetric to reading it: one method call, no resource management, one important option to know about. This lesson covers `writeString`, `write`, and the open options that change their behaviour.
 
 ## The two main writes
 
@@ -97,7 +97,7 @@ The choice is just convenience: if you already have a String, use `writeString`.
 
 <Note>The directory containing the file must already exist. If <code>/tmp/some-dir/notes.txt</code> is the target but <code>/tmp/some-dir</code> doesn't exist, the call throws <code>NoSuchFileException</code>. Use <code>Files.createDirectories</code> to ensure the parent exists first.</Note>
 
-## Default behavior: TRUNCATE then WRITE
+## Default behaviour: TRUNCATE then WRITE
 
 By default, `writeString` and `write` follow these rules:
 

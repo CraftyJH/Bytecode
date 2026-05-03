@@ -94,7 +94,7 @@ public class Main {
   },
 };
 
-Lambdas (introduced in Java 8) and anonymous classes look like solutions to the same problem — express a small bit of behavior inline. But under the hood, they are different. The compiler treats them differently, the runtime allocates them differently, and several subtle semantics — especially the meaning of `this` — diverge.
+Lambdas (introduced in Java 8) and anonymous classes look like solutions to the same problem — express a small bit of behaviour inline. But under the hood, they are different. The compiler treats them differently, the runtime allocates them differently, and several subtle semantics — especially the meaning of `this` — diverge.
 
 This lesson clarifies when you can swap an anonymous class for a lambda, when you cannot, and what changes when you do.
 
@@ -108,7 +108,7 @@ Runnable a = new Runnable() {
     public void run() { System.out.println("hi"); }
 };
 
-// Lambda — same behavior, much shorter
+// Lambda — same behaviour, much shorter
 Runnable b = () -> System.out.println("hi");
 ```
 
@@ -172,7 +172,7 @@ A lambda implements exactly one abstract method, so it can't satisfy `ReadWrite`
 
 ### 3. You want to override a method that has a default implementation
 
-If you want a `Comparator<String>` whose `equals` you've overridden, a lambda only fills in `compare`. To customize `equals` you need an anonymous class.
+If you want a `Comparator<String>` whose `equals` you've overridden, a lambda only fills in `compare`. To customise `equals` you need an anonymous class.
 
 ### 4. You need state across calls
 
@@ -251,7 +251,7 @@ System.out.println(longA.test("elderberry"));   // true
 System.out.println(longB.test("fig"));          // false
 ```
 
-Both forms produce equivalent behavior; the lambda is shorter and produces leaner bytecode.
+Both forms produce equivalent behaviour; the lambda is shorter and produces leaner bytecode.
 
 <Quiz data={quizzes.midQ} label="quick check" />
 
@@ -278,7 +278,7 @@ Try converting the lambda comparator back into an anonymous class. Confirm the o
 
 ## Common mistakes
 
-- **Mechanically converting `this`.** Inside an anonymous class, `this.method()` calls a method on the anonymous instance. Move the body into a lambda and `this` now refers to the enclosing class instance — completely different behavior, but the compiler won't warn you.
+- **Mechanically converting `this`.** Inside an anonymous class, `this.method()` calls a method on the anonymous instance. Move the body into a lambda and `this` now refers to the enclosing class instance — completely different behaviour, but the compiler won't warn you.
 - **Trying to `extend` with a lambda.** Lambdas implement interfaces only. If your code needs to extend an abstract class, you cannot use a lambda — anonymous or named class is required.
 - **Targeting a non-functional interface.** A lambda can only implement an interface with exactly one abstract method. Adding a second abstract method to an interface silently makes existing lambda usages illegal — that's why standard-library functional interfaces are typically annotated `@FunctionalInterface` to prevent this drift.
 - **Adding instance state to a lambda.** Lambdas can't declare instance fields the way anonymous classes can. If you need a counter across calls, either use an anonymous class or capture an `AtomicInteger`.
@@ -286,14 +286,14 @@ Try converting the lambda comparator back into an anonymous class. Confirm the o
 
 ## Recap
 
-Lambdas are the modern default for inline behavior in Java, but anonymous classes still play a role. Knowing the boundary between them — and especially the `this` distinction — keeps your code clean and bug-free.
+Lambdas are the modern default for inline behaviour in Java, but anonymous classes still play a role. Knowing the boundary between them — and especially the `this` distinction — keeps your code clean and bug-free.
 
 - A **lambda** can replace an anonymous class only if the target is a **functional interface** (single abstract method)
 - Lambdas **cannot** extend a class, implement multi-method interfaces, or carry their own instance fields
 - Inside a lambda, `this` refers to the **enclosing class instance**; inside an anonymous class, `this` refers to the **anonymous instance**
 - Both lambdas and anonymous classes capture **effectively final** local variables
 - Lambdas are typically smaller in bytecode and may be cached by the JVM via `invokedynamic`
-- For one-off, single-method behavior, prefer a lambda; for richer needs, fall back to an anonymous or named class
+- For one-off, single-method behaviour, prefer a lambda; for richer needs, fall back to an anonymous or named class
 
 **Up next:** Module 8 — File I/O Basics. We'll start working with the file system using the modern `Path` and `Files` APIs.
 

@@ -47,7 +47,7 @@ export const quizzes = {
     difficulty: "medium",
     question: "Inside an anonymous class, what does the keyword `this` refer to?",
     options: [
-      { text: "The enclosing outer class instance.", correct: false, feedback: "That's the behavior of `this` inside a lambda. Inside an anonymous class, `this` refers to the anonymous instance itself." },
+      { text: "The enclosing outer class instance.", correct: false, feedback: "That's the behaviour of `this` inside a lambda. Inside an anonymous class, `this` refers to the anonymous instance itself." },
       { text: "The instance of the anonymous class itself.", correct: true, feedback: "Correct — like any class, an anonymous class has its own `this`. To reach the enclosing instance, you must write `OuterClass.this`." },
       { text: "Always `null`.", correct: false, feedback: "`this` is never `null` inside an instance method." },
       { text: "The supertype's static context.", correct: false, feedback: "`this` always refers to an instance, not to a class." },
@@ -192,7 +192,7 @@ public class Main {
 }
 ```
 
-This behavior is the most important difference between anonymous classes and lambdas — and the topic of the next lesson.
+This behaviour is the most important difference between anonymous classes and lambdas — and the topic of the next lesson.
 
 ## Anonymous classes for instant subclassing
 
@@ -262,7 +262,7 @@ Anonymous classes let you create a one-off implementation of an interface or a o
 - It can capture **effectively final** locals and access the enclosing instance's fields
 - Inside, `this` refers to the **anonymous instance**, not the enclosing one (use `OuterClass.this` for that)
 - It has no name, so no explicit constructor — use an instance initializer block for setup
-- Lambdas have replaced most simple uses, but anonymous classes are still required for multi-method overrides, class extension, and a few subtle `this` behaviors
+- Lambdas have replaced most simple uses, but anonymous classes are still required for multi-method overrides, class extension, and a few subtle `this` behaviours
 
 **Up next:** Lambdas vs Anonymous Classes — when you can switch, when you can't, and what changes when you do.
 

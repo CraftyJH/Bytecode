@@ -70,7 +70,7 @@ export const quizzes = {
     difficulty: "hard",
     question: "Which statement about per-constant bodies (`ADD { ... }`) is correct?",
     options: [
-      { text: "They are anonymous subclasses of the enum class.", correct: true, feedback: "Correct — each body produces a tiny anonymous subclass. That is why each constant can have its own behavior while still being of type `Op`." },
+      { text: "They are anonymous subclasses of the enum class.", correct: true, feedback: "Correct — each body produces a tiny anonymous subclass. That is why each constant can have its own behaviour while still being of type `Op`." },
       { text: "They generate a separate top-level class file you can refer to by name.", correct: false, feedback: "The compiler does emit synthetic class files (`Op$1.class`, etc.), but you cannot reference them by name." },
       { text: "They make the constant a different type from the enum, which causes `==` to fail.", correct: false, feedback: "The constant is still assignable to the enum type, and `==` works exactly as before because the constant is still a singleton." },
       { text: "They run a static initialiser instead of a constructor.", correct: false, feedback: "The constructor still runs. The body is for *method* overrides, not for replacing initialisation." },
@@ -80,7 +80,7 @@ export const quizzes = {
   },
 };
 
-In the previous lesson we gave an enum *data*: each constant carried its own value in `private final` fields. That works beautifully when the data alone is enough to drive behavior — `cents()` just returns a stored number. But sometimes the work each constant has to do is genuinely different: addition is not subtraction, and a JSON serializer is not a YAML serializer. For these cases Java lets each enum constant carry its own implementation of a method through **abstract methods with per-constant bodies**.
+In the previous lesson we gave an enum *data*: each constant carried its own value in `private final` fields. That works beautifully when the data alone is enough to drive behaviour — `cents()` just returns a stored number. But sometimes the work each constant has to do is genuinely different: addition is not subtraction, and a JSON serialiser is not a YAML serialiser. For these cases Java lets each enum constant carry its own implementation of a method through **abstract methods with per-constant bodies**.
 
 This is the closest thing Java's enums have to the classical Strategy pattern, and it is one of the most elegant features in the language once you see it in action.
 
@@ -165,7 +165,7 @@ If a developer adds `DEBUG` tomorrow, the compiler immediately complains until t
 
 ## Field-based dispatch vs. abstract methods
 
-There is more than one way to model per-constant behavior. Compare these two designs of the same operator enum:
+There is more than one way to model per-constant behaviour. Compare these two designs of the same operator enum:
 
 ### Field-based dispatch
 
@@ -284,7 +284,7 @@ Per-constant abstract methods turn an enum into a tiny, type-safe family of stra
 - Each constant body is syntactic sugar for an anonymous subclass of the enum.
 - The compiler forces completeness: forgetting a body is a compile error, not a runtime surprise.
 - Constants can combine constructor arguments and method bodies — `MUL("*") { ... }`.
-- Prefer this style when per-constant logic is non-trivial or when correctness on growth matters; a `switch` with a throwing `default` is fine for one-line behaviors.
+- Prefer this style when per-constant logic is non-trivial or when correctness on growth matters; a `switch` with a throwing `default` is fine for one-line behaviours.
 
 **Up next:** Enums Implementing Interfaces — once an enum has methods, it is a small step to making it satisfy an existing API contract such as `Comparable` or `Runnable`.
 

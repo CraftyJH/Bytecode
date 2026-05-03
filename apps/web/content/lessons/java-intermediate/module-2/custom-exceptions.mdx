@@ -55,7 +55,7 @@ public class Main {
       { text: "It is required by the compiler for all classes that extend Exception.", correct: false, feedback: "The compiler doesn't require it; if you omit it the no-arg `Exception()` constructor is called, giving a null message." },
       { text: "It stores the message in the parent class so that `getMessage()` returns it correctly.", correct: true },
       { text: "It causes the exception to print its message automatically.", correct: false, feedback: "Automatic printing happens via the stack trace mechanism, not `super(message)`. `super(message)` just stores the string." },
-      { text: "It initializes the `cause` field.", correct: false, feedback: "The cause is set by passing a `Throwable` as a second argument: `super(message, cause)`. A bare string only sets the message." },
+      { text: "It initialises the `cause` field.", correct: false, feedback: "The cause is set by passing a `Throwable` as a second argument: `super(message, cause)`. A bare string only sets the message." },
     ],
     explanation: "`Exception`'s constructor stores the message string so `getMessage()` can return it. Without `super(message)`, `getMessage()` returns null and stack traces print no detail.",
   },
@@ -249,7 +249,7 @@ class MyException extends Exception {
 }
 ```
 
-For most application code you will never actually serialize exceptions. Adding `serialVersionUID = 1L` is fine and silences the warning; the exact value doesn't matter as long as you don't change it after serializing instances to disk.
+For most application code you will never actually serialise exceptions. Adding `serialVersionUID = 1L` is fine and silences the warning; the exact value doesn't matter as long as you don't change it after serializing instances to disk.
 
 ## A realistic domain-level example
 
@@ -355,7 +355,7 @@ Custom exceptions extend Java's type system into your own domain. They make fail
 - Always call `super(message)` in every constructor to store the message
 - Provide a `(message, cause)` constructor overload so wrapping is always possible
 - Build hierarchies (`AppException` → specific subtypes) when you need uniform global handling plus specific local handling
-- Add `serialVersionUID = 1L` to silence the serialization warning; the exact value doesn't matter for most code
+- Add `serialVersionUID = 1L` to silence the serialisation warning; the exact value doesn't matter for most code
 
 **Up next:** Best Practices and Common Mistakes — try-with-resources, avoiding silent swallowing, and when NOT to use exceptions.
 

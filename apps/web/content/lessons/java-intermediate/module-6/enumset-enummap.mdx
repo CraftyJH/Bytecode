@@ -78,7 +78,7 @@ public class Main {
   },
 };
 
-The standard `HashMap` and `HashSet` are workhorses, but they pay for their generality. They hash, they handle collisions, they grow, and they wrap every primitive in a boxed object. When the keys come from a known, finite set — an enum — you can do *much* better. Java's `java.util` package ships two specialized collection types tailor-made for enum keys: `EnumSet` and `EnumMap`. Both are blazing fast, memory-efficient, and produce predictable iteration order. They are also genuinely pleasant to use.
+The standard `HashMap` and `HashSet` are workhorses, but they pay for their generality. They hash, they handle collisions, they grow, and they wrap every primitive in a boxed object. When the keys come from a known, finite set — an enum — you can do *much* better. Java's `java.util` package ships two specialised collection types tailor-made for enum keys: `EnumSet` and `EnumMap`. Both are blazing fast, memory-efficient, and produce predictable iteration order. They are also genuinely pleasant to use.
 
 ## EnumSet — a set as a bunch of bits
 
@@ -198,7 +198,7 @@ The asymptotic complexity is the same — O(1) — but the constant factors are 
 
 ## When NOT to use them
 
-These are specialized tools. Reach for the regular `HashSet` or `HashMap` when:
+These are specialised tools. Reach for the regular `HashSet` or `HashMap` when:
 
 - The keys are not from a single enum type — for example, mixed enums, strings, or arbitrary objects.
 - The set of legal keys is genuinely open-ended.
@@ -267,7 +267,7 @@ Every operation here — `put`, `get`, `add`, `remove` — is essentially an arr
 - Both iterate in **declaration order**, which is deterministic and predictable.
 - Neither is thread-safe — synchronize externally or pick a concurrent map if you share them between threads.
 
-You now have the full module-6 toolkit: declare an enum, give it data, give it behavior, plug it into interfaces, and store it in fast specialized collections. The next module pivots away from enums to nested and inner classes — another case of putting types where the data lives.
+You now have the full module-6 toolkit: declare an enum, give it data, give it behaviour, plug it into interfaces, and store it in fast specialised collections. The next module pivots away from enums to nested and inner classes — another case of putting types where the data lives.
 
 **Up next:** Static Nested Classes — a small helper type that lives inside a class without depending on any instance.
 
