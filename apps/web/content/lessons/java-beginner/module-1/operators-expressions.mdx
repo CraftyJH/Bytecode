@@ -86,6 +86,18 @@ Compound assignment operators are shorthand: `x += 5` is the same as `x = x + 5`
 
 <Quiz data={quizzes.midPredict} label="quick check" />
 
+## Increment and decrement
+
+Java has two shorthand operators for adding or subtracting 1:
+
+```java
+int count = 5;
+count++;          // count is now 6
+count--;          // count is back to 5
+```
+
+The `++` and `--` operators have a prefix and postfix form. As standalone statements they behave the same, but when embedded in a larger expression the order matters — `i++` returns the old value then increments, while `++i` increments first then returns. Stick to standalone use until you're comfortable with the difference.
+
 ## Comparison and logical operators
 
 Comparison operators return a `boolean`:
@@ -107,6 +119,8 @@ System.out.println(isAdult && hasTicket);  // true only if both
 System.out.println(isAdult || hasTicket);  // true if either
 System.out.println(!isAdult);              // flips the value
 ```
+
+`&&` and `||` are **short-circuit** operators: if the left side of `&&` is `false`, Java skips the right side entirely (it can't change the result). This matters when the right side has a side effect or could throw an exception.
 
 ## String concatenation
 
@@ -130,6 +144,8 @@ int result = 2 + 3 * 4;    // 14, not 20
 int clear  = (2 + 3) * 4;  // 20
 ```
 
+<Note>The modulo operator `%` is surprisingly useful. Checking `n % 2 == 0` tells you if `n` is even. Checking `index % size` wraps an index around a circular buffer. It comes up in almost every real program.</Note>
+
 ## Try it
 
 Predict the output, then run the code to confirm.
@@ -145,24 +161,6 @@ public class Operators {
 }
 ```
 
-## Exercise
-
-Write a program that calculates and prints the number of whole weeks and leftover days in a given number of days (use 100 days as the input).
-
-```java
-public class Main {
-    public static void main(String[] args) {
-        int totalDays = 100;
-        // Calculate whole weeks and leftover days
-        // Print: "Weeks: X, Days: Y"
-    }
-}
-```
-
-<Note>Hint: use / for whole weeks and % for the remaining days.</Note>
-
----
-
 ## End-of-lesson quiz
 
 <Quiz data={quizzes.endQ1} label="question 1 of 4" />
@@ -177,17 +175,35 @@ public class Main {
 
 ## Common mistakes
 
-- **int / int truncates** → `5 / 2` is `2`, not `2.5`. Cast one operand to `double` if you need decimals.
-- **String + int + int** → `"x=" + 1 + 2` gives `"x=12"`. Wrap the math in parentheses: `"x=" + (1 + 2)`.
+- **int / int truncates** → `5 / 2` is `2`, not `2.5`. Cast one operand to `double` if you need decimals: `(double) 5 / 2` gives `2.5`.
+- **String + int + int** → `"x=" + 1 + 2` gives `"x=12"`. Wrap the math in parentheses: `"x=" + (1 + 2)`. The rule is simple: once Java sees a String on either side of `+`, everything to the right becomes string concatenation unless you use parentheses.
 - **Using `=` in a condition** → `if (x = 5)` is a compile error in Java (unlike C). You want `==`.
-- **Confusing `&&` and `&`** → `&&` short-circuits (stops early if left side is false); `&` always evaluates both sides.
+- **Confusing `&&` and `&`** → `&&` short-circuits (stops early if left side is false); `&` always evaluates both sides. Prefer `&&` in conditions.
 
 ## Recap
+
+Operators are the vocabulary of expressions. Mastering integer division and short-circuit logic prevents a large class of subtle bugs. Any time output looks wrong, check whether you have an unintended `int / int` or misplaced string concatenation.
 
 - `+`, `-`, `*`, `/`, `%` are the arithmetic operators; `%` gives the remainder
 - `int / int` performs integer division and drops the decimal
 - `==`, `!=`, `>`, `<`, `>=`, `<=` compare values and return `boolean`
-- `&&` (AND), `||` (OR), `!` (NOT) combine boolean expressions
+- `&&` (AND), `||` (OR), `!` (NOT) combine boolean expressions; `&&` and `||` short-circuit
 - `+` concatenates strings; use parentheses to control evaluation order
 
 **Up next:** Control Flow.
+
+<Exercise>
+Write a program that calculates and prints the number of whole weeks and leftover days in a given number of days (use 100 days as the input).
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        int totalDays = 100;
+        // Calculate whole weeks and leftover days
+        // Print: "Weeks: X, Days: Y"
+    }
+}
+```
+
+<Note>Hint: use / for whole weeks and % for the remaining days.</Note>
+</Exercise>

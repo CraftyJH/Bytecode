@@ -75,6 +75,8 @@ Three things to notice:
 - `public static void main(String[] args)` — the special starting point. Memorize this signature; we'll explain every word over the next few lessons.
 - `System.out.println(...)` — prints text to the screen, then moves to a new line
 
+Think of the class like a blueprint for a building, and `main` as the front door — the one entrance the JVM uses when it runs your program. Every other room (method) exists inside the building, but the JVM always enters through that door first.
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Try it
@@ -87,8 +89,60 @@ Hello, Java
 
 Now try changing the string to your name and running again.
 
-## Exercise
+## print vs println
 
+Java gives you two similar-looking methods:
+
+```java
+System.out.println("Line one");   // prints text + newline
+System.out.print("Line two");     // prints text, cursor stays on the same line
+System.out.print(" continued");   // output: Line two continued
+```
+
+`println` adds a line break after the text. `print` does not. When you want output on separate lines, `println` is almost always what you want.
+
+<Note>You can print numbers, booleans, and other types the same way — `System.out.println(42)` and `System.out.println(true)` both work without any conversion.</Note>
+
+## What `public static void` means (briefly)
+
+You will understand every word of `public static void main(String[] args)` fully by lesson 6. For now:
+
+- `public` — anyone can call this method (the JVM needs to)
+- `static` — belongs to the class, not to an object
+- `void` — does not return a value
+- `String[] args` — command-line arguments (ignore for now)
+
+Don't try to memorize the *why* yet. Just recognize the signature when you see it.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting the semicolon** → `error: ';' expected`. Every statement ends with `;`. Think of it like the period at the end of a sentence — Java won't accept the sentence without it.
+- **Single quotes around text** → in Java, single quotes are for single characters (`'A'`), not strings. Use `"double quotes"` for any text longer than one character.
+- **Misspelling `main`** → the program compiles but won't run as a standalone application. The JVM looks for the exact name `main` — no other name works as the entry point.
+- **Wrong class name vs filename** → if the class is `public`, the filename must match exactly (including case). `HelloWorld.java` must contain `public class HelloWorld`.
+
+## Recap
+
+Java's static typing and verbose syntax pay off in large codebases: the compiler catches entire classes of errors before the program ever runs, and the explicit structure makes large programs easier to navigate. Every Java file you'll ever write starts with the same skeleton you saw today.
+
+- Java code lives in **classes**
+- `public static void main(String[] args)` is where execution starts
+- `System.out.println(...)` prints a line of text; `System.out.print(...)` stays on the same line
+- Statements end with `;`
+
+**Up next:** Storing values — variables and primitive types.
+
+<Exercise>
 Modify the program to print your name on a second line.
 
 ```java
@@ -105,30 +159,4 @@ public class Main {
 - Second line is non-empty
 
 <Note>Hint: add another `System.out.println(...)` line below the first one.</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 3" />
-
-<Quiz data={quizzes.endQ2} label="question 2 of 3" />
-
-<Quiz data={quizzes.endQ3} label="question 3 of 3" />
-
----
-
-## Common mistakes
-
-- **Forgetting the semicolon** → `error: ';' expected`. Every statement ends with `;`.
-- **Single quotes around text** → in Java, single quotes are for single characters (`'A'`), not strings. Use `"double quotes"` for text.
-- **Misspelling `main`** → the program compiles but won't run as a standalone application.
-
-## Recap
-
-- Java code lives in **classes**
-- `public static void main(String[] args)` is where execution starts
-- `System.out.println(...)` prints a line of text
-- Statements end with `;`
-
-**Up next:** Storing values — variables and primitive types.
+</Exercise>

@@ -68,6 +68,8 @@ System.out.println(grade);`,
 
 Java is a **statically typed** language — before you can store a value, you must tell the compiler exactly what kind of value it is. This might feel strict coming from other languages, but it catches entire categories of bugs before your program ever runs.
 
+Think of a variable as a labelled box. The type is the shape of the box — it determines what you're allowed to put inside. Once you declare `int age`, that box will only ever hold whole numbers. The compiler refuses to let you put a decimal or a word in it.
+
 ## Declaring variables
 
 The syntax is always: `type name = value;`
@@ -94,6 +96,22 @@ The other four — `byte`, `short`, `long`, `float` — exist for specific perfo
 
 <Quiz data={quizzes.midPredict} label="quick check" />
 
+## Type casting
+
+Sometimes you need to convert between numeric types. Java does some conversions automatically (called *widening*) and requires an explicit cast for others (*narrowing*):
+
+```java
+int whole = 7;
+double decimal = whole;          // widening: int → double, automatic
+System.out.println(decimal);     // 7.0
+
+double pi = 3.14159;
+int truncated = (int) pi;        // narrowing cast: decimal part dropped
+System.out.println(truncated);   // 3
+```
+
+<Note>A narrowing cast silently drops the decimal part — it does not round. `(int) 9.99` gives `9`, not `10`.</Note>
+
 ## Constants with final
 
 When a value should never change after it's first assigned, mark it `final`. By convention, constant names are written in SCREAMING_SNAKE_CASE.
@@ -105,6 +123,8 @@ final double TAX_RATE = 0.08;
 // This would cause a compile error:
 // MAX_RETRIES = 5;
 ```
+
+Using `final` communicates intent to everyone who reads the code: "this value is fixed by design, not by accident." It also lets the compiler catch accidental reassignment.
 
 ## Try it
 
@@ -123,23 +143,6 @@ public class Variables {
 }
 ```
 
-## Exercise
-
-Declare a `final double` constant named `GRAVITY` set to `9.81`, then print it.
-
-```java
-public class Main {
-    public static void main(String[] args) {
-        // Declare GRAVITY here
-        // Print GRAVITY here
-    }
-}
-```
-
-<Note>Hint: use the final keyword before the type, and end the name in all caps by convention.</Note>
-
----
-
 ## End-of-lesson quiz
 
 <Quiz data={quizzes.endQ1} label="question 1 of 4" />
@@ -154,12 +157,15 @@ public class Main {
 
 ## Common mistakes
 
-- **Assigning a decimal to an int** → `int x = 1.5;` is a compile error. Use `double` for decimals.
-- **Forgetting `L` on long literals** → `long n = 10000000000;` won't compile. Write `10000000000L`.
+- **Assigning a decimal to an int** → `int x = 1.5;` is a compile error. The compiler won't quietly truncate — you must use `double` or cast explicitly with `(int)`.
+- **Forgetting `L` on long literals** → `long n = 10000000000;` won't compile because the literal overflows `int` before the assignment. Write `10000000000L`.
 - **Using `=` instead of `==`** → `=` assigns a value; `==` compares two values. Mixing them up causes logic bugs or compile errors.
-- **Comparing with `==` for non-primitive types** → for `String` and other objects, use `.equals()`, not `==`.
+- **Comparing with `==` for non-primitive types** → for `String` and other objects, `==` compares memory addresses, not content. Use `.equals()` instead — you'll see this in the Strings lesson.
+- **Widening vs narrowing confusion** → Java widens automatically (int → double) but never narrows automatically. If you want to convert from double to int you must write the cast `(int)` explicitly.
 
 ## Recap
+
+Static typing is one of Java's biggest strengths for large codebases. When the compiler knows the type of every variable, it can catch type mismatches immediately and tooling (like your IDE) can give accurate autocomplete. The small upfront cost of declaring types pays off quickly.
 
 - Every variable has a fixed type declared before its name
 - The four workhorse primitives: `int`, `double`, `boolean`, `char`
@@ -168,3 +174,18 @@ public class Main {
 - `long` literals need an `L` suffix; `float` literals need an `F` suffix
 
 **Up next:** Operators and Expressions.
+
+<Exercise>
+Declare a `final double` constant named `GRAVITY` set to `9.81`, then print it.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // Declare GRAVITY here
+        // Print GRAVITY here
+    }
+}
+```
+
+<Note>Hint: use the final keyword before the type, and end the name in all caps by convention.</Note>
+</Exercise>

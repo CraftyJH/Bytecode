@@ -85,6 +85,8 @@ export const quizzes = {
 
 Methods are named, reusable blocks of code. Instead of writing the same logic in five places, you write it once as a method and call it wherever you need it. Good methods are short, focused, and named so clearly that the call site reads like plain English.
 
+Think of a method like a recipe. You write the recipe once (the method definition), and then you can follow it as many times as you like (the method calls). Each time you follow it you may use different ingredients (parameters) but the steps are the same.
+
 ## Declaring and calling methods
 
 Every method has a return type, a name, a parameter list (possibly empty), and a body:
@@ -134,6 +136,8 @@ static double add(double a, double b) {
 
 Overloading is useful for convenience methods that work with different types. Don't overload just to avoid naming things — different behaviour should usually get different names.
 
+<Note>Overloading is resolved at compile time based on the argument types the compiler can see. If you pass `3` and `4`, the compiler picks the `int` version. If you pass `3.0` and `4.0`, it picks `double`. There's no runtime guesswork involved.</Note>
+
 ## Variable scope
 
 A variable only exists within the block `{}` where it was declared. This is called **scope**:
@@ -153,6 +157,24 @@ static void scopeDemo() {
 
 Local variables (declared inside a method) are only visible within that method. They cease to exist when the method returns. Parameters behave like local variables — they're copies of the values passed in, not references to the originals (for primitives).
 
+## Passing by value
+
+When you pass a primitive to a method, Java copies the value. Changes inside the method don't affect the original:
+
+```java
+static void tryToChange(int n) {
+    n = 999;   // changes only the local copy
+}
+
+public static void main(String[] args) {
+    int x = 5;
+    tryToChange(x);
+    System.out.println(x);   // still 5
+}
+```
+
+This is called **pass by value**. It's one of the most common sources of "why didn't my variable change?" confusion for new Java programmers.
+
 ## Try it
 
 ```java
@@ -171,8 +193,38 @@ public class Scope {
 }
 ```
 
-## Exercise
+## End-of-lesson quiz
 
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+
+<Quiz data={quizzes.endChoice} label="question 2 of 4" />
+
+<Quiz data={quizzes.endBug} label="question 3 of 4" />
+
+<Quiz data={quizzes.endOrder} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting `return`** → a non-void method without a reachable `return` statement is a compile error. The compiler tracks every possible code path and demands that all of them return a value.
+- **Using a variable outside its scope** → declaring a variable inside an `if` block and trying to read it after the block ends causes a compile error. Move the declaration to the enclosing scope if you need it later.
+- **Thinking parameters are the original variables** → modifying a primitive parameter inside a method does not affect the variable at the call site. Java passes a copy of the value, not a reference to the variable itself.
+- **Overloading with the same parameters, different return type** → Java does not allow this. The return type alone is not enough to distinguish overloads; only parameter types matter.
+
+## Recap
+
+Well-named methods are one of the biggest quality improvements you can make to code. A method called `calculateMonthlyPayment` communicates far more than the same 10 lines of arithmetic scattered inline. Breaking code into methods also makes it easier to test, to reuse, and to debug one piece at a time.
+
+- Methods have: return type, name, parameter list, and a body
+- `void` methods perform actions; non-void methods compute and return a value
+- `return` provides the value and exits the method immediately
+- Overloading lets multiple methods share a name when their parameters differ
+- Variables are scoped to the block `{}` where they are declared
+
+**Up next:** Arrays.
+
+<Exercise>
 Write two overloaded `max` methods: one that takes two `int` parameters and returns the larger one, and one that takes three `int` parameters and returns the largest. Call both from `main` and print the results.
 
 ```java
@@ -189,34 +241,4 @@ public class Main {
 ```
 
 <Note>Hint: the three-argument version can reuse the two-argument version — call max(a, b) to get the bigger of the first two, then call max(result, c).</Note>
-
----
-
-## End-of-lesson quiz
-
-<Quiz data={quizzes.endQ1} label="question 1 of 4" />
-
-<Quiz data={quizzes.endChoice} label="question 2 of 4" />
-
-<Quiz data={quizzes.endBug} label="question 3 of 4" />
-
-<Quiz data={quizzes.endOrder} label="question 4 of 4" />
-
----
-
-## Common mistakes
-
-- **Forgetting `return`** → a non-void method without a reachable `return` statement is a compile error.
-- **Using a variable outside its scope** → declaring a variable inside an `if` block and trying to read it after the block ends causes a compile error.
-- **Thinking parameters are the original variables** → modifying a primitive parameter inside a method does not affect the variable at the call site.
-- **Overloading with the same parameters, different return type** → Java does not allow this. The return type alone is not enough to distinguish overloads.
-
-## Recap
-
-- Methods have: return type, name, parameter list, and a body
-- `void` methods perform actions; non-void methods compute and return a value
-- `return` provides the value and exits the method immediately
-- Overloading lets multiple methods share a name when their parameters differ
-- Variables are scoped to the block `{}` where they are declared
-
-**Up next:** Arrays.
+</Exercise>

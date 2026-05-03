@@ -127,6 +127,8 @@ public class DoWhile {
 }
 ```
 
+This is useful for situations like "prompt the user until they give valid input" — you always want to run the prompt at least once.
+
 ## break and continue
 
 `break` exits the loop immediately. `continue` skips the rest of the current iteration and moves to the next:
@@ -138,6 +140,27 @@ for (int i = 0; i < 10; i++) {
     System.out.println(i);  // prints 1, 3, 5
 }
 ```
+
+<Note>Overusing `break` can make loops hard to reason about. If you find yourself adding multiple `break` statements, consider whether a better loop condition or a different loop structure would be cleaner.</Note>
+
+## Nested loops
+
+Loops can be placed inside other loops. The inner loop completes fully for each iteration of the outer loop:
+
+```java
+for (int row = 1; row <= 3; row++) {
+    for (int col = 1; col <= 3; col++) {
+        System.out.print(row * col + " ");
+    }
+    System.out.println();
+}
+// Output:
+// 1 2 3
+// 2 4 6
+// 3 6 9
+```
+
+Watch out for performance: if both loops run `n` times, the body executes `n²` times. For large inputs this can be very slow.
 
 ## Try it
 
@@ -153,24 +176,6 @@ public class SumLoop {
 }
 ```
 
-## Exercise
-
-Print all multiples of 3 from 3 to 30, one per line. Then print their total.
-
-```java
-public class Main {
-    public static void main(String[] args) {
-        int total = 0;
-        // Your loop here
-        System.out.println("Total: " + total);
-    }
-}
-```
-
-<Note>Hint: use the % operator to check divisibility, or simply start your loop at 3 and step by 3 each time using i += 3.</Note>
-
----
-
 ## End-of-lesson quiz
 
 <Quiz data={quizzes.endQ1} label="question 1 of 4" />
@@ -185,12 +190,14 @@ public class Main {
 
 ## Common mistakes
 
-- **Off-by-one errors** → `i < n` iterates n times (0 through n-1); `i <= n` iterates n+1 times (0 through n).
-- **Infinite loops** → forgetting to update the loop variable in a `while` loop. The program hangs silently.
-- **Modifying the loop variable inside the body** → changing `i` inside a `for` loop body makes the iteration count unpredictable.
+- **Off-by-one errors** → `i < n` iterates n times (0 through n-1); `i <= n` iterates n+1 times (0 through n). When in doubt, trace through the first and last iteration manually.
+- **Infinite loops** → forgetting to update the loop variable in a `while` loop. The program hangs silently. Always ask yourself: "what makes this condition eventually false?"
+- **Modifying the loop variable inside the body** → changing `i` inside a `for` loop body makes the iteration count unpredictable. Update `i` only in the for-header's update expression.
 - **Using `break` too eagerly** → sometimes a well-crafted condition is cleaner than `break`. Reach for it when the exit condition is genuinely complex.
 
 ## Recap
+
+Loops are one of the most powerful tools in programming — they turn code that would take thousands of manual lines into a handful. The key is always knowing what controls the number of iterations and making sure that control eventually ends the loop.
 
 - `for` loops are best when the iteration count is known: `for (init; condition; update)`
 - `while` loops run as long as a condition is true — check for infinite loop risk
@@ -199,3 +206,19 @@ public class Main {
 - Off-by-one errors (`<` vs `<=`) are among the most common loop bugs
 
 **Up next:** Methods and Scope.
+
+<Exercise>
+Print all multiples of 3 from 3 to 30, one per line. Then print their total.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        int total = 0;
+        // Your loop here
+        System.out.println("Total: " + total);
+    }
+}
+```
+
+<Note>Hint: use the % operator to check divisibility, or simply start your loop at 3 and step by 3 each time using i += 3.</Note>
+</Exercise>

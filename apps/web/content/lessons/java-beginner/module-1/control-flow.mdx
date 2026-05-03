@@ -99,6 +99,8 @@ if (temperature >= 30) {
 
 Java checks each condition top-to-bottom and stops at the first one that's true. Order matters: put the most specific (or highest-value) conditions first.
 
+Think of an `else-if` chain like a series of filters on a conveyor belt. As soon as a filter catches the value, the rest are skipped. Only one branch runs per execution.
+
 <Quiz data={quizzes.midPredict} label="quick check" />
 
 ## The ternary operator
@@ -113,6 +115,8 @@ System.out.println(label);  // adult
 ```
 
 Use ternary for simple value selection. For anything with side effects or multiple statements, stick with a regular `if/else`.
+
+<Note>Nested ternary expressions — `a ? b : c ? d : e` — are technically valid but quickly become hard to read. If you need more than one level of nesting, switch to an `if/else if/else` chain instead.</Note>
 
 ## switch
 
@@ -169,23 +173,6 @@ public class ControlFlow {
 }
 ```
 
-## Exercise
-
-Write a program that takes an integer `hour` (0–23) and prints `"Good morning"` for hours 5–11, `"Good afternoon"` for 12–17, `"Good evening"` for 18–21, and `"Good night"` otherwise.
-
-```java
-public class Main {
-    public static void main(String[] args) {
-        int hour = 14;
-        // Write your if/else-if/else chain here
-    }
-}
-```
-
-<Note>Hint: use {">="} and {"<="} together to check a range, e.g. hour {">="} 5 && hour {"<="} 11.</Note>
-
----
-
 ## End-of-lesson quiz
 
 <Quiz data={quizzes.endQ1} label="question 1 of 4" />
@@ -200,12 +187,14 @@ public class Main {
 
 ## Common mistakes
 
-- **Omitting `{}`** → adding a second line to an if body without braces silently breaks the logic.
-- **Missing `break` in traditional switch** → execution falls through to the next case. Use the arrow form to avoid this entirely.
-- **Condition order in else-if** → if a broad condition comes first, narrower ones below it are never reached.
+- **Omitting `{}`** → adding a second line to an if body without braces silently breaks the logic. Only the first line is guarded by the condition; the second runs unconditionally. This is one of the most dangerous "looks fine at a glance" bugs.
+- **Missing `break` in traditional switch** → execution falls through to the next case automatically. Use the arrow form (`->`) to eliminate this risk entirely, or add `break` to every case.
+- **Condition order in else-if** → if a broad condition comes first (`score >= 60`), narrower ones below it (`score >= 90`) are never reached for any score above 60.
 - **Assignment in condition** → `if (x = 5)` won't compile in Java, but double-check you mean `==` for comparison.
 
 ## Recap
+
+Branching logic is how programs adapt to their inputs. The single most important habit here is always using braces — the short-term convenience of dropping them is not worth the long-term debugging pain.
 
 - `if / else if / else` selects a branch based on boolean conditions — evaluated top to bottom
 - Always wrap bodies in `{}`, even single statements
@@ -214,3 +203,18 @@ public class Main {
 - Order conditions from most specific to least specific
 
 **Up next:** Loops.
+
+<Exercise>
+Write a program that takes an integer `hour` (0–23) and prints `"Good morning"` for hours 5–11, `"Good afternoon"` for 12–17, `"Good evening"` for 18–21, and `"Good night"` otherwise.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        int hour = 14;
+        // Write your if/else-if/else chain here
+    }
+}
+```
+
+<Note>Hint: use {">="} and {"<="} together to check a range, e.g. hour {">="} 5 && hour {"<="} 11.</Note>
+</Exercise>
