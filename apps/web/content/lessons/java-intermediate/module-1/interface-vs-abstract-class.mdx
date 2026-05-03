@@ -62,15 +62,15 @@ public class Main {
     id: "ivsa-end-3",
     type: "order_the_steps",
     difficulty: "medium",
-    question: "Order these design steps when deciding between an interface and an abstract class:",
-    steps: [
-      "Ask: does the contract need to be adopted by unrelated classes?",
-      "Ask: is there concrete implementation or state to share?",
-      "If yes to unrelated classes and no to shared state → choose interface.",
-      "If yes to shared state or constructor logic → choose abstract class.",
-      "Consider combining both: abstract class implements an interface.",
+    prompt: "Order these design steps when deciding between an interface and an abstract class:",
+    items: [
+      { id: "a", text: "Ask: does the contract need to be adopted by unrelated classes?" },
+      { id: "b", text: "Ask: is there concrete implementation or state to share?" },
+      { id: "c", text: "If yes to unrelated classes and no to shared state → choose interface." },
+      { id: "d", text: "If yes to shared state or constructor logic → choose abstract class." },
+      { id: "e", text: "Consider combining both: abstract class implements an interface." },
     ],
-    correctOrder: [0, 1, 2, 3, 4],
+    correctOrder: ["a", "b", "c", "d", "e"],
     explanation: "The decision starts with the breadth of the contract (interface wins for cross-cutting concerns) and then inspects whether shared implementation demands an abstract class. The best designs often use both: an interface defines the public API and an abstract class provides the common implementation skeleton.",
   },
   endQ4: {
