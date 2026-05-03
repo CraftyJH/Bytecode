@@ -10,6 +10,7 @@ interface QuizBase {
   type: QuizType;
   explanation: string;
   difficulty: "easy" | "medium" | "hard";
+  hint?: string;
 }
 
 export interface MultipleChoiceQuiz extends QuizBase {

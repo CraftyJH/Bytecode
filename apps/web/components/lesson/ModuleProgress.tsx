@@ -36,7 +36,10 @@ export function ModuleProgress({ lessons, trackSlug, moduleSlug }: ModuleProgres
   const count = completed.length;
   const pct = total > 0 ? count / total : 0;
 
-  const r = 18;
+  const SIZE = 64;
+  const STROKE = 4;
+  const CENTER = SIZE / 2;
+  const r = CENTER - STROKE;
   const circ = 2 * Math.PI * r;
   const dash = pct * circ;
 
@@ -102,48 +105,61 @@ export function ModuleProgress({ lessons, trackSlug, moduleSlug }: ModuleProgres
       <button
         onClick={() => setOpen((v) => !v)}
         title={`${count}/${total} lessons complete`}
-        className="w-12 h-12 rounded-full border flex items-center justify-center relative cursor-pointer hover:border-accent transition-colors duration-100"
+        className="rounded-full border flex items-center justify-center cursor-pointer transition-all duration-150 ease-out hover:scale-110 hover:shadow-lg"
         style={{
+          width: SIZE,
+          height: SIZE,
           backgroundColor: "var(--color-elevated)",
           borderColor: open ? "var(--color-accent)" : "var(--border-emphasis)",
+          boxShadow: open ? "0 0 0 2px rgba(199, 123, 58, 0.25)" : undefined,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = "var(--color-accent)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = open
+            ? "var(--color-accent)"
+            : "var(--border-emphasis)";
         }}
       >
-        <svg
-          width="44"
-          height="44"
-          viewBox="0 0 44 44"
-          className="absolute inset-0 -rotate-90"
-          style={{ transform: "rotate(-90deg)" }}
-        >
+        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
           {/* Track */}
           <circle
-            cx="22"
-            cy="22"
+            cx={CENTER}
+            cy={CENTER}
             r={r}
             fill="none"
             stroke="var(--border-subtle)"
-            strokeWidth="2.5"
+            strokeWidth={STROKE}
           />
-          {/* Progress arc */}
+          {/* Progress arc — rotated only on this circle so text stays upright */}
           {pct > 0 && (
             <circle
-              cx="22"
-              cy="22"
+              cx={CENTER}
+              cy={CENTER}
               r={r}
               fill="none"
               stroke="var(--color-accent)"
-              strokeWidth="2.5"
+              strokeWidth={STROKE}
               strokeDasharray={`${dash} ${circ - dash}`}
               strokeLinecap="round"
+              transform={`rotate(-90 ${CENTER} ${CENTER})`}
             />
           )}
+          {/* Centered label */}
+          <text
+            x={CENTER}
+            y={CENTER}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill="var(--color-prose-muted)"
+            fontSize="13"
+            fontWeight="500"
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
+            {count}/{total}
+          </text>
         </svg>
-        <span
-          className="relative text-[10px] font-medium text-prose-muted"
-          style={{ fontFamily: "var(--font-mono)" }}
-        >
-          {count}/{total}
-        </span>
       </button>
     </div>
   );
