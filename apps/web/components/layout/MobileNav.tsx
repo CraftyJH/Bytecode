@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Menu, X, Download } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -20,7 +21,11 @@ interface MobileNavProps {
 
 export function MobileNav({ user }: MobileNavProps) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  // Ensure we're in the browser before portalling
+  useEffect(() => { setMounted(true); }, []);
 
   // Lock body scroll when drawer open
   useEffect(() => {
@@ -39,32 +44,18 @@ export function MobileNav({ user }: MobileNavProps) {
   const displayName =
     user?.user_metadata?.name ?? user?.email?.split("@")[0] ?? null;
 
-  return (
+  const overlay = (
     <>
-      {/* Hamburger button — mobile only */}
-      <button
-        className="md:hidden flex items-center justify-center w-8 h-8 text-prose-muted hover:text-prose transition-colors duration-100 cursor-pointer"
-        onClick={() => setOpen(true)}
-        aria-label="Open navigation menu"
-        aria-expanded={open}
-      >
-        <Menu size={20} />
-      </button>
-
       {/* Backdrop */}
-      {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden"
-          onClick={() => setOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+      <div
+        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden"
+        onClick={() => setOpen(false)}
+        aria-hidden="true"
+      />
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 bottom-0 z-50 w-72 flex flex-col border-l transition-transform duration-200 md:hidden ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
+        className="fixed top-0 right-0 bottom-0 z-50 w-72 flex flex-col border-l md:hidden"
         style={{
           backgroundColor: "var(--bg-elevated)",
           borderColor: "var(--border-subtle)",
@@ -113,10 +104,7 @@ export function MobileNav({ user }: MobileNavProps) {
           {/* User section */}
           {user ? (
             <>
-              <div
-                className="my-4 border-t"
-                style={{ borderColor: "var(--border-subtle)" }}
-              />
+              <div className="my-4 border-t" style={{ borderColor: "var(--border-subtle)" }} />
               <div className="px-3 mb-3">
                 <p className="text-xs text-prose truncate font-medium">{displayName}</p>
                 <p className="text-xs text-prose-faint truncate">{user.email}</p>
@@ -150,10 +138,7 @@ export function MobileNav({ user }: MobileNavProps) {
             </>
           ) : (
             <>
-              <div
-                className="my-4 border-t"
-                style={{ borderColor: "var(--border-subtle)" }}
-              />
+              <div className="my-4 border-t" style={{ borderColor: "var(--border-subtle)" }} />
               <div className="px-3 space-y-2">
                 <a
                   href="/signin"
@@ -177,4 +162,23 @@ export function MobileNav({ user }: MobileNavProps) {
       </div>
     </>
   );
+
+  return (
+    <>
+      {/* Hamburger button — stays inside navbar */}
+      <button
+        className="md:hidden flex items-center justify-center w-8 h-8 text-prose-muted hover:text-prose transition-colors duration-100 cursor-pointer"
+        onClick={() => setOpen(true)}
+        aria-label="Open navigation menu"
+        aria-expanded={open}
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Portal backdrop + drawer to body so backdrop-filter on the navbar
+          doesn't create a containing block that traps position:fixed children */}
+      {mounted && open && createPortal(overlay, document.body)}
+    </>
+  );
 }
+
