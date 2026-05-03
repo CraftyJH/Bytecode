@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 const NAV_LINKS = [
   { href: "/curriculum", label: "Curriculum" },
+  { href: "/blog", label: "Blog" },
   { href: "/pricing", label: "Pricing" },
   { href: "/why-bytecode", label: "Why Bytecode?" },
   { href: "/forum", label: "Forum" },

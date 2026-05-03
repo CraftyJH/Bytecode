@@ -35,6 +35,7 @@ export function Navbar({ user }: NavbarProps) {
         <ul className="hidden md:flex items-center gap-6 list-none m-0 p-0">
           {[
             { href: "/curriculum", label: "Curriculum" },
+            { href: "/blog", label: "Blog" },
             { href: "/pricing", label: "Pricing" },
             { href: "/why-bytecode", label: "Why Bytecode?" },
             { href: "/forum", label: "Forum" },

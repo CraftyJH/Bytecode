@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Shield } from "lucide-react";
 
 interface UserMenuProps {
   user: User;
@@ -43,6 +43,7 @@ export function UserMenu({ user }: UserMenuProps) {
   }, []);
 
   const isAdmin = user.app_metadata?.role === "admin";
+  const isPremiumUser = user.app_metadata?.plan === "premium";
 
   const items = [
     ...(isAdmin ? [{ label: "Admin panel", href: "/admin" }] : []),
@@ -85,11 +86,23 @@ export function UserMenu({ user }: UserMenuProps) {
           role="menu"
         >
           <div
-            className="px-3 py-2 border-b"
+            className="px-3 py-2.5 border-b"
             style={{ borderColor: "var(--border-subtle)" }}
           >
-            <p className="text-xs text-prose truncate">{displayName}</p>
-            <p className="text-xs text-prose-faint truncate">{user.email}</p>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <p className="text-xs text-prose truncate font-medium">{displayName}</p>
+              {isAdmin && <Shield size={11} className="text-accent shrink-0" />}
+            </div>
+            <p className="text-xs text-prose-faint truncate mb-1.5">{user.email}</p>
+            <span
+              className={`inline-block text-xs px-1.5 py-0.5 rounded-sm font-medium ${
+                isPremiumUser
+                  ? "text-accent bg-accent/10"
+                  : "text-prose-faint bg-subtle"
+              }`}
+            >
+              {isPremiumUser ? "Premium" : "Free"}
+            </span>
           </div>
 
           {items.map(({ label, href }) => (
