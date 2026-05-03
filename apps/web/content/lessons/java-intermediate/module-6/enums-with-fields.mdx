@@ -1,0 +1,349 @@
+export const meta = {
+  title: "Enum Constructors and Methods",
+  duration: 12,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ewf-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What access level does an enum constructor have, even if you write it with no modifier?",
+    options: [
+      { text: "public", correct: false, feedback: "If enum constructors were public, callers could create new constants — which would defeat the singleton guarantee." },
+      { text: "protected", correct: false, feedback: "`protected` would still allow subclasses to invoke it. Enums forbid that." },
+      { text: "private", correct: true, feedback: "Correct — enum constructors are implicitly `private`. The compiler rejects `public` or `protected` modifiers and treats `package-private` as `private` too." },
+      { text: "package-private", correct: false, feedback: "Although it is legal to omit the modifier, the resulting constructor is `private`, not package-private. Only the enum itself can call it." },
+    ],
+    explanation: "Java enforces that nobody outside the enum can build new instances. Marking the constructor `private` is allowed for clarity, but the compiler infers it either way.",
+    hint: "Could outsiders be allowed to create new copies of `Coin.PENNY`? What modifier prevents that?",
+  },
+  endQ1: {
+    id: "ewf-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    enum Severity {
+        INFO(1), WARN(2), ERROR(3);
+
+        private final int level;
+        Severity(int level) { this.level = level; }
+        public int level() { return level; }
+    }
+
+    public static void main(String[] args) {
+        Severity s = Severity.WARN;
+        System.out.println(s + " level=" + s.level());
+    }
+}`,
+    expectedOutput: "WARN level=2",
+    explanation: "Each constant calls the constructor with its own argument, so `WARN.level` becomes 2. `toString()` defaults to `name()`, printing `WARN`.",
+  },
+  endQ2: {
+    id: "ewf-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the field declaration so the value is set once at construction and never changed afterwards:",
+    code: "private ___ int cents;",
+    correctAnswers: ["final"],
+    caseSensitive: true,
+    explanation: "Marking enum fields `final` matches the immutable, singleton spirit of enums and ensures the value is fixed for the lifetime of the constant.",
+  },
+  endQ3: {
+    id: "ewf-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why must the semicolon appear after `QUARTER(25)` in `enum Coin { PENNY(1), NICKEL(5), DIME(10), QUARTER(25); private final int cents; ... }`?",
+    options: [
+      { text: "Java requires every enum to end with a semicolon, even when there are no other members.", correct: false, feedback: "If the body has *only* constants, the trailing semicolon is optional." },
+      { text: "It separates the list of constants from the rest of the enum body (fields, constructors, methods).", correct: true, feedback: "Correct — the semicolon tells the compiler the constant list is over and class-like members follow." },
+      { text: "It is a stylistic preference and the compiler ignores it.", correct: false, feedback: "Without the semicolon the compiler cannot tell where the constants end and the rest of the body begins." },
+      { text: "Because every field declaration in Java must be preceded by a semicolon.", correct: false, feedback: "Field declarations end with a semicolon; they are not preceded by one." },
+    ],
+    explanation: "An enum body is split into two regions: the comma-separated list of constants and the rest of the class. The semicolon is the boundary marker between them — required whenever the second region exists.",
+    hint: "Look at where the semicolon sits relative to the constants and the fields.",
+  },
+  endQ4: {
+    id: "ewf-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which statement about enum fields is most accurate?",
+    options: [
+      { text: "Fields can be re-assigned by any method on the enum.", correct: false, feedback: "Fields *can* be re-assigned if they are not `final`, but doing so is strongly discouraged because each constant is meant to be immutable." },
+      { text: "Fields should typically be `private final`, set once by the constructor.", correct: true, feedback: "Correct — `private` for encapsulation, `final` because the constant should be immutable for the lifetime of the program." },
+      { text: "Enum fields must be `static`, like the constants themselves.", correct: false, feedback: "The constants are static, but their *fields* are instance fields belonging to each individual constant." },
+      { text: "Fields cannot have any modifier — only the constructor parameters can.", correct: false, feedback: "Fields use the same modifiers as ordinary classes: `private`, `final`, `static`, etc." },
+    ],
+    explanation: "Treat each constant like a small immutable value object: data goes in once via the constructor, lives in `private final` fields, and is exposed by accessor methods.",
+    hint: "Think about how the constants ought to behave once created.",
+  },
+};
+
+The simplest enums — like `enum TrafficLight { RED, YELLOW, GREEN }` — only carry a name. Real-world domains usually need more: a coin has a value in cents, an HTTP status has a numeric code, a log severity has a level. Java enums are full-blown classes, so you can attach **fields**, a **constructor**, and **methods** to them. Each constant becomes a tiny, immutable object that knows everything it needs to know.
+
+In this lesson we build up an enum with state, learn the exact rules around enum constructors, and see why this pattern is so much cleaner than parallel arrays of `static final int`s.
+
+## Anatomy of an enum with state
+
+```java
+enum Coin {
+    PENNY(1), NICKEL(5), DIME(10), QUARTER(25);
+
+    private final int cents;
+
+    Coin(int cents) {
+        this.cents = cents;
+    }
+
+    public int cents() {
+        return cents;
+    }
+}
+```
+
+Three new things are happening here.
+
+1. **Constructor calls in the constant list.** `PENNY(1)` does not declare a method called `PENNY`; it tells the compiler "create the `PENNY` constant by invoking the constructor with the argument `1`." Each constant gets its own constructor invocation.
+2. **A semicolon separates the constants from the rest of the body.** As soon as the enum has fields or methods, the comma-separated constant list must end with a `;`. Forgetting it is one of the most common compile errors when first writing a stateful enum.
+3. **Ordinary class-like members.** Below the semicolon, you write fields, constructors, and methods exactly like in a regular class.
+
+## Enum constructors are implicitly private
+
+Look closely at the constructor:
+
+```java
+Coin(int cents) { this.cents = cents; }
+```
+
+There is no `public`, `protected`, or `private` modifier. That is not an oversight — Java *forbids* `public` and `protected` enum constructors. The only legal modifier is `private`, and even that is redundant because the compiler treats every enum constructor as private regardless.
+
+This is how the singleton guarantee is enforced. If an outsider could call `new Coin(7)`, the type would no longer represent a finite, well-known set. By making construction unreachable from outside, the JVM keeps the catalogue closed.
+
+<Note>Each constant in the constant list is the *only* place where the constructor is invoked. The JVM runs the invocations once, in declaration order, the first time the enum class is loaded.</Note>
+
+## Why fields should be `private final`
+
+The same reasoning that gives us singletons also tells us our fields should be immutable: once `PENNY` knows it's worth 1 cent, that should never change. The standard pattern is `private final`:
+
+- **`private`** keeps the field encapsulated. Callers must use the accessor method.
+- **`final`** prevents re-assignment after the constructor finishes. The compiler enforces this.
+
+Mutable enum fields are legal but almost always a mistake. They turn a "constant" into a piece of shared mutable global state — exactly the thing enums were invented to avoid.
+
+## Adding methods that operate on the fields
+
+Once you have data, you can compute things from it. Methods on an enum behave like methods on any other class — they can use the fields and call other methods:
+
+```java
+enum Coin {
+    PENNY(1), NICKEL(5), DIME(10), QUARTER(25);
+
+    private final int cents;
+    Coin(int cents) { this.cents = cents; }
+
+    public int cents() { return cents; }
+
+    public double dollars() {
+        return cents / 100.0;
+    }
+
+    public boolean isLargerThan(Coin other) {
+        return this.cents > other.cents;
+    }
+}
+
+System.out.println(Coin.QUARTER.dollars());                  // 0.25
+System.out.println(Coin.DIME.isLargerThan(Coin.NICKEL));     // true
+```
+
+Notice how `isLargerThan` uses both `this` (the receiver constant) and `other` (the argument constant) — they are both real objects, despite being members of the enum.
+
+## A real-world analogy: planets
+
+A famous example from Joshua Bloch's *Effective Java* models the eight planets of the solar system as an enum, each carrying its mass and radius. From those two numbers you can compute surface gravity for *every* planet without writing a separate `if` for each one:
+
+```java
+enum Planet {
+    MERCURY(3.303e+23, 2.4397e6),
+    VENUS  (4.869e+24, 6.0518e6),
+    EARTH  (5.976e+24, 6.37814e6),
+    MARS   (6.421e+23, 3.3972e6);
+
+    private final double mass;     // kilograms
+    private final double radius;   // metres
+
+    Planet(double mass, double radius) {
+        this.mass = mass;
+        this.radius = radius;
+    }
+
+    private static final double G = 6.67300E-11;
+
+    public double surfaceGravity() {
+        return G * mass / (radius * radius);
+    }
+}
+
+for (Planet p : Planet.values()) {
+    System.out.printf("%s: %.2f m/s^2%n", p, p.surfaceGravity());
+}
+```
+
+This is the killer feature of stateful enums: the data and the formula live together, and the loop works for any planet you ever add.
+
+## A second example: HTTP status codes
+
+```java
+enum HttpStatus {
+    OK(200, "OK"),
+    NOT_FOUND(404, "Not Found"),
+    INTERNAL_ERROR(500, "Internal Server Error");
+
+    private final int code;
+    private final String reason;
+
+    HttpStatus(int code, String reason) {
+        this.code = code;
+        this.reason = reason;
+    }
+
+    public int code()      { return code; }
+    public String reason() { return reason; }
+
+    public boolean isClientError() { return code >= 400 && code < 500; }
+    public boolean isServerError() { return code >= 500 && code < 600; }
+}
+```
+
+The constants now carry both the numeric code *and* a human-readable phrase. Adding a helper like `isClientError()` is a one-liner that uses the field directly.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Run the starter code. The output is the cents value of every coin and the running total:
+
+```
+PENNY = 1 cents
+NICKEL = 5 cents
+DIME = 10 cents
+QUARTER = 25 cents
+Total: 41 cents
+```
+
+This pattern — store data in `private final` fields, expose it through small accessor methods, and let `values()` drive a `for` loop — comes up constantly in real Java code.
+
+## Multiple constructor parameters
+
+Constructors can take any number of parameters, and you can even overload them. Most enums stick to one constructor for simplicity:
+
+```java
+enum Currency {
+    USD("United States Dollar", "$"),
+    EUR("Euro",                 "EUR"),
+    JPY("Japanese Yen",         "Yen");
+
+    private final String fullName;
+    private final String symbol;
+
+    Currency(String fullName, String symbol) {
+        this.fullName = fullName;
+        this.symbol = symbol;
+    }
+
+    public String label() {
+        return fullName + " (" + symbol + ")";
+    }
+}
+```
+
+Each constant supplies *exactly* the arguments declared by the constructor, so the compiler catches typos immediately.
+
+<Note>If you forget an argument — say you write `EUR("Euro")` for a two-arg constructor — the error is reported at the constant, not somewhere distant. That is far easier to fix than a runtime mismatch from parallel arrays.</Note>
+
+## Overriding `toString()`
+
+The default `toString()` returns `name()`, which is great for debugging but ugly in user-facing strings. Override it to produce something nicer — `name()` is still available if you ever need the raw identifier:
+
+```java
+@Override
+public String toString() {
+    return name().charAt(0) + name().substring(1).toLowerCase();
+}
+// PENNY  -> "Penny"
+// NICKEL -> "Nickel"
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting the semicolon after the constant list.** As soon as you add any field, constructor, or method, the compiler needs that semicolon to know the constants are done. The error message can be cryptic, so train your eye to look for it first.
+- **Trying to make the constructor `public`.** The compiler will reject it. Just leave the modifier off, or write `private` for clarity. Outsiders cannot create new constants — that is the whole point.
+- **Mutable, non-`final` fields.** Technically legal, almost always wrong. A constant that can change behind your back is no longer a constant. Store data once in the constructor and treat each constant as immutable.
+- **Mismatching constructor arguments.** If the constructor takes two parameters, every constant must supply two values. Forgetting an argument or adding an extra is a compile error pinned to that specific constant.
+- **Hand-rolling parallel arrays of `static final` data.** Tempting, but it puts the data far away from the constant and lets the two drift out of sync. Putting fields on the enum keeps each constant's data alongside its identity.
+
+## Recap
+
+A stateful enum is just a small, immutable class with a fixed set of pre-built instances.
+
+- Constants in the list can call the constructor with arguments — `PENNY(1)`, `NICKEL(5)`, ...
+- Enum constructors are implicitly `private`. No outsider can create new constants.
+- Use `private final` fields and small accessor methods to expose the data.
+- A single semicolon separates the constant list from the rest of the body.
+- Methods on the enum can compute derived values, compare constants, or override `toString()` for friendlier output.
+
+This pattern keeps every constant's data right next to its name and prevents the parallel-array bugs that plagued pre-enum Java.
+
+**Up next:** Per-Constant Behaviour with Abstract Methods — what if each constant needs its *own* implementation of a method, not just its own data?
+
+<Exercise>
+Run the program. Each iteration of the loop should print the coin name, its cents value, and accumulate a running total. The expected output is:
+
+```
+PENNY = 1 cents
+NICKEL = 5 cents
+DIME = 10 cents
+QUARTER = 25 cents
+Total: 41 cents
+```
+
+```java
+public class Main {
+    enum Coin {
+        PENNY(1), NICKEL(5), DIME(10), QUARTER(25);
+
+        private final int cents;
+        Coin(int cents) { this.cents = cents; }
+        public int cents() { return cents; }
+    }
+
+    public static void main(String[] args) {
+        int total = 0;
+        for (Coin c : Coin.values()) {
+            System.out.println(c + " = " + c.cents() + " cents");
+            total += c.cents();
+        }
+        System.out.println("Total: " + total + " cents");
+    }
+}
+```
+
+**What the program should do:**
+- Iterate over `Coin.values()` in declaration order.
+- For each coin, print `NAME = N cents` using the constant's `name()` and `cents()`.
+- Sum the cents values and print the total at the end.
+- Demonstrate that constructor arguments populate the `cents` field for each constant.
+
+<Note>Hint: try adding `HALF_DOLLAR(50)` and `DOLLAR(100)` to the constant list. The loop and total update automatically because everything is driven by `values()`.</Note>
+</Exercise>

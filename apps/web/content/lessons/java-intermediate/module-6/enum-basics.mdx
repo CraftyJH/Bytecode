@@ -1,0 +1,302 @@
+export const meta = {
+  title: "What is an Enum?",
+  duration: 10,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "eb-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Given `enum Color { RED, GREEN, BLUE }`, what does `Color.GREEN.ordinal()` return?",
+    options: [
+      { text: "0", correct: false, feedback: "0 is the ordinal of the *first* declared constant, which is `RED`." },
+      { text: "1", correct: true, feedback: "Correct — `ordinal()` returns the zero-based position in the declaration order, and `GREEN` is declared second." },
+      { text: "2", correct: false, feedback: "2 would be the ordinal of `BLUE`, the third constant." },
+      { text: "It throws an exception because ordinals are not exposed.", correct: false, feedback: "`ordinal()` is a public final method inherited from `java.lang.Enum`. It always returns a number." },
+    ],
+    explanation: "Enum constants are numbered starting from 0 in the order they appear in the source code. `RED` is 0, `GREEN` is 1, and `BLUE` is 2.",
+    hint: "Count from zero, in declaration order.",
+  },
+  endQ1: {
+    id: "eb-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    enum Status { ACTIVE, PAUSED, DONE }
+
+    public static void main(String[] args) {
+        Status s = Status.PAUSED;
+        System.out.println(s.name() + " " + s.ordinal());
+    }
+}`,
+    expectedOutput: "PAUSED 1",
+    explanation: "`name()` returns the exact identifier used in the source — `PAUSED`. `ordinal()` returns its declaration index, which is 1 (after `ACTIVE` at 0).",
+  },
+  endQ2: {
+    id: "eb-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why is comparing enum constants with `==` safe and idiomatic in Java?",
+    options: [
+      { text: "The compiler rewrites `==` as `.equals()` for enums.", correct: false, feedback: "There is no such rewrite. `==` and `equals()` happen to behave the same way for enums for a different reason." },
+      { text: "Each enum constant is a singleton, so reference equality and value equality coincide.", correct: true, feedback: "Correct — the JVM creates exactly one instance per constant, so `Color.RED == Color.RED` is always true." },
+      { text: "Enums are primitives, so `==` is the only valid comparison.", correct: false, feedback: "Enums are objects, not primitives. They extend `java.lang.Enum`." },
+      { text: "`==` performs a deep structural comparison on enums.", correct: false, feedback: "`==` only ever performs reference comparison; it never inspects fields." },
+    ],
+    explanation: "Because the JVM guarantees one and only one instance per enum constant, two references to the same constant are always the same object. That makes `==` both correct and slightly faster than `equals()` (which itself just delegates to `==` for enums).",
+    hint: "Think about how many instances of `Color.RED` can exist at runtime.",
+  },
+  endQ3: {
+    id: "eb-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the call that converts the string `\"RED\"` into the matching `Color` constant:",
+    code: "Color c = Color.___(\"RED\");",
+    correctAnswers: ["valueOf"],
+    caseSensitive: true,
+    explanation: "`valueOf(String)` is a static method generated for every enum. It returns the constant whose `name()` equals the argument, or throws `IllegalArgumentException` if no match is found.",
+  },
+  endQ4: {
+    id: "eb-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which of these is a real advantage of an `enum Direction { N, S, E, W }` over `public static final int N = 0; ... W = 3;`?",
+    options: [
+      { text: "The enum uses less memory at runtime.", correct: false, feedback: "Enums actually use slightly more memory (one object per constant). The advantages are about safety and clarity, not size." },
+      { text: "A method that takes `Direction` cannot accidentally receive an unrelated integer.", correct: true, feedback: "Correct — type safety is the headline benefit. The compiler refuses to pass `5` or `Compass.NORTH` where `Direction` is expected." },
+      { text: "Enums can be re-assigned to different values at runtime.", correct: false, feedback: "Enum constants are immutable singletons. They cannot be re-assigned." },
+      { text: "Integer constants support `switch`, but enums do not.", correct: false, feedback: "It is the opposite: `switch` works beautifully with enums, and you can omit the type prefix in the `case` labels." },
+    ],
+    explanation: "The classic 'int constants' pattern is fragile because any integer can be passed where one of the named constants is expected. An enum gives you a dedicated type, exhaustive `switch`, helpful tooling, and no chance of mixing constants from different families.",
+    hint: "What does the compiler know about an `int` parameter that it does not know about an `enum` parameter?",
+  },
+};
+
+Most programs need to talk about a small, fixed set of named choices: the four suits of a deck of cards, the days of the week, the states of an HTTP request. Before Java had enums, programmers used integer constants — `public static final int RED = 0;` — and hoped that callers never mixed them up with unrelated integers. They did, of course, and bugs followed. Java's `enum` keyword gives you a first-class type for these closed sets, with the compiler firmly on your side.
+
+An **enum** (short for *enumeration*) declares a finite list of named constants. Each constant is a real object, fully typed, that the JVM creates exactly once. You cannot accidentally make a fifth playing-card suit or pass a stray integer where the API expects a `Suit` — the type system simply refuses.
+
+## Declaring an enum
+
+The syntax is intentionally short:
+
+```java
+enum TrafficLight {
+    RED, YELLOW, GREEN
+}
+```
+
+That single line creates a new type called `TrafficLight` with three values: `TrafficLight.RED`, `TrafficLight.YELLOW`, and `TrafficLight.GREEN`. Notice the semicolons are optional after the last constant when the body has nothing else in it; once you add fields or methods, the closing semicolon becomes required.
+
+Under the hood an enum is a special kind of class. It implicitly extends `java.lang.Enum`, which gives every constant a handful of useful methods for free. We will meet them in a moment.
+
+<Note>Enum constants are written in `SCREAMING_SNAKE_CASE` by convention — the same convention used for `static final` constants. This makes them easy to spot in `switch` statements and conditional checks.</Note>
+
+## Each constant is a singleton
+
+When the class is first loaded, the JVM creates one — and only one — instance for each declared constant. From that point forward, every reference to `TrafficLight.RED` points to that single shared object. This is why you can compare enum constants with `==`:
+
+```java
+TrafficLight a = TrafficLight.RED;
+TrafficLight b = TrafficLight.RED;
+System.out.println(a == b);          // true
+System.out.println(a.equals(b));     // also true (delegates to ==)
+```
+
+`==` on objects normally compares references, which is what most programmers want for enums anyway: "is this the *same* constant?" Both styles work, but `==` is slightly faster and produces a clearer NullPointerException if the left operand is `null`, so the community generally prefers it for enums.
+
+## Built-in methods you get for free
+
+Every enum inherits these from `java.lang.Enum`:
+
+- `name()` — returns the exact identifier as declared in the source, e.g., `"RED"`.
+- `ordinal()` — returns the zero-based position in declaration order. `RED` is `0`, `YELLOW` is `1`, `GREEN` is `2`.
+- `toString()` — returns `name()` by default; override it for friendlier output.
+- `static T[] values()` — returns an array of every constant in declaration order. Generated per enum.
+- `static T valueOf(String name)` — returns the constant whose `name()` equals the argument; throws `IllegalArgumentException` otherwise. Also generated per enum.
+
+```java
+for (TrafficLight t : TrafficLight.values()) {
+    System.out.println(t.ordinal() + ": " + t.name());
+}
+// 0: RED
+// 1: YELLOW
+// 2: GREEN
+
+TrafficLight parsed = TrafficLight.valueOf("YELLOW");
+System.out.println(parsed);          // YELLOW
+```
+
+<Note>Avoid relying on `ordinal()` for business logic — if a teammate later inserts a new constant in the middle of the declaration, every ordinal shifts and your code silently changes meaning. Use the constants themselves (`if (t == YELLOW)`) or store an explicit numeric field on the enum, which we cover in the next lesson.</Note>
+
+## Switch statements love enums
+
+Inside a `switch` whose discriminant is an enum value, you write the constants without the type prefix. The compiler knows the type already:
+
+```java
+static int seconds(TrafficLight t) {
+    switch (t) {
+        case RED:    return 30;
+        case YELLOW: return 5;
+        case GREEN:  return 25;
+        default:     throw new AssertionError("Unknown: " + t);
+    }
+}
+```
+
+Two pleasant consequences: no more typos like `TrafficLight.YELOW`, and the IDE can warn you when a new constant is added but a `switch` somewhere does not handle it. Modern Java also supports the arrow form `case RED -> 30;` and `switch` *expressions*, which return a value directly — useful once you reach Java 14 or later.
+
+## Why an enum beats `public static final int` constants
+
+Suppose you're choosing between these two designs:
+
+```java
+// Old style — integer constants
+public class Direction {
+    public static final int NORTH = 0;
+    public static final int SOUTH = 1;
+    public static final int EAST  = 2;
+    public static final int WEST  = 3;
+}
+
+void move(int direction) { ... }
+move(Direction.NORTH);
+move(42);                 // compiles fine — clearly a bug
+```
+
+```java
+// Modern style — enum
+enum Direction { NORTH, SOUTH, EAST, WEST }
+
+void move(Direction direction) { ... }
+move(Direction.NORTH);
+move(42);                 // compile error — type mismatch
+```
+
+The enum version wins on every axis worth measuring:
+
+- **Type safety.** The compiler refuses any value that is not a `Direction`. No more passing `Compass.WEST` (also an `int`) into a `move` that expected `Direction`.
+- **Self-documenting tooling.** Hover over `Direction` in your IDE and you see the four legal values. Auto-complete after `Direction.` lists them.
+- **Readable output.** `System.out.println(d)` prints `NORTH`, not `0`.
+- **Bulk operations.** `Direction.values()` lets you loop over every direction without maintaining a separate array.
+- **Behavior, not just data.** As we will see in later lessons, enums can carry fields, methods, and even per-constant logic.
+
+The slight memory cost — one object per constant — is irrelevant in any program where correctness matters more than nanoseconds.
+
+## A real-world analogy: a deck of cards
+
+Think of an enum as printing the deck once at the factory. Every shuffle, every deal, every game — they all reuse the same physical cards. You never "make" a new Ace of Spades; you just reach for the existing one. Trying to invent a fifth suit is impossible because the deck is fixed. That is exactly what an enum buys you in code: a finite, immutable, shared catalogue of values.
+
+## A second example: order status
+
+```java
+enum OrderStatus { PENDING, PAID, SHIPPED, DELIVERED, CANCELLED }
+
+class Order {
+    private OrderStatus status = OrderStatus.PENDING;
+
+    void markPaid() {
+        if (status != OrderStatus.PENDING) {
+            throw new IllegalStateException("Cannot pay an order in state " + status);
+        }
+        status = OrderStatus.PAID;
+    }
+
+    boolean canRefund() {
+        return status == OrderStatus.PAID || status == OrderStatus.SHIPPED;
+    }
+}
+```
+
+Notice how the enum makes the legal transitions read like English. If a new state is ever added — say `RETURNED` — the IDE will flag every `switch` and every comparison so you can decide whether the new state belongs there.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run** on the starter code. You should see:
+
+```
+State: GREEN
+Ordinal: 2
+Total: 3
+Parsed: RED
+```
+
+The program demonstrates the four most common enum operations: storing a constant in a variable, calling `ordinal()`, asking for `values().length`, and parsing a name with `valueOf`.
+
+## Comparing enums: `==` vs `equals()`
+
+Because each constant is a singleton, both work, but the conventions differ:
+
+```java
+TrafficLight t = TrafficLight.RED;
+
+if (t == TrafficLight.RED)        { /* idiomatic */ }
+if (t.equals(TrafficLight.RED))   { /* also fine, just verbose */ }
+```
+
+If `t` is `null`, the `==` form evaluates to `false` cleanly, while `t.equals(...)` throws `NullPointerException`. That alone is reason enough to prefer `==` for enums.
+
+## Enums in collections
+
+Enums work seamlessly inside the standard collection types — `List<Direction>`, `Map<Direction, String>`, and so on. Java even ships specialized, faster implementations for enum keys: `EnumSet` and `EnumMap`. We dedicate the final lesson of this module to them.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Relying on `ordinal()` for persistence or logic.** If you save an ordinal to a database and later insert a new constant in the middle of the enum, every stored row now means something different. Persist the `name()` instead, or — better — give the enum an explicit, stable code field.
+- **Calling `valueOf` with an unknown name.** It throws `IllegalArgumentException`, not `null`. Wrap the call in a try/catch or pre-validate the input if you accept names from outside the program.
+- **Forgetting that constants are case-sensitive.** `Color.valueOf("red")` will throw, even though `Color.RED` exists. The argument must match `name()` exactly.
+- **Using `equals()` instead of `==`.** Functionally identical, but `equals()` throws when the receiver is `null`, while `==` simply yields `false`. Most style guides therefore prefer `==` for enums.
+- **Trying to extend an enum.** Enums implicitly extend `java.lang.Enum` and cannot extend any other class. They *can* implement interfaces (covered in lesson 4), which gives you most of the flexibility you might want.
+
+## Recap
+
+Enums are how Java models a closed, named set of values with full compiler support. They feel like the simple integer constants of older languages but bring real types, real methods, and real safety.
+
+- An **enum** declares a finite list of constants of a brand-new type.
+- Each constant is a **singleton** — exactly one instance per JVM — so `==` is the natural comparison.
+- Every enum inherits `name()`, `ordinal()`, `toString()`, `values()`, and `valueOf()` from `java.lang.Enum`.
+- `switch` statements omit the type prefix in `case` labels, making the code read like a decision table.
+- Prefer enums over `public static final int` constants for **type safety**, **readable output**, and **richer tooling** support.
+
+**Up next:** Enum Constructors and Methods — we attach data and behavior to each constant so an enum can carry more than just a name.
+
+<Exercise>
+Run the program and observe how `values()`, `ordinal()`, `toString()`, and `valueOf()` work together. Then try adding a fourth constant `FLASHING` to the enum, and predict how the output will change before re-running.
+
+```java
+public class Main {
+    enum TrafficLight { RED, YELLOW, GREEN }
+
+    public static void main(String[] args) {
+        TrafficLight light = TrafficLight.GREEN;
+        System.out.println("State: " + light);
+        System.out.println("Ordinal: " + light.ordinal());
+        System.out.println("Total: " + TrafficLight.values().length);
+        TrafficLight parsed = TrafficLight.valueOf("RED");
+        System.out.println("Parsed: " + parsed);
+    }
+}
+```
+
+**What the program should do:**
+- Print `State: GREEN` (because `toString()` defaults to `name()`).
+- Print `Ordinal: 2` (because `GREEN` is declared third, index 2).
+- Print `Total: 3` (because `values()` returns all three constants).
+- Print `Parsed: RED` (because `valueOf("RED")` looks up the constant by exact name).
+
+<Note>Hint: try changing `valueOf("RED")` to `valueOf("red")` and observe the `IllegalArgumentException`. Enum names are case-sensitive.</Note>
+</Exercise>

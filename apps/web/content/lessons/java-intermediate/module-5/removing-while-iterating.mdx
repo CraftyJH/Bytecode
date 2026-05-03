@@ -1,0 +1,282 @@
+export const meta = {
+  title: "Removing Elements Safely While Iterating",
+  duration: 12,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "rwi-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which exception is thrown when you call `list.remove(x)` *inside* a for-each loop over the same list?",
+    options: [
+      { text: "`IllegalStateException`", correct: false, feedback: "That's thrown by `Iterator.remove()` if you call it before any `next()`, not for in-loop list mutation." },
+      { text: "`ConcurrentModificationException`", correct: true, feedback: "Correct — the iterator detects that the list's structural modification count changed underneath it and fails fast." },
+      { text: "`UnsupportedOperationException`", correct: false, feedback: "That's thrown by immutable collections (e.g. `List.of(...)`) — not by mutable lists during iteration." },
+      { text: "`IndexOutOfBoundsException`", correct: false, feedback: "Index errors arise from indexed access, not from mutating during iteration." },
+    ],
+    explanation: "Most `java.util` collections track a `modCount` field. The iterator stores the value it saw at creation; if `modCount` changes from outside, the next `next()` throws `ConcurrentModificationException`. The whole point is to stop you from reading a corrupted view.",
+    hint: "It's a *fail-fast* exception with the word 'modification' in the name.",
+  },
+  endQ1: {
+    id: "rwi-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> xs = new ArrayList<>(Arrays.asList(1, 2, 3, 4));
+        Iterator<Integer> it = xs.iterator();
+        while (it.hasNext()) {
+            int n = it.next();
+            if (n % 2 == 0) it.remove();
+        }
+        System.out.println(xs);
+    }
+}`,
+    expectedOutput: "[1, 3]",
+    explanation: "`Iterator.remove()` removes the element returned by the *most recent* `next()` call. Walking 1, 2, 3, 4 and calling `remove()` on the even ones leaves the list with 1 and 3.",
+  },
+  endQ2: {
+    id: "rwi-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which one-liner is the modern Java 8+ replacement for the iterator-and-remove pattern when filtering by a predicate?",
+    options: [
+      { text: "`list.clear()`", correct: false, feedback: "That removes everything, not just elements matching a predicate." },
+      { text: "`list.removeIf(predicate)`", correct: true, feedback: "Correct — `removeIf` is the idiomatic one-liner. It walks the collection and removes anything matching the predicate, with no `ConcurrentModificationException` risk." },
+      { text: "`list.remove(predicate)`", correct: false, feedback: "There is no such overload. `remove(Object)` removes by equality, and `remove(int)` removes by index." },
+      { text: "`list.stream().filter(predicate)`", correct: false, feedback: "`filter` is non-mutating — it builds a new stream. It does not modify `list`." },
+    ],
+    explanation: "Since Java 8, `Collection.removeIf(Predicate)` is the cleanest way to remove elements matching a condition. Internally it uses an iterator and `remove()`, so it's both safe and concise.",
+    hint: "Look for a method on `Collection` whose name starts with 'remove'.",
+  },
+  endQ3: {
+    id: "rwi-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the iterator method that safely removes the element just returned by `next()`:",
+    code: "while (it.hasNext()) { int n = it.next(); if (n % 2 == 0) it.___(); }",
+    correctAnswers: ["remove"],
+    caseSensitive: true,
+    explanation: "`Iterator.remove()` removes from the underlying collection the last element returned by `next()`. It is the only method that can mutate the collection during iteration without triggering `ConcurrentModificationException`.",
+  },
+  endQ4: {
+    id: "rwi-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When does `Iterator.remove()` itself throw `IllegalStateException`?",
+    options: [
+      { text: "When the collection is empty", correct: false, feedback: "An empty collection means `hasNext()` returns false; you wouldn't be calling `remove()` at all." },
+      { text: "When called before any `next()`, or twice without an intervening `next()`", correct: true, feedback: "Correct — `remove()` only makes sense relative to the *last* element returned. No prior `next()` (or two `remove()`s in a row) is illegal." },
+      { text: "Whenever the collection is immutable", correct: false, feedback: "Immutable collections throw `UnsupportedOperationException`, not `IllegalStateException`." },
+      { text: "When the iterator is from a `Set` rather than a `List`", correct: false, feedback: "Both support `remove()` provided their iterator does." },
+    ],
+    explanation: "`Iterator.remove()` operates on the element returned by the *immediately preceding* `next()`. Calling it before any `next()` or after another `remove()` violates that contract and yields `IllegalStateException`.",
+    hint: "It complains when the operation makes no sense in the current state.",
+  },
+};
+
+In the previous lesson you learned how to walk a collection with an explicit `Iterator`. Now we tackle the most common *real* reason to drop down from for-each to iterator: **removing elements as you go**. This is one of those topics where naïve code looks reasonable, runs once, and then crashes loudly the next day with a stack trace nobody understands.
+
+Let's understand the crash, fix it the right way, and then meet the modern one-liner that makes it almost unnecessary.
+
+## The naïve attempt — and what goes wrong
+
+Suppose you want to delete every even number from a list. The first thing many learners write is:
+
+```java
+List<Integer> nums = new ArrayList<>(List.of(1, 2, 3, 4, 5, 6));
+for (int n : nums) {
+    if (n % 2 == 0) {
+        nums.remove(Integer.valueOf(n));   // BAD
+    }
+}
+```
+
+It compiles. It even *looks* fine. But run it and you get:
+
+```
+Exception in thread "main" java.util.ConcurrentModificationException
+    at java.base/java.util.ArrayList$Itr.checkForComodification(...)
+    at java.base/java.util.ArrayList$Itr.next(...)
+    at Main.main(Main.java:5)
+```
+
+<Note>The exception name is misleading. There are no threads involved — "concurrent" here means "you modified the collection *while* iterating it", which is logically concurrent even on a single thread.</Note>
+
+## Why the iterator gets angry
+
+Most `java.util` collections (`ArrayList`, `HashSet`, `HashMap`, ...) maintain a hidden field called `modCount` — a counter that bumps every time the *structure* of the collection changes (an element added or removed). When you ask for an iterator, it snapshots the current `modCount`. On every call to `next()` it compares the live count with its snapshot:
+
+```java
+// Inside ArrayList.Itr (paraphrased):
+final void checkForComodification() {
+    if (modCount != expectedModCount)
+        throw new ConcurrentModificationException();
+}
+```
+
+If the numbers don't match, *something* changed the collection through a path the iterator didn't know about — so the iterator throws rather than silently return stale data. This is **fail-fast** behaviour, and it's a feature, not a bug. Without it you might skip elements, double-visit elements, or read garbage.
+
+## The right way: `Iterator.remove()`
+
+The iterator has one — and only one — sanctioned way to mutate the collection mid-walk: its own `remove()` method. That call is special because the iterator updates its `modCount` snapshot at the same time, so the consistency check still passes on the next `next()`.
+
+```java
+List<Integer> nums = new ArrayList<>(List.of(1, 2, 3, 4, 5, 6));
+Iterator<Integer> it = nums.iterator();
+while (it.hasNext()) {
+    int n = it.next();
+    if (n % 2 == 0) {
+        it.remove();        // safe — removes the element next() just returned
+    }
+}
+System.out.println(nums);   // [1, 3, 5]
+```
+
+Three rules to remember about `Iterator.remove()`:
+
+1. It removes the element returned by the **most recent** `next()` call.
+2. You may call it **at most once** per `next()`.
+3. Calling it before any `next()`, or twice without an intervening `next()`, throws `IllegalStateException`.
+
+That last rule is why a body like `if (it.hasNext()) it.remove();` is *not* valid — `hasNext()` doesn't count.
+
+<Note>Not every iterator implements `remove()`. Iterators returned by immutable collections (e.g. `List.of(...)` or `Collections.unmodifiableList(...)`) throw `UnsupportedOperationException`. Stick with mutable collection types when you intend to remove.</Note>
+
+## The modern shortcut: `Collection.removeIf`
+
+Java 8 added a one-liner that wraps the iterator+remove pattern for the common case "remove everything matching this condition":
+
+```java
+List<Integer> nums = new ArrayList<>(List.of(1, 2, 3, 4, 5, 6));
+nums.removeIf(n -> n % 2 == 0);
+System.out.println(nums);   // [1, 3, 5]
+```
+
+It is implemented exactly the way you would write it: walk an iterator, call `remove()` whenever the predicate is true. But it's shorter, and the intent is unmistakable. Reach for `removeIf` whenever your removal rule fits in a lambda.
+
+`removeIf` lives on `Collection`, so it works on `List`, `Set`, `Queue`, and friends — but not on `Map` directly. For maps, use `map.entrySet().removeIf(e -> ...)` or the dedicated `map.values().removeIf(...)`.
+
+## When `removeIf` *isn't* enough
+
+Some scenarios still call for the explicit iterator pattern:
+
+- You need to **inspect more than just the element** — for example, the position, the previous element, or some external state machine.
+- You want to **transform some elements and remove others** in the same pass. `removeIf` only deletes; it doesn't update.
+- You're iterating something that **isn't a `Collection`** (a custom `Iterable`, a stream of records from a parser, etc.).
+
+In those cases, the manual `while (it.hasNext()) { ... it.remove(); ... }` loop remains the right tool.
+
+## A second example: scrubbing a Set
+
+`HashSet` supports the same iterator-remove pattern. Suppose we have a set of usernames and want to delete every name shorter than four characters:
+
+```java
+Set<String> names = new HashSet<>(Set.of("Al", "Bea", "Carol", "Dan", "Eleanor"));
+Iterator<String> it = names.iterator();
+while (it.hasNext()) {
+    String name = it.next();
+    if (name.length() < 4) {
+        it.remove();
+    }
+}
+System.out.println(names);    // some order of [Carol, Eleanor]
+```
+
+Or, more idiomatically:
+
+```java
+names.removeIf(name -> name.length() < 4);
+```
+
+Both produce the same result. The iterator version is more flexible; the `removeIf` version is more readable.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run** on the starter code. The TODO is already filled in: it walks the iterator and removes every even number with `it.remove()`. You should see:
+
+```
+odd only: [1, 3, 5]
+```
+
+Try changing the condition to `n > 3` — what's left? Try replacing the whole loop with `nums.removeIf(n -> n % 2 == 0);` and confirm you get the same result.
+
+## A failing example, deliberately
+
+Sometimes the best way to *believe* the rule is to break it:
+
+```java
+List<Integer> nums = new ArrayList<>(List.of(1, 2, 3, 4));
+for (int n : nums) {
+    if (n == 2) nums.remove(Integer.valueOf(n));   // crashes
+}
+```
+
+Run this and you'll see the dreaded `ConcurrentModificationException` on the second iteration — the iterator's stored `modCount` no longer matches the list's actual `modCount`. The fix is one of the two patterns we've just covered. Memorise the failure mode; it will save you debugging time later.
+
+<Note>Counter-intuitive twist: with an `ArrayList`, removing the *last* element inside a for-each happens to "work" by accident — the loop terminates before the next `hasNext()` check fires. Don't rely on this. The correct rule is simple: never mutate the collection except through the iterator, or with `removeIf`.</Note>
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling `list.remove(...)` inside a for-each** — This is the canonical bug. The iterator detects the change and throws `ConcurrentModificationException`. Switch to an explicit `Iterator` plus `it.remove()`, or use `removeIf`.
+- **Calling `it.remove()` before any `next()`** — `remove()` only makes sense relative to the most recent `next()`. Calling it on a fresh iterator throws `IllegalStateException`.
+- **Calling `it.remove()` twice in a row** — Same reason. After the first `remove()`, you must call `next()` again before another `remove()` is legal.
+- **Trying to remove from an immutable collection** — `List.of(...)` and `Collections.unmodifiableList(...)` produce iterators whose `remove()` throws `UnsupportedOperationException`. If you need to remove, build a mutable copy: `new ArrayList<>(immutableList)`.
+- **Using a stream's `filter` to mutate the source** — `stream().filter(...)` builds a new sequence; it does not modify the original list. If you intended to delete in place, use `removeIf` instead.
+- **Catching `ConcurrentModificationException` to "fix" the bug** — The exception is a symptom, not the disease. Catching it leaves the loop in an undefined state. Fix the mutation pattern instead.
+
+## Recap
+
+Java collections protect you from yourself: they fail fast when something modifies them in a way the iterator can't see. Knowing this lets you write loops that delete exactly what they should, without crashing.
+
+- Mutating a collection during a for-each (or while another iterator is open) throws **`ConcurrentModificationException`**
+- Use **`Iterator.remove()`** to delete the most recently returned element safely
+- Java 8+ offers **`Collection.removeIf(predicate)`** as a clean one-liner for predicate-based deletion
+- `Iterator.remove()` itself throws `IllegalStateException` if called before `next()` or twice in a row
+- The fail-fast behaviour is a *feature* — silent corruption would be far worse
+
+**Up next:** Building a Custom Iterable — make your own classes for-each compatible by implementing `Iterable<T>`.
+
+<Exercise>
+Walk the list with an explicit `Iterator` and remove every even number using `it.remove()`. The result should be the list of odd numbers, in the same order.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5, 6));
+        Iterator<Integer> it = nums.iterator();
+        // TODO: while iterating, remove all even numbers using it.remove()
+        while (it.hasNext()) {
+            int n = it.next();
+            if (n % 2 == 0) it.remove();
+        }
+        System.out.println("odd only: " + nums);
+    }
+}
+```
+
+**What the tests check:**
+- The output is exactly `odd only: [1, 3, 5]`
+- Removal is performed via `Iterator.remove()` (not `list.remove(...)`)
+- The original `nums` list is mutated, not replaced
+
+<Note>Hint: as a stretch goal, rewrite the body using `nums.removeIf(n -> n % 2 == 0)` and confirm the same output. That single line replaces the whole `while` loop in modern Java.</Note>
+</Exercise>

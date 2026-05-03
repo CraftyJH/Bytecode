@@ -377,7 +377,7 @@ class Point {
     title: "Java Intermediate",
     order: 2,
     isPremium: false,
-    tagline: "Interfaces, generics, collections, and exception handling.",
+    tagline: "Interfaces, exceptions, generics, collections, enums, nested classes, and file I/O.",
     modules: [
       // ── Module 1: Interfaces & Abstraction ──────────────────────────
       {
@@ -1318,6 +1318,598 @@ public class Main {
     }
 }`,
             expectedOutput: "Reading at index 3: 2.0\nUnique tags: [api, backend, java, rest]\n'be' count: 2\nSorted keys: [be, is, not, or, question, that, the, to]\nProcessing: GET /api/users\nQueue size: 2",
+          },
+        ],
+      },
+
+      // ── Module 5: Iterators & for-each ─────────────────────────────
+      {
+        slug: "module-5",
+        title: "Iterators and the for-each Loop",
+        order: 5,
+        isPremium: false,
+        lessons: [
+          {
+            slug: "for-each-loop",
+            title: "The for-each Loop and Iterable",
+            order: 1,
+            duration: 10,
+            isPremium: false,
+            starterCode:
+`import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> langs = Arrays.asList("Java", "Kotlin", "Scala", "Groovy");
+        // TODO: print each language using a for-each loop, prefixed with "- "
+        for (String lang : langs) {
+            System.out.println("- " + lang);
+        }
+
+        int[] nums = {1, 2, 3, 4, 5};
+        int sum = 0;
+        // TODO: sum the array using for-each
+        for (int n : nums) sum += n;
+        System.out.println("sum=" + sum);
+    }
+}`,
+            expectedOutput: "- Java\n- Kotlin\n- Scala\n- Groovy\nsum=15",
+          },
+          {
+            slug: "using-iterator",
+            title: "Using Iterator Directly",
+            order: 2,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> tasks = new ArrayList<>(Arrays.asList("eat", "sleep", "code"));
+        Iterator<String> it = tasks.iterator();
+        // TODO: walk the iterator with hasNext / next, printing "doing: <task>"
+        while (it.hasNext()) {
+            String task = it.next();
+            System.out.println("doing: " + task);
+        }
+        System.out.println("done");
+    }
+}`,
+            expectedOutput: "doing: eat\ndoing: sleep\ndoing: code\ndone",
+          },
+          {
+            slug: "removing-while-iterating",
+            title: "Removing Elements Safely While Iterating",
+            order: 3,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5, 6));
+        Iterator<Integer> it = nums.iterator();
+        // TODO: while iterating, remove all even numbers using it.remove()
+        while (it.hasNext()) {
+            int n = it.next();
+            if (n % 2 == 0) it.remove();
+        }
+        System.out.println("odd only: " + nums);
+    }
+}`,
+            expectedOutput: "odd only: [1, 3, 5]",
+          },
+          {
+            slug: "custom-iterable",
+            title: "Building a Custom Iterable",
+            order: 4,
+            duration: 14,
+            isPremium: false,
+            starterCode:
+`import java.util.*;
+
+public class Main implements Iterable<Integer> {
+    private final int max;
+    public Main(int max) { this.max = max; }
+
+    @Override
+    public Iterator<Integer> iterator() {
+        return new Iterator<Integer>() {
+            int n = 1;
+            public boolean hasNext() { return n <= max; }
+            public Integer next() { return n++; }
+        };
+    }
+
+    public static void main(String[] args) {
+        Main range = new Main(5);
+        // TODO: iterate range with a for-each loop, printing each number
+        for (int n : range) System.out.println(n);
+    }
+}`,
+            expectedOutput: "1\n2\n3\n4\n5",
+          },
+          {
+            slug: "streams-intro",
+            title: "Streams — A First Look",
+            order: 5,
+            duration: 14,
+            isPremium: false,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+        // TODO: use a stream to sum the squares of the even numbers
+        int result = nums.stream()
+            .filter(n -> n % 2 == 0)
+            .mapToInt(n -> n * n)
+            .sum();
+        System.out.println("result: " + result);
+
+        // TODO: collect odd numbers into a List<Integer>
+        List<Integer> odds = nums.stream()
+            .filter(n -> n % 2 != 0)
+            .collect(Collectors.toList());
+        System.out.println("odds: " + odds);
+    }
+}`,
+            expectedOutput: "result: 220\nodds: [1, 3, 5, 7, 9]",
+          },
+        ],
+      },
+
+      // ── Module 6: Enums ────────────────────────────────────────────
+      {
+        slug: "module-6",
+        title: "Enums",
+        order: 6,
+        isPremium: false,
+        lessons: [
+          {
+            slug: "enum-basics",
+            title: "What is an Enum?",
+            order: 1,
+            duration: 10,
+            isPremium: false,
+            starterCode:
+`public class Main {
+    enum TrafficLight { RED, YELLOW, GREEN }
+
+    public static void main(String[] args) {
+        TrafficLight light = TrafficLight.GREEN;
+        System.out.println("State: " + light);
+        System.out.println("Ordinal: " + light.ordinal());
+        System.out.println("Total: " + TrafficLight.values().length);
+        TrafficLight parsed = TrafficLight.valueOf("RED");
+        System.out.println("Parsed: " + parsed);
+    }
+}`,
+            expectedOutput: "State: GREEN\nOrdinal: 2\nTotal: 3\nParsed: RED",
+          },
+          {
+            slug: "enums-with-fields",
+            title: "Enum Constructors and Methods",
+            order: 2,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`public class Main {
+    enum Coin {
+        PENNY(1), NICKEL(5), DIME(10), QUARTER(25);
+
+        private final int cents;
+        Coin(int cents) { this.cents = cents; }
+        public int cents() { return cents; }
+    }
+
+    public static void main(String[] args) {
+        int total = 0;
+        for (Coin c : Coin.values()) {
+            System.out.println(c + " = " + c.cents() + " cents");
+            total += c.cents();
+        }
+        System.out.println("Total: " + total + " cents");
+    }
+}`,
+            expectedOutput: "PENNY = 1 cents\nNICKEL = 5 cents\nDIME = 10 cents\nQUARTER = 25 cents\nTotal: 41 cents",
+          },
+          {
+            slug: "enum-abstract-methods",
+            title: "Per-Constant Behaviour with Abstract Methods",
+            order: 3,
+            duration: 14,
+            isPremium: false,
+            starterCode:
+`public class Main {
+    enum Op {
+        ADD { public int apply(int a, int b) { return a + b; } },
+        SUB { public int apply(int a, int b) { return a - b; } },
+        MUL { public int apply(int a, int b) { return a * b; } };
+
+        public abstract int apply(int a, int b);
+    }
+
+    public static void main(String[] args) {
+        for (Op op : Op.values()) {
+            System.out.println(op + "(3, 4) = " + op.apply(3, 4));
+        }
+    }
+}`,
+            expectedOutput: "ADD(3, 4) = 7\nSUB(3, 4) = -1\nMUL(3, 4) = 12",
+          },
+          {
+            slug: "enums-implement-interface",
+            title: "Enums Implementing Interfaces",
+            order: 4,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`public class Main {
+    interface Greetable { String greet(); }
+
+    enum Lang implements Greetable {
+        ENGLISH { public String greet() { return "Hello"; } },
+        SPANISH { public String greet() { return "Hola"; } },
+        FRENCH  { public String greet() { return "Bonjour"; } };
+    }
+
+    public static void main(String[] args) {
+        for (Lang l : Lang.values()) {
+            System.out.println(l + ": " + l.greet());
+        }
+    }
+}`,
+            expectedOutput: "ENGLISH: Hello\nSPANISH: Hola\nFRENCH: Bonjour",
+          },
+          {
+            slug: "enumset-enummap",
+            title: "EnumSet and EnumMap",
+            order: 5,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.util.*;
+
+public class Main {
+    enum Day { MON, TUE, WED, THU, FRI, SAT, SUN }
+
+    public static void main(String[] args) {
+        EnumSet<Day> weekend = EnumSet.of(Day.SAT, Day.SUN);
+        EnumSet<Day> weekday = EnumSet.complementOf(weekend);
+        System.out.println("Weekend: " + weekend);
+        System.out.println("Weekday: " + weekday);
+
+        EnumMap<Day, String> mood = new EnumMap<>(Day.class);
+        mood.put(Day.MON, "tired");
+        mood.put(Day.FRI, "happy");
+        mood.put(Day.SAT, "ecstatic");
+        for (Map.Entry<Day, String> e : mood.entrySet()) {
+            System.out.println(e.getKey() + ": " + e.getValue());
+        }
+    }
+}`,
+            expectedOutput: "Weekend: [SAT, SUN]\nWeekday: [MON, TUE, WED, THU, FRI]\nMON: tired\nFRI: happy\nSAT: ecstatic",
+          },
+        ],
+      },
+
+      // ── Module 7: Nested & Inner Classes ───────────────────────────
+      {
+        slug: "module-7",
+        title: "Nested and Inner Classes",
+        order: 7,
+        isPremium: false,
+        lessons: [
+          {
+            slug: "static-nested",
+            title: "Static Nested Classes",
+            order: 1,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`public class Main {
+    static class Pair {
+        final int first;
+        final int second;
+        Pair(int a, int b) { first = a; second = b; }
+        @Override
+        public String toString() { return "(" + first + "," + second + ")"; }
+    }
+
+    public static void main(String[] args) {
+        Pair p = new Pair(3, 7);
+        System.out.println("Pair: " + p);
+        System.out.println("Sum: " + (p.first + p.second));
+    }
+}`,
+            expectedOutput: "Pair: (3,7)\nSum: 10",
+          },
+          {
+            slug: "inner-classes",
+            title: "Inner Classes — Linked to Enclosing Instance",
+            order: 2,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`public class Main {
+    private int counter = 0;
+
+    class Incrementer {
+        void increment() { counter++; }
+    }
+
+    public static void main(String[] args) {
+        Main outer = new Main();
+        Main.Incrementer inc = outer.new Incrementer();
+        inc.increment();
+        inc.increment();
+        inc.increment();
+        System.out.println("Counter: " + outer.counter);
+    }
+}`,
+            expectedOutput: "Counter: 3",
+          },
+          {
+            slug: "local-classes",
+            title: "Local Classes",
+            order: 3,
+            duration: 10,
+            isPremium: false,
+            starterCode:
+`public class Main {
+    static String greetMaker(String prefix) {
+        class Greeter {
+            String greet(String name) {
+                return prefix + ", " + name + "!";
+            }
+        }
+        return new Greeter().greet("World");
+    }
+
+    public static void main(String[] args) {
+        System.out.println(greetMaker("Hi"));
+        System.out.println(greetMaker("Hello"));
+    }
+}`,
+            expectedOutput: "Hi, World!\nHello, World!",
+          },
+          {
+            slug: "anonymous-classes",
+            title: "Anonymous Classes",
+            order: 4,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Comparator<String> byLength = new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                return Integer.compare(a.length(), b.length());
+            }
+        };
+        List<String> words = new ArrayList<>(
+            Arrays.asList("banana", "fig", "elderberry", "apple"));
+        words.sort(byLength);
+        System.out.println(words);
+    }
+}`,
+            expectedOutput: "[fig, apple, banana, elderberry]",
+          },
+          {
+            slug: "lambdas-vs-anonymous",
+            title: "Lambdas vs Anonymous Classes",
+            order: 5,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Anonymous class
+        Runnable r1 = new Runnable() {
+            public void run() { System.out.println("anon"); }
+        };
+        // Lambda — same job, much shorter
+        Runnable r2 = () -> System.out.println("lambda");
+
+        r1.run();
+        r2.run();
+
+        List<String> words = new ArrayList<>(
+            Arrays.asList("banana", "fig", "elderberry", "apple"));
+        // TODO: sort by length using a lambda Comparator
+        words.sort((a, b) -> Integer.compare(a.length(), b.length()));
+        System.out.println(words);
+    }
+}`,
+            expectedOutput: "anon\nlambda\n[fig, apple, banana, elderberry]",
+          },
+        ],
+      },
+
+      // ── Module 8: File I/O Basics ──────────────────────────────────
+      {
+        slug: "module-8",
+        title: "File I/O Basics",
+        order: 8,
+        isPremium: false,
+        lessons: [
+          {
+            slug: "path-and-files-api",
+            title: "The Path and Files API",
+            order: 1,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.nio.file.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/example.txt");
+        System.out.println("Path: " + p);
+        System.out.println("Filename: " + p.getFileName());
+        System.out.println("Parent: " + p.getParent());
+        System.out.println("Absolute: " + p.isAbsolute());
+
+        Path resolved = Paths.get("/tmp").resolve("notes/today.md");
+        System.out.println("Resolved: " + resolved);
+    }
+}`,
+            expectedOutput: "Path: /tmp/example.txt\nFilename: example.txt\nParent: /tmp\nAbsolute: true\nResolved: /tmp/notes/today.md",
+          },
+          {
+            slug: "reading-text-files",
+            title: "Reading Text Files",
+            order: 2,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.nio.file.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/poem.txt");
+        Files.writeString(p, "Roses are red\\nViolets are blue\\nJava is solid\\nKotlin is too\\n");
+
+        // TODO: read the whole file as a single String with Files.readString
+        String content = Files.readString(p);
+        System.out.println("--- All ---");
+        System.out.print(content);
+
+        // TODO: read line-by-line with Files.readAllLines
+        List<String> lines = Files.readAllLines(p);
+        System.out.println("Lines: " + lines.size());
+        System.out.println("First: " + lines.get(0));
+    }
+}`,
+            expectedOutput: "--- All ---\nRoses are red\nViolets are blue\nJava is solid\nKotlin is too\nLines: 4\nFirst: Roses are red",
+          },
+          {
+            slug: "writing-text-files",
+            title: "Writing Text Files",
+            order: 3,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.nio.file.*;
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/numbers.txt");
+        // TODO: write three lines: one, two, three (each ending with \\n)
+        Files.writeString(p, "one\\ntwo\\nthree\\n");
+        System.out.println("Wrote: " + Files.size(p) + " bytes");
+
+        // TODO: append "four\\n" using StandardOpenOption.APPEND
+        Files.writeString(p, "four\\n", StandardOpenOption.APPEND);
+        System.out.println("After append: " + Files.size(p) + " bytes");
+
+        List<String> all = Files.readAllLines(p);
+        System.out.println("Lines: " + all);
+    }
+}`,
+            expectedOutput: "Wrote: 14 bytes\nAfter append: 19 bytes\nLines: [one, two, three, four]",
+          },
+          {
+            slug: "working-with-directories",
+            title: "Working with Directories",
+            order: 4,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.nio.file.*;
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path dir = Paths.get("/tmp/sample-dir");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("a.txt"), "alpha");
+        Files.writeString(dir.resolve("b.txt"), "beta");
+        Files.writeString(dir.resolve("c.txt"), "gamma");
+
+        // TODO: list the directory, collect filenames, sorted
+        List<String> names = new ArrayList<>();
+        try (Stream<Path> stream = Files.list(dir)) {
+            stream.map(p -> p.getFileName().toString()).sorted().forEach(names::add);
+        }
+        System.out.println("Files: " + names);
+        System.out.println("Exists: " + Files.exists(dir));
+    }
+}`,
+            expectedOutput: "Files: [a.txt, b.txt, c.txt]\nExists: true",
+          },
+          {
+            slug: "try-with-resources",
+            title: "try-with-resources",
+            order: 5,
+            duration: 12,
+            isPremium: false,
+            starterCode:
+`import java.nio.file.*;
+import java.io.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/twr.txt");
+        Files.writeString(p, "line 1\\nline 2\\nline 3\\n");
+
+        // TODO: open a BufferedReader inside try-with-resources, print each line numbered
+        try (BufferedReader r = Files.newBufferedReader(p)) {
+            String line;
+            int n = 1;
+            while ((line = r.readLine()) != null) {
+                System.out.println(n + ": " + line);
+                n++;
+            }
+        }
+        System.out.println("done — reader auto-closed");
+    }
+}`,
+            expectedOutput: "1: line 1\n2: line 2\n3: line 3\ndone — reader auto-closed",
+          },
+          {
+            slug: "streams-of-lines",
+            title: "Streaming File Lines with Files.lines",
+            order: 6,
+            duration: 14,
+            isPremium: false,
+            starterCode:
+`import java.nio.file.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/log.txt");
+        Files.writeString(p, "INFO: started\\nWARN: slow query\\nERROR: timeout\\nINFO: finished\\nERROR: crash\\n");
+
+        // TODO: count ERROR lines using Files.lines + filter + count
+        long errorCount;
+        try (Stream<String> lines = Files.lines(p)) {
+            errorCount = lines.filter(l -> l.startsWith("ERROR")).count();
+        }
+        System.out.println("Error lines: " + errorCount);
+
+        // TODO: print only INFO lines
+        try (Stream<String> lines = Files.lines(p)) {
+            lines.filter(l -> l.startsWith("INFO")).forEach(System.out::println);
+        }
+    }
+}`,
+            expectedOutput: "Error lines: 2\nINFO: started\nINFO: finished",
           },
         ],
       },

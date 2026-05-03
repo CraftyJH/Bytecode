@@ -1,0 +1,288 @@
+export const meta = {
+  title: "Static Nested Classes",
+  duration: 12,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "sn-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "How do you instantiate a static nested class `Pair` declared inside `Outer` from outside `Outer`?",
+    options: [
+      { text: "new Outer().new Pair()", correct: false, feedback: "That syntax is for non-static inner classes, which require an enclosing instance. A static nested class doesn't need one." },
+      { text: "new Outer.Pair()", correct: true, feedback: "Correct — a static nested class is namespaced under its outer class but otherwise behaves like a top-level class." },
+      { text: "Outer.new Pair()", correct: false, feedback: "There is no such syntax in Java. The `new` keyword must immediately precede the type name." },
+      { text: "new Pair()", correct: false, feedback: "Without an import or qualification, the compiler doesn't know which `Pair` you mean. Static nested classes must be qualified by the outer class name." },
+    ],
+    explanation: "A static nested class lives inside its outer class as a namespace, but doesn't depend on an outer instance. The instantiation syntax is `new Outer.Nested()`, and you can shorten it to `new Nested()` from inside `Outer` itself.",
+    hint: "Does a static nested class need an enclosing object?",
+  },
+  endQ1: {
+    id: "sn-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    static class Point {
+        int x, y;
+        Point(int x, int y) { this.x = x; this.y = y; }
+        public String toString() { return "(" + x + "," + y + ")"; }
+    }
+
+    public static void main(String[] args) {
+        Point p = new Point(2, 5);
+        System.out.println(p);
+    }
+}`,
+    expectedOutput: "(2,5)",
+    explanation: "`Point` is a static nested class, so we can instantiate it from `main` (also static) with no enclosing instance. The `toString` override is invoked implicitly by `println`.",
+  },
+  endQ2: {
+    id: "sn-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which statement about static nested classes is TRUE?",
+    options: [
+      { text: "They can access non-static fields of the enclosing class through `this`.", correct: false, feedback: "Static nested classes have no enclosing instance, so they cannot reach instance fields without an explicit reference." },
+      { text: "They behave like top-level classes that happen to be namespaced inside another class.", correct: true, feedback: "Correct — a static nested class is logically a top-level class with a longer fully qualified name." },
+      { text: "They require the outer class to be instantiated before they can be used.", correct: false, feedback: "That requirement applies only to non-static inner classes. Static nested classes need no outer instance." },
+      { text: "They cannot have their own static methods.", correct: false, feedback: "Static nested classes can have static and instance members, just like a regular class." },
+    ],
+    explanation: "The keyword `static` removes the link to an enclosing instance. The class is grouped under the outer class for organization (think `Map.Entry`), but is otherwise a normal class.",
+  },
+  endQ3: {
+    id: "sn-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the declaration so `Node` is a static nested class inside `LinkedList`:",
+    code: `class LinkedList {
+    ___ class Node {
+        int value;
+        Node next;
+    }
+}`,
+    correctAnswers: ["static"],
+    caseSensitive: true,
+    explanation: "Adding `static` makes `Node` a static nested class. Without it, `Node` would be an inner class and every `Node` would carry a hidden reference to its enclosing `LinkedList`.",
+  },
+  endQ4: {
+    id: "sn-end-4",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    static int outerCount = 10;
+
+    static class Counter {
+        int n;
+        Counter(int n) { this.n = n; }
+        int total() { return n + outerCount; }
+    }
+
+    public static void main(String[] args) {
+        Counter c = new Counter(5);
+        System.out.println(c.total());
+    }
+}`,
+    expectedOutput: "15",
+    explanation: "A static nested class can freely access static members of the enclosing class (`outerCount`) because they belong to the class, not to an instance. `5 + 10` prints `15`.",
+  },
+};
+
+A class declared inside another class is called a **nested class**. Java offers four flavors of them: static nested classes, inner classes, local classes, and anonymous classes. They look similar at first glance but differ in how they capture (or don't capture) the enclosing context. This module walks through each kind and shows when to reach for which.
+
+We start with the simplest variant: the **static nested class**. Despite living inside another class, it does not depend on an instance of that class. Think of it as a top-level class that happens to be namespaced inside its parent for organizational purposes.
+
+## What is a static nested class?
+
+A static nested class is a class declared inside another class with the `static` keyword:
+
+```java
+public class Outer {
+    static class Nested {
+        void hello() {
+            System.out.println("hi from Nested");
+        }
+    }
+}
+```
+
+The `static` keyword here does **not** mean "only one instance" the way it does on a field. It means "this class is not tied to an instance of `Outer`." You can create as many `Nested` objects as you like, and each one stands alone — no hidden reference to an `Outer` lurks inside it.
+
+<Note>The `static` modifier on a nested class has a different meaning than on a field or method. On a field it means "shared by all instances." On a nested class it means "no enclosing instance is captured." It's the same keyword reused for different purposes.</Note>
+
+## Instantiating from outside
+
+From outside `Outer`, you instantiate `Nested` by qualifying the type with the outer class name:
+
+```java
+Outer.Nested n = new Outer.Nested();
+n.hello();   // hi from Nested
+```
+
+The qualifier `Outer.` is only a namespace prefix — like writing `java.util.List`. There is no `Outer` object involved. From inside `Outer` itself, you can drop the prefix and write `new Nested()` because the name is already in scope.
+
+## A real-world analogy: nested folders
+
+Picture a folder called `kitchen/` on your computer. Inside it you have a sub-folder called `recipes/`. Files inside `recipes/` are organized under `kitchen/`, but they are independent files — they don't require the `kitchen/` folder to be "open" or "running" to exist. A static nested class is the same idea: it lives inside a parent for grouping, but it is otherwise a self-sufficient unit.
+
+## When to use a static nested class
+
+The Java standard library is full of examples. The clearest is `Map.Entry`:
+
+```java
+import java.util.Map;
+import java.util.HashMap;
+
+Map<String, Integer> ages = new HashMap<>();
+ages.put("Alice", 30);
+for (Map.Entry<String, Integer> entry : ages.entrySet()) {
+    System.out.println(entry.getKey() + " -> " + entry.getValue());
+}
+```
+
+`Entry` is conceptually tied to `Map` — a key/value pair only makes sense in the context of a map — but a single `Entry` object doesn't need a `Map` instance to exist. Declaring it as `static` keeps the namespace tidy without imposing a runtime relationship.
+
+Common use cases:
+
+- **Helper data structures** that are an implementation detail of the outer class (linked-list `Node`, tree `Branch`).
+- **Builders** for the outer class (`StringBuilder`-style fluent builders are often nested).
+- **Simple value/record types** scoped to the outer class.
+
+If your nested type doesn't need to reach into instance state of the outer, use `static`. It's smaller, faster, and easier to reason about.
+
+<Note>If you're on Java 16 or later, a record nested inside another class is implicitly static — you cannot remove the staticness. The language designers picked the safer default.</Note>
+
+## A second example: a tree node
+
+```java
+public class BinaryTree {
+    static class Node {
+        int value;
+        Node left;
+        Node right;
+
+        Node(int value) {
+            this.value = value;
+        }
+    }
+
+    private Node root;
+
+    void add(int value) {
+        root = insert(root, value);
+    }
+
+    private Node insert(Node node, int value) {
+        if (node == null) return new Node(value);
+        if (value < node.value) node.left = insert(node.left, value);
+        else node.right = insert(node.right, value);
+        return node;
+    }
+}
+```
+
+`Node` is a static nested class because a `Node` object on its own — without a tree — is meaningful. Code outside `BinaryTree` rarely needs to construct a `Node` directly, so nesting it inside the tree class hides the implementation detail nicely.
+
+## Accessing the outer class
+
+A static nested class can read **static** members of the outer class freely (including private ones), but cannot reach instance members without an explicit reference:
+
+```java
+public class Outer {
+    private static int classConstant = 42;
+    private int instanceField = 7;
+
+    static class Nested {
+        void demo() {
+            System.out.println(classConstant);     // OK — static
+            // System.out.println(instanceField); // Compile error — needs an Outer object
+        }
+    }
+}
+```
+
+This is the same rule that applies inside any static method: no implicit `this`, so no instance state.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run** on the starter code below. The program defines a tiny `Pair` class as a static nested class inside `Main` and prints a pair plus the sum of its parts. You should see:
+
+```
+Pair: (3,7)
+Sum: 10
+```
+
+Try changing the numbers, or add a `swap()` method to `Pair` that returns a new pair with the components reversed.
+
+## Static nested vs top-level: why bother nesting?
+
+A reasonable question: if a static nested class behaves like a top-level class, why nest it at all? Three reasons:
+
+1. **Encapsulation of implementation detail.** A `Node` class is meaningless outside its owning data structure — nesting it signals that.
+2. **Tidier namespace.** `Map.Entry` is clearly part of `Map`. As a separate top-level class it would just be `Entry`, which is too vague.
+3. **Access to private static members.** A static nested class can read the outer class's private static fields and methods, which is sometimes useful for tightly coupled helpers.
+
+If none of these apply, prefer a top-level class — fewer levels of nesting are easier to read.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting `static` and getting an inner class instead.** Without `static`, every instance of the nested class secretly carries a reference to the enclosing instance. That can leak memory and prevent the outer object from being garbage collected. If your class doesn't need the enclosing instance, mark it `static`.
+- **Trying to access instance fields of the outer class.** A static nested class has no implicit `Outer.this`. To read `outer.instanceField` you must accept an `Outer` reference as a parameter. The compiler error message is "non-static variable cannot be referenced from a static context."
+- **Writing `new Outer().new Nested()` for a static nested class.** That syntax is reserved for non-static inner classes. For static nested classes, write `new Outer.Nested()` — no outer instance required.
+- **Confusing the `static` keyword's two meanings.** On a field, `static` means "shared by all instances." On a nested class, it means "no enclosing instance." Different concepts, same word.
+- **Over-nesting.** If a class is reused outside its parent, promote it to a top-level class. Deep nesting just to "tidy up" hurts readability when the inner type is also imported elsewhere.
+
+## Recap
+
+Static nested classes are the friendliest member of the nested-class family. They give you namespace organization and access to the outer class's private statics without the runtime overhead of capturing an enclosing instance.
+
+- A **static nested class** is declared with `static` inside another class
+- It does **not** depend on an instance of the outer class
+- Instantiate from outside as `new Outer.Nested()`; from inside `Outer`, just `new Nested()`
+- Useful for `Entry`-style helpers, tree/list node types, and tightly coupled builders
+- It can access static members (including private ones) of the outer class, but not instance members without an explicit reference
+- When in doubt, prefer `static` — it's the simpler default
+
+**Up next:** Inner Classes — the non-static cousin that really does carry an enclosing instance with it.
+
+<Exercise>
+The starter program declares a static nested class `Pair` inside `Main`. Run it as-is and confirm the output. Then experiment: try removing the `static` keyword from `Pair` — what error does the compiler give you? (Put the `static` back when you're done; the test relies on it.)
+
+```java
+public class Main {
+    static class Pair {
+        final int first;
+        final int second;
+        Pair(int a, int b) { first = a; second = b; }
+        @Override
+        public String toString() { return "(" + first + "," + second + ")"; }
+    }
+
+    public static void main(String[] args) {
+        Pair p = new Pair(3, 7);
+        System.out.println("Pair: " + p);
+        System.out.println("Sum: " + (p.first + p.second));
+    }
+}
+```
+
+**What the tests check:**
+- The program prints `Pair: (3,7)` followed by `Sum: 10`
+- `Pair` is declared `static` (so `main`, also static, can instantiate it with no enclosing instance)
+- The fields are `final` so a `Pair` is immutable
+
+<Note>Why does `main` work without an `outer.new Pair()` style call? Because `Pair` is static — it has no enclosing instance. From inside `Main` itself, `new Pair(...)` is enough.</Note>
+</Exercise>

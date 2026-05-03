@@ -1,0 +1,286 @@
+export const meta = {
+  title: "Local Classes",
+  duration: 10,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "lc-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What does 'effectively final' mean for a local variable captured by a local class?",
+    options: [
+      { text: "It must be declared with the `final` keyword.", correct: false, feedback: "Since Java 8, the `final` keyword is no longer required — but the variable must still behave as if it were final." },
+      { text: "It is never reassigned after its initial assignment, even if it isn't declared `final`.", correct: true, feedback: "Correct — the compiler infers final-ness from your usage. If you assign to the variable a second time, it loses effectively-final status and the local class can't capture it." },
+      { text: "It is automatically copied into the local class with a getter and setter.", correct: false, feedback: "There is no synthetic accessor — the local class captures the value directly into a synthetic field." },
+      { text: "It refers only to method parameters, not to local variables.", correct: false, feedback: "Both parameters and local variables can be effectively final." },
+    ],
+    explanation: "Effectively final is the relaxed rule introduced in Java 8: a variable counts as final if you don't reassign it after initialization, even without the `final` keyword. This applies to both lambdas and local classes — they can capture only effectively final locals.",
+    hint: "If you can prove the variable's value never changes, the compiler can capture its current value safely.",
+  },
+  endQ1: {
+    id: "lc-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    static Runnable make(int seed) {
+        class Task implements Runnable {
+            public void run() {
+                System.out.println("seed=" + seed);
+            }
+        }
+        return new Task();
+    }
+
+    public static void main(String[] args) {
+        Runnable a = make(7);
+        Runnable b = make(42);
+        a.run();
+        b.run();
+    }
+}`,
+    expectedOutput: "seed=7\nseed=42",
+    explanation: "Each call to `make` produces a fresh `Task` that captures the current value of `seed`. The local class is generated once at compile time, but every instance carries its own copy of the captured value, so the two `Runnable`s remember different seeds.",
+  },
+  endQ2: {
+    id: "lc-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which is true about a local class declared inside a method?",
+    options: [
+      { text: "It is visible from outside the method as `MethodName.LocalClass`.", correct: false, feedback: "Local classes have no public name outside the enclosing method or block. They can't be referenced by clients of the class." },
+      { text: "Its scope ends at the closing brace of the enclosing block.", correct: true, feedback: "Correct — the name `Task` exists only between the local class declaration and the closing `}` of the surrounding block." },
+      { text: "It cannot capture any local variables.", correct: false, feedback: "It *can* capture local variables, but only those that are effectively final." },
+      { text: "It must be declared `static`.", correct: false, feedback: "Local classes cannot be marked `static` (with the exception of static members in modern Java). The keyword is not allowed on the class declaration itself." },
+    ],
+    explanation: "A local class is scoped exactly like a local variable. Its name disappears after the closing brace, although the *objects* you create from it can still escape the method via a return value (then accessed only through a supertype).",
+  },
+  endQ3: {
+    id: "lc-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the keyword that allows a local variable to be captured by a local class without restriction:",
+    code: "// effectively ___ — value never reassigned after initialization\nint count = 5;",
+    correctAnswers: ["final"],
+    caseSensitive: false,
+    explanation: "A variable is *effectively final* if it is never reassigned after its initial value is given. The compiler treats it like a `final` declaration for the purpose of capture by inner, local, and anonymous classes (and lambdas).",
+  },
+  endQ4: {
+    id: "lc-end-4",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        String prefix = ">> ";
+        class Printer {
+            void print(String s) { System.out.println(prefix + s); }
+        }
+        Printer p = new Printer();
+        p.print("hello");
+        p.print("world");
+    }
+}`,
+    expectedOutput: ">> hello\n>> world",
+    explanation: "The local class `Printer` captures the effectively final variable `prefix`. Every call to `p.print` uses the same captured value, so both lines are prefixed with `>> `.",
+  },
+};
+
+A **local class** is a class declared inside a method body, a constructor, or an initializer block. Its scope is exactly the surrounding block — once you pass the closing brace, the class name is gone, just like any other local declaration.
+
+Local classes were a clever workaround back when Java had no lambdas. They let you bundle a small bit of state and behavior together inside a single method, then expose it to callers through a supertype (interface or abstract class). Today, lambdas have replaced most uses, but local classes are still useful when you need a class with multiple methods, mutable state, or a constructor.
+
+## Declaring a local class
+
+A local class looks identical to a top-level class, just nested inside a method:
+
+```java
+public class Main {
+    static String greet(String name) {
+        class Greeter {
+            String hello() { return "Hello, " + name + "!"; }
+        }
+        Greeter g = new Greeter();
+        return g.hello();
+    }
+}
+```
+
+The class `Greeter` exists only between its declaration and the closing brace of `greet`. You cannot refer to `Greeter` from outside the method — and that's by design. A local class is for use right here, right now.
+
+<Note>Local classes can capture the enclosing method's parameters and local variables, but only if they are effectively final. We'll unpack that constraint in a moment.</Note>
+
+## Real-world analogy: a one-time-use stencil
+
+Think of a craft project where you cut a stencil out of cardboard, use it to paint a few shapes, and then throw it away. The stencil exists only for the duration of the project; you don't keep it on a shelf. A local class is a stencil scoped to a method: it's created when the method needs it, used to stamp out a few objects, and disappears when the method returns.
+
+## Capturing local variables
+
+Just like inner classes, local classes can read fields of the enclosing class (if there is one). On top of that, they can capture **local variables and parameters** of the enclosing method:
+
+```java
+static Runnable countdown(int start) {
+    class Counter implements Runnable {
+        public void run() {
+            for (int i = start; i > 0; i--) {
+                System.out.println(i);
+            }
+        }
+    }
+    return new Counter();
+}
+```
+
+The `Counter` instance returned by `countdown` remembers the value of `start` even after `countdown` has returned. Internally, the compiler stashes a copy of `start` into a synthetic field of `Counter`.
+
+## The effectively-final rule
+
+The captured local variable must be **effectively final** — meaning it is never reassigned after initialization. This restriction has a good reason: the local class instance might outlive the method, so it captures the value at construction time. If the variable could change later, the local class's view of it would diverge from the method's view, and that would be confusing.
+
+```java
+static Runnable broken() {
+    int x = 10;
+    Runnable r = () -> System.out.println(x);   // OK so far
+    // x = 20;   // <-- if you uncomment this, both this line and the lambda fail to compile
+    return r;
+}
+```
+
+The compiler error reads `Variable used in lambda expression should be final or effectively final`. The same message applies to local classes.
+
+<Note>Effectively final was added in Java 8 alongside lambdas. Before that, you had to write `final int x = 10;` explicitly to capture in an anonymous class. The keyword is no longer required, but the *behavior* must be the same.</Note>
+
+## Local classes vs lambdas
+
+Most simple cases that needed local classes ten years ago are now expressed as lambdas. So when does a local class still make sense?
+
+- **You need multiple methods.** Lambdas implement a single abstract method. If you want a class with `start()` and `stop()`, write a local class.
+- **You need a constructor.** Lambdas have no explicit constructor.
+- **You need state across calls.** A lambda can capture variables, but its body is executed fresh each call. A local class is a real object with mutable instance fields.
+- **You want to extend a concrete class.** Lambdas can only target functional interfaces.
+
+Here's an example that genuinely needs a local class:
+
+```java
+static Iterable<Integer> range(int start, int endExclusive) {
+    class RangeIterator implements java.util.Iterator<Integer> {
+        int current = start;
+        public boolean hasNext() { return current < endExclusive; }
+        public Integer next()    { return current++; }
+    }
+    return () -> new RangeIterator();   // Iterable.iterator() is functional
+}
+```
+
+`RangeIterator` has mutable state (`current`) and two methods, so a lambda can't replace it.
+
+## A second example: a small parser
+
+```java
+static java.util.List<String> splitWords(String input) {
+    class Parser {
+        int pos = 0;
+        boolean atEnd() { return pos >= input.length(); }
+        String nextWord() {
+            while (!atEnd() && Character.isWhitespace(input.charAt(pos))) pos++;
+            int start = pos;
+            while (!atEnd() && !Character.isWhitespace(input.charAt(pos))) pos++;
+            return input.substring(start, pos);
+        }
+    }
+
+    Parser p = new Parser();
+    java.util.List<String> out = new java.util.ArrayList<>();
+    while (!p.atEnd()) {
+        String w = p.nextWord();
+        if (!w.isEmpty()) out.add(w);
+    }
+    return out;
+}
+```
+
+The `Parser` is a small state machine — too big for a lambda, but too specific to deserve its own top-level class. Living inside `splitWords` is just right.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+The starter program defines a local class `Greeter` inside the `greetMaker` method. Each call to `greetMaker` builds a fresh `Greeter` that captures the `prefix` parameter, then calls `greet("World")`. Run it and you should see:
+
+```
+Hi, World!
+Hello, World!
+```
+
+Notice that `prefix` is never reassigned — that's why the local class can capture it. Try assigning a new value to `prefix` inside `greetMaker` and watch the compile error.
+
+## Visibility and access modifiers
+
+Local classes don't get access modifiers (`public`, `private`, `protected`) on the class declaration itself — they wouldn't mean anything because the class is invisible outside the method anyway. The compiler enforces this; writing `public class Greeter` inside a method is an error.
+
+Members inside the local class can have access modifiers, but again, they are only meaningful relative to the enclosing method.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Reassigning a captured variable.** Writing `x = x + 1;` after a local class has captured `x` breaks the effectively-final rule. The compile error is identical to the one you get when a lambda captures a non-final variable. Either don't reassign, or use a small wrapper (a one-element array, an `AtomicInteger`) when you really need mutation.
+- **Trying to instantiate a local class from outside its block.** You can't — the name doesn't exist there. Return an object typed as a supertype (an interface or an abstract base class) that the rest of the program understands.
+- **Adding access modifiers to the local class declaration.** `private class Greeter { ... }` inside a method is a compile error. Local classes are package-private to their containing block, no more, no less.
+- **Forgetting the difference between captured locals and outer fields.** A local class inside an instance method can also see the enclosing object's fields. Those fields are referenced live (any change is visible), unlike captured locals which are snapshotted at construction time.
+- **Reaching for a local class when a lambda would do.** If your "class" implements a functional interface and has a single short method, a lambda is shorter and clearer. Local classes shine when you need richer structure.
+
+## Recap
+
+Local classes are a niche but expressive feature: a full class definition tucked inside a method, with access to that method's variables and the enclosing class's fields. They live and die with the surrounding block.
+
+- A **local class** is declared inside a method, constructor, or initializer block
+- Its **name** is in scope only until the enclosing block's closing brace
+- It can capture local variables and parameters that are **effectively final**
+- It can also access the enclosing class's fields normally (when the method is non-static)
+- Most simple uses today are better written as **lambdas**; reach for a local class when you need multiple methods, a constructor, or significant mutable state
+- You cannot mark a local class with access modifiers on the class declaration itself
+
+**Up next:** Anonymous Classes — declaration and instantiation in a single expression.
+
+<Exercise>
+Run the starter code. It defines a local class `Greeter` inside `greetMaker(String prefix)`. Each invocation creates a fresh `Greeter` that captures the current value of `prefix`. The output should be:
+
+```
+Hi, World!
+Hello, World!
+```
+
+```java
+public class Main {
+    static String greetMaker(String prefix) {
+        class Greeter {
+            String greet(String name) {
+                return prefix + ", " + name + "!";
+            }
+        }
+        return new Greeter().greet("World");
+    }
+
+    public static void main(String[] args) {
+        System.out.println(greetMaker("Hi"));
+        System.out.println(greetMaker("Hello"));
+    }
+}
+```
+
+**What the tests check:**
+- `greetMaker("Hi")` returns `"Hi, World!"`
+- `greetMaker("Hello")` returns `"Hello, World!"`
+- The local class `Greeter` is declared inside `greetMaker` (so its name is not visible to `main`)
+
+<Note>Try adding `prefix = prefix + "!";` inside `greetMaker` before the `Greeter` declaration and watch the compiler complain. The capture rule requires `prefix` to be effectively final.</Note>
+</Exercise>

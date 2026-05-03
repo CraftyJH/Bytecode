@@ -1,0 +1,297 @@
+export const meta = {
+  title: "Inner Classes — Linked to Enclosing Instance",
+  duration: 12,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ic-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Given a non-static inner class `Inner` declared inside `Outer`, how do you create an `Inner` instance from outside `Outer`?",
+    options: [
+      { text: "new Outer.Inner()", correct: false, feedback: "That syntax works for *static* nested classes. An inner class needs an enclosing instance." },
+      { text: "new Inner()", correct: false, feedback: "Without an outer instance, the compiler doesn't know which `Outer` to bind the new `Inner` to." },
+      { text: "outer.new Inner()", correct: true, feedback: "Correct — you call `new Inner()` on an existing `Outer` reference. The new `Inner` is implicitly tied to that outer instance." },
+      { text: "Outer.new Inner()", correct: false, feedback: "There is no such syntax. The receiver must be an *instance*, not the class name." },
+    ],
+    explanation: "An inner class is bound to a specific outer instance. The instantiation syntax `outer.new Inner()` makes that link explicit — the new `Inner` will see `outer`'s fields when it accesses them.",
+    hint: "An inner class without an outer object is like a phone without a battery — it can't run.",
+  },
+  endQ1: {
+    id: "ic-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    private int x = 10;
+
+    class Inner {
+        int read() { return x; }
+    }
+
+    public static void main(String[] args) {
+        Main outer = new Main();
+        Main.Inner in = outer.new Inner();
+        outer.x = 25;
+        System.out.println(in.read());
+    }
+}`,
+    expectedOutput: "25",
+    explanation: "`Inner` holds a live reference to `outer`. When `outer.x` is changed to `25`, the `Inner` sees the updated value because it dereferences the same field through the captured outer instance.",
+  },
+  endQ2: {
+    id: "ic-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why might using inner classes contribute to a memory leak?",
+    options: [
+      { text: "They allocate memory faster than other classes.", correct: false, feedback: "Allocation speed isn't the issue. The leak comes from object reachability." },
+      { text: "Each inner instance keeps a hidden reference to the enclosing outer instance, which prevents the outer from being garbage collected.", correct: true, feedback: "Correct — if the inner instance lives longer than expected (e.g., stored in a long-lived collection), it pins the outer in memory too." },
+      { text: "The JVM allocates inner classes on a separate, leaky heap.", correct: false, feedback: "There is no separate heap for inner classes; they live in the normal heap." },
+      { text: "Inner classes have no `finalize` method.", correct: false, feedback: "Most modern Java code shouldn't rely on `finalize` at all — it's been deprecated." },
+    ],
+    explanation: "An inner class instance contains a synthetic field (often called `this$0`) that points at its enclosing outer instance. As long as the inner instance is alive, the outer cannot be collected. This is one reason Android lint warnings nudge you toward static nested classes for handler types.",
+  },
+  endQ3: {
+    id: "ic-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Inside an inner class, how do you refer to the field `name` declared in the enclosing class `Person` when an inner field shadows it?",
+    code: "// inside an inner class declared in Person\nString outerName = ___.name;",
+    correctAnswers: ["Person.this"],
+    caseSensitive: true,
+    explanation: "The qualified `OuterClassName.this` syntax accesses the enclosing instance from inside the inner class. Plain `this` refers to the inner instance itself.",
+  },
+  endQ4: {
+    id: "ic-end-4",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `public class Main {
+    int n = 1;
+
+    class Inner {
+        int n = 2;
+        void show() {
+            int n = 3;
+            System.out.println(n + " " + this.n + " " + Main.this.n);
+        }
+    }
+
+    public static void main(String[] args) {
+        new Main().new Inner().show();
+    }
+}`,
+    expectedOutput: "3 2 1",
+    explanation: "Three different `n`s are in scope. Plain `n` is the local variable (`3`). `this.n` is the inner field (`2`). `Main.this.n` reaches through to the enclosing instance's field (`1`). The qualified `Outer.this` syntax is exactly designed for this disambiguation.",
+  },
+};
+
+A non-static nested class — usually just called an **inner class** — is fundamentally different from a static nested class. Every inner instance is implicitly tied to an instance of the enclosing class. From inside the inner class you can read and write the outer's fields, including its private ones, as if you were sitting inside the outer itself.
+
+This makes inner classes powerful for tightly coupled helpers, but it also makes them the most surprising of the nested-class family. The hidden link to the outer instance affects how you instantiate them, what they can see, and how long they keep memory alive.
+
+## Declaring an inner class
+
+Drop the `static` keyword from a nested class and you have an inner class:
+
+```java
+public class Outer {
+    private int count = 0;
+
+    class Inner {           // no `static`
+        void bump() {
+            count++;        // can read the outer's private field
+        }
+    }
+}
+```
+
+Notice that `Inner.bump()` mutates `count` directly. There's no `outer.count` — the inner class transparently sees `count` as if it lived inside `Outer`. That's because, behind the scenes, every `Inner` instance has a synthetic field pointing at the `Outer` instance it was created from.
+
+## Instantiating an inner class
+
+Because every inner instance is tied to an outer instance, you must supply that outer instance at construction time. From outside `Outer`:
+
+```java
+Outer outer = new Outer();
+Outer.Inner inner = outer.new Inner();
+```
+
+The unusual `outer.new Inner()` syntax names the receiver. The compiler stashes a reference to `outer` inside the new `Inner` so that later, when `inner.bump()` accesses `count`, it knows which outer object's `count` to touch.
+
+From *inside* `Outer`, you can simply write `new Inner()` — the current `this` is used as the enclosing instance:
+
+```java
+public class Outer {
+    Inner make() {
+        return new Inner();    // implicitly: this.new Inner()
+    }
+}
+```
+
+<Note>You cannot write `new Outer.Inner()` — that's the syntax for *static* nested classes. The compiler will give you an error along the lines of "an enclosing instance that contains Outer.Inner is required."</Note>
+
+## Real-world analogy: an employee badge
+
+Imagine an employee badge that only opens doors when scanned by its assigned employee. The badge (the inner instance) is useless without the employee (the outer instance). You can't make a badge first and find an employee for it later — every badge is born tied to a specific person. Inner classes work the same way: they are issued for a specific outer instance and stay linked to it for life.
+
+## What can an inner class see?
+
+Everything in the enclosing class — including private members:
+
+```java
+public class Cart {
+    private double total = 0;
+    private int itemCount = 0;
+
+    class Reporter {
+        String summary() {
+            return itemCount + " items, total $" + total;
+        }
+    }
+}
+```
+
+`Reporter` can read `total` and `itemCount` even though they are `private`. The compiler treats the inner class as if it lived inside `Cart`'s body. This makes inner classes particularly useful for "view" or "iterator" classes that need privileged access to the data.
+
+## Disambiguating `this`
+
+When the inner class has a field with the same name as the outer's, you need a way to refer to each. Plain `this` is the inner instance, and the qualified form `OuterClass.this` reaches through to the enclosing instance:
+
+```java
+public class Outer {
+    int x = 1;
+    class Inner {
+        int x = 2;
+        void show() {
+            System.out.println(this.x);        // 2 — inner field
+            System.out.println(Outer.this.x);  // 1 — outer field
+        }
+    }
+}
+```
+
+The `Outer.this` syntax is the inner class's escape hatch back to the enclosing instance. It works for any depth of nesting (`Outer.Middle.this` and so on), though you should rarely nest inner classes that deeply.
+
+## A second example: an Iterator
+
+A classic use of inner classes is implementing `Iterator` for a custom collection:
+
+```java
+public class IntStack {
+    private int[] data = new int[16];
+    private int top = 0;
+
+    void push(int v) { data[top++] = v; }
+
+    Iterator iterator() { return new Iterator(); }
+
+    class Iterator {
+        private int i = 0;
+        boolean hasNext() { return i < top; }
+        int next()        { return data[i++]; }
+    }
+}
+```
+
+`Iterator` reads `data` and `top` directly because it's an inner class. Each call to `iterator()` produces a new `Iterator` bound to the current `IntStack`, so two iterators on the same stack don't interfere with each other (each has its own `i`), but they both see the same underlying `data`.
+
+<Note>The standard library's `java.util.ArrayList` uses exactly this pattern — its `Itr` class is a private non-static inner class. Read the source if you're curious.</Note>
+
+## The memory-leak gotcha
+
+Because every inner instance pins its outer in memory, an inner class outliving its enclosing instance keeps the outer alive too. This bites in three common situations:
+
+1. **Listeners or callbacks** stored in long-lived event buses, but defined as inner classes of short-lived screens or activities.
+2. **Background threads** whose `Runnable` is an inner class — the thread can outlive its owning object, holding a reference to it.
+3. **Static collections** (caches, registries) that store inner instances by mistake.
+
+If your "inner" class doesn't actually need access to the enclosing instance, mark it `static` and you sidestep the whole issue.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+The starter program below uses an inner class `Incrementer` to bump a private field `counter` on the enclosing `Main` instance. Run it and you should see:
+
+```
+Counter: 3
+```
+
+Notice the `outer.new Incrementer()` syntax in `main` — that's how you create an inner class instance when you're not inside the outer class.
+
+## When to use an inner class (and when not to)
+
+Reach for an inner class when:
+
+- The inner type genuinely needs to access the outer instance's fields.
+- The inner type's lifetime is shorter than or equal to the outer's.
+- The coupling between inner and outer is so tight that they should evolve together.
+
+Avoid an inner class (use static nested or top-level instead) when:
+
+- The inner type is conceptually independent — it just happens to be small.
+- Instances might outlive the outer (long-lived listeners, threads, caches).
+- You find yourself writing `Outer.this.something` constantly — the relationship may be muddled.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Treating an inner class as if it were static.** Writing `new Outer.Inner()` from outside the class fails to compile. The compiler is telling you it needs an enclosing instance — supply one with `outer.new Inner()`.
+- **Declaring static members in a non-static inner class.** Before Java 16 this was outright illegal; even today, mixing static state into an inner class is awkward because each instance is conceptually scoped to its outer. If you need static state, use a static nested class.
+- **Holding onto inner instances longer than the outer.** A long-lived listener, thread, or cached object that captures an outer instance keeps that outer alive in memory until the inner is also released. Mark it `static` if the link isn't needed.
+- **Forgetting `Outer.this` when names collide.** If both inner and outer have a field called `name`, `this.name` refers to the inner one. Use `Outer.this.name` to reach the enclosing instance's field.
+- **Thinking the outer reference is "weak."** It's a normal strong reference. The garbage collector treats it like any other field. If the inner object is reachable, so is the outer.
+
+## Recap
+
+Inner classes are the close-knit cousin of static nested classes — they live inside another class *and* inside one of its instances. The implicit link to the outer instance is what gives them privileged access to private members and what makes them riskier from a memory perspective.
+
+- An **inner class** is a nested class declared *without* `static`
+- Each inner instance carries a synthetic reference to an enclosing outer instance
+- Instantiate from outside as `outer.new Inner()`; from inside the outer class, just `new Inner()`
+- Inner classes can read and write **private** members of the outer instance
+- Use `OuterClass.this` to disambiguate when names collide between inner and outer
+- The hidden outer reference can prevent garbage collection — prefer `static` when you don't need the link
+
+**Up next:** Local Classes — classes declared inside a method body, able to capture local variables.
+
+<Exercise>
+Run the starter program. It defines a non-static inner class `Incrementer` that mutates the enclosing `Main`'s `counter` field. Notice the `outer.new Incrementer()` syntax — `main` is static, so you must supply an outer instance explicitly. After three increments, the counter should reach 3.
+
+```java
+public class Main {
+    private int counter = 0;
+
+    class Incrementer {
+        void increment() { counter++; }
+    }
+
+    public static void main(String[] args) {
+        Main outer = new Main();
+        Main.Incrementer inc = outer.new Incrementer();
+        inc.increment();
+        inc.increment();
+        inc.increment();
+        System.out.println("Counter: " + outer.counter);
+    }
+}
+```
+
+**What the tests check:**
+- The program prints `Counter: 3`
+- `Incrementer` is a non-static inner class (no `static` keyword)
+- Each call to `inc.increment()` modifies the *same* `outer.counter` because the inner class shares the enclosing instance
+
+<Note>Try changing `class Incrementer` to `static class Incrementer`. The compile error you get tells you exactly why inner classes need an enclosing instance: `counter` becomes inaccessible.</Note>
+</Exercise>

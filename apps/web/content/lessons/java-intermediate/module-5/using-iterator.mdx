@@ -1,0 +1,292 @@
+export const meta = {
+  title: "Using Iterator Directly",
+  duration: 12,
+  order: 2,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "ui-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does `Iterator.next()` throw when called after the iterator has been exhausted?",
+    options: [
+      { text: "`IndexOutOfBoundsException`", correct: false, feedback: "That's for indexed access on lists or arrays, not for iterators." },
+      { text: "`NoSuchElementException`", correct: true, feedback: "Correct — `next()` is contractually required to throw `NoSuchElementException` when there is nothing left." },
+      { text: "`NullPointerException`", correct: false, feedback: "Only if the underlying collection contained a null and you assigned it to a primitive — not because the iterator is empty." },
+      { text: "It returns `null` silently", correct: false, feedback: "Returning `null` would be ambiguous (a list can hold real `null` elements). The contract throws instead." },
+    ],
+    explanation: "`Iterator.next()` always advances the iterator. If there is no element to advance to, the contract specifies a `NoSuchElementException`. Always guard with `hasNext()` first.",
+    hint: "It's a runtime exception named after the situation: there's no such next element.",
+  },
+  endQ1: {
+    id: "ui-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> xs = new ArrayList<>(Arrays.asList("a", "b", "c"));
+        Iterator<String> it = xs.iterator();
+        while (it.hasNext()) {
+            System.out.println(it.next().toUpperCase());
+        }
+    }
+}`,
+    expectedOutput: "A\nB\nC",
+    explanation: "`hasNext()` returns true while elements remain. `next()` returns the current element and advances. Each value is upper-cased and printed on its own line.",
+  },
+  endQ2: {
+    id: "ui-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which of the following is a *legitimate* reason to use an explicit `Iterator` rather than a for-each loop?",
+    options: [
+      { text: "You want to remove elements during iteration", correct: true, feedback: "Correct — `Iterator.remove()` is the only safe in-loop removal mechanism for most collections (besides `removeIf`)." },
+      { text: "You want the code to read more cleanly", correct: false, feedback: "For-each is almost always the cleaner read. Explicit iterators are noisier — you switch to them for capability, not aesthetics." },
+      { text: "You want random access by index", correct: false, feedback: "Iterators walk forward only. For random access use `list.get(i)` in a classic `for`." },
+      { text: "Iterators are faster than for-each", correct: false, feedback: "For-each compiles to the same iterator calls. There is no speed difference." },
+    ],
+    explanation: "The big reason to drop down from for-each to a raw `Iterator` is mid-walk removal. A secondary reason is when you want to control advancement yourself (e.g. peek-and-decide, or interleave two iterators in lockstep).",
+    hint: "What can the underlying iterator do that for-each hides?",
+  },
+  endQ3: {
+    id: "ui-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the method that returns true when the iterator still has elements to deliver:",
+    code: "while (it.___()) { System.out.println(it.next()); }",
+    correctAnswers: ["hasNext"],
+    caseSensitive: true,
+    explanation: "`hasNext()` is the look-ahead probe — it tells you whether `next()` would succeed. The full pair is `hasNext()` (peek) and `next()` (consume).",
+  },
+  endQ4: {
+    id: "ui-end-4",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> xs = new ArrayList<>(Arrays.asList(1, 2, 3));
+        Iterator<Integer> it = xs.iterator();
+        try {
+            it.next();
+            it.next();
+            it.next();
+            it.next();
+        } catch (NoSuchElementException e) {
+            System.out.println("done");
+        }
+    }
+}`,
+    expectedOutput: "done",
+    explanation: "The list has three elements. The first three `next()` calls succeed. The fourth has nothing left to return and throws `NoSuchElementException`, which the catch block handles by printing `done`.",
+  },
+};
+
+The for-each loop is convenient, but it hides the machinery underneath. Sometimes you need direct access to that machinery — for example, when you want to remove an element mid-walk, or when your loop logic isn't a simple "do something to every element." That machinery is the **`Iterator<T>`** interface.
+
+In this lesson you'll learn the three methods every iterator exposes, the patterns that need an explicit iterator, and the exceptions you must guard against.
+
+## What is an Iterator?
+
+`java.util.Iterator<T>` is the small interface every Java collection uses to deliver its elements one at a time. It has just three methods:
+
+```java
+public interface Iterator<T> {
+    boolean hasNext();          // is there another element?
+    T       next();             // return the next element, advance
+    default void remove();      // remove the element next() last returned
+}
+```
+
+You almost never write `implements Iterator<T>` yourself (we will, later, in lesson 4). For now think of an iterator as a **cursor** that a collection hands you. The cursor starts before the first element. Calling `next()` advances it and returns the element it just stepped past.
+
+```java
+List<String> tasks = new ArrayList<>(Arrays.asList("eat", "sleep", "code"));
+Iterator<String> it = tasks.iterator();
+while (it.hasNext()) {
+    String task = it.next();
+    System.out.println("doing: " + task);
+}
+```
+
+That prints three lines. The pattern is so common that you should commit it to muscle memory: **get an iterator, loop while `hasNext`, consume with `next`.**
+
+<Note>Every call to `collection.iterator()` returns a *fresh* iterator, starting from the beginning. Iterators are throwaway — you don't reset them, you just ask the collection for a new one.</Note>
+
+## Why does for-each hide this?
+
+Because most loops just want each element in order. The for-each loop:
+
+```java
+for (String task : tasks) {
+    System.out.println("doing: " + task);
+}
+```
+
+is compiled to almost the same five lines as the explicit version above. The compiler calls `tasks.iterator()`, walks `hasNext()`/`next()`, and assigns each result to the loop variable. So when you write a for-each, you *are* using an iterator — you just don't see it.
+
+So why ever drop down? Three reasons:
+
+1. **You need to remove the current element.** For-each gives you no handle on the iterator, so it can't call `remove()`. Lesson 3 shows the safe pattern.
+2. **You need to control advancement yourself** — for example, peek at the next two elements before deciding what to print, or interleave two iterators.
+3. **You want to expose iteration without exposing the collection.** Returning an `Iterator<T>` is a clean way to let callers walk your data without giving them mutate access to the underlying list.
+
+## The contract for `next()` and `hasNext()`
+
+Two rules from the JavaDoc you should know by heart:
+
+- `next()` throws **`java.util.NoSuchElementException`** if the iterator is exhausted.
+- `hasNext()` is *idempotent* — calling it twice in a row gives the same answer; it does not advance the cursor.
+
+```java
+Iterator<Integer> it = List.of(1, 2).iterator();
+it.next();   // 1
+it.next();   // 2
+it.next();   // BANG — NoSuchElementException
+```
+
+You almost always pair them: `while (it.hasNext()) { ... it.next(); ... }`. The `hasNext()` guard is what keeps you out of trouble.
+
+<Note>`hasNext()` looks at the underlying data structure (or buffered state) to decide whether another element is available. It does *not* eagerly fetch the element — only `next()` advances. That's why you can call `hasNext()` repeatedly without side effects.</Note>
+
+## Iterator state
+
+An iterator carries state — at minimum, a position. For an `ArrayList` iterator, that's an integer index into the backing array. For a `LinkedList`, it's a pointer to a node. You should think of an iterator as a *snapshot of where you are*, not as the collection itself.
+
+Two iterators on the same list are independent:
+
+```java
+List<String> xs = new ArrayList<>(Arrays.asList("a", "b", "c"));
+Iterator<String> a = xs.iterator();
+Iterator<String> b = xs.iterator();
+a.next();             // "a" — a is now past index 0
+System.out.println(b.next());  // still "a" — b has its own cursor
+```
+
+This is useful when you need to walk a collection more than once, or compare two views.
+
+## A second pattern: zipping two collections
+
+Iterators shine when you walk *two* collections in lockstep. The for-each loop only knows one source at a time, so the explicit form wins:
+
+```java
+List<String> names  = List.of("Alice", "Bob", "Carol");
+List<Integer> ages   = List.of(30, 25, 41);
+
+Iterator<String>  ni = names.iterator();
+Iterator<Integer> ai = ages.iterator();
+while (ni.hasNext() && ai.hasNext()) {
+    System.out.println(ni.next() + " is " + ai.next());
+}
+// Alice is 30
+// Bob is 25
+// Carol is 41
+```
+
+If the two lists have different sizes, the loop stops at the shorter one — a sensible default. Try doing the same with two for-each loops and you'll see why the explicit cursor is the right tool here.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run** on the starter code. You should see:
+
+```
+doing: eat
+doing: sleep
+doing: code
+done
+```
+
+The starter already shows the canonical `while (it.hasNext()) { ... it.next(); ... }` pattern.
+
+## Iterator vs Iterable
+
+It's easy to confuse the two interfaces because their names look alike, but they play different roles:
+
+- **`Iterable<T>`** is something you can *get an iterator from*. It has one method: `iterator()`. `List`, `Set`, and your own collections implement this.
+- **`Iterator<T>`** is the cursor itself. It has `hasNext()`, `next()`, and `remove()`.
+
+Roughly: an `Iterable` is a *book*, and an `Iterator` is your *bookmark*. You can ask the same book for many bookmarks; each bookmark advances independently.
+
+```java
+List<String> xs  = List.of("a", "b");   // Iterable<String>
+Iterator<String> it1 = xs.iterator();    // Iterator<String> — first bookmark
+Iterator<String> it2 = xs.iterator();    // Iterator<String> — second bookmark
+```
+
+## Calling `next()` without `hasNext()`
+
+You may sometimes see `next()` called inside an `if`, or after a manual count, with no `hasNext()` guard. That's fine *only* when you can prove the iterator has at least one element left:
+
+```java
+Iterator<String> it = words.iterator();
+if (it.hasNext()) {
+    String first = it.next();   // safe — we just checked
+    // ...
+}
+```
+
+Anywhere else, write the `while (it.hasNext())` shape and let the loop terminate cleanly.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Calling `next()` without `hasNext()`** — On an empty or exhausted iterator, `next()` throws `NoSuchElementException`. Always guard with `hasNext()` unless you can prove the iterator is non-empty by another means.
+- **Calling `next()` twice when you only meant once** — Each `next()` advances the cursor. `it.next() + " " + it.next()` consumes *two* elements, which is rarely what you intended. Store the result in a local variable first.
+- **Re-using a finished iterator** — Once `hasNext()` returns `false`, the iterator is done. There is no `reset()`. Call `collection.iterator()` again for a fresh cursor.
+- **Confusing `Iterable` with `Iterator`** — `for (var x : it)` does *not* compile when `it` is an `Iterator`, because `Iterator` is not `Iterable`. (Java 8+ does have `Iterable`-from-`Iterator` adapters, but the two interfaces are distinct.)
+- **Modifying the collection through methods other than `Iterator.remove()`** — Adding or removing elements directly during iteration usually triggers `ConcurrentModificationException` on the next `next()` call. Lesson 3 covers safe alternatives.
+
+## Recap
+
+`Iterator<T>` is the tiny interface every Java collection uses to expose its elements one by one. The for-each loop uses it under the hood; you reach for it explicitly when you need finer control — most often to remove elements safely or to walk multiple collections in lockstep.
+
+- An **`Iterator`** is a forward-only cursor with `hasNext()`, `next()`, and `remove()`
+- `next()` throws **`NoSuchElementException`** if the iterator is exhausted
+- Each call to `collection.iterator()` returns a **fresh** iterator
+- An **`Iterable`** is what you ask for an iterator; an **`Iterator`** is the cursor itself
+- Use an explicit iterator when for-each can't express what you need
+
+**Up next:** Removing Elements Safely While Iterating — what happens when the collection changes under your cursor, and the two correct ways to fix it.
+
+<Exercise>
+The starter walks a list of tasks using `Iterator.hasNext()` and `Iterator.next()` and prints `"doing: <task>"` for each one, then `done` at the end. Run it as-is to see the canonical pattern, then experiment: try adding a task, or printing the index alongside the task using a manual counter.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> tasks = new ArrayList<>(Arrays.asList("eat", "sleep", "code"));
+        Iterator<String> it = tasks.iterator();
+        // TODO: walk the iterator with hasNext / next, printing "doing: <task>"
+        while (it.hasNext()) {
+            String task = it.next();
+            System.out.println("doing: " + task);
+        }
+        System.out.println("done");
+    }
+}
+```
+
+**What the tests check:**
+- Each task is printed on its own line as `doing: <task>`
+- The final line is exactly `done`
+- The loop uses an explicit `Iterator` (not for-each)
+
+<Note>Hint: store `it.next()` in a local variable so you can use the value more than once without advancing the cursor.</Note>
+</Exercise>

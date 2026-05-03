@@ -1,0 +1,325 @@
+export const meta = {
+  title: "Per-Constant Behaviour with Abstract Methods",
+  duration: 14,
+  order: 3,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "eam-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When an enum declares an `abstract` method, what must each constant do?",
+    options: [
+      { text: "Override the method in its own constant body `{ ... }`.", correct: true, feedback: "Correct — every constant must supply a body, otherwise the enum class is incomplete and the compiler refuses." },
+      { text: "Provide the implementation once at the top of the enum.", correct: false, feedback: "A single shared implementation defeats the purpose of an abstract method. If that is what you want, make the method concrete instead." },
+      { text: "Mark itself `abstract` as well.", correct: false, feedback: "Constants cannot be marked `abstract`; they are concrete instances." },
+      { text: "Nothing — the compiler synthesizes an empty body.", correct: false, feedback: "There is no auto-generated body. Forgetting one is a compile error." },
+    ],
+    explanation: "An abstract method on the enum forces every constant to act like a tiny anonymous subclass with its own implementation. That is exactly the strategy-pattern flavour this feature is designed for.",
+    hint: "Think about what `abstract` means in a regular class — what must subclasses do?",
+  },
+  endQ1: {
+    id: "eam-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    enum Op {
+        ADD { public int apply(int a, int b) { return a + b; } },
+        SUB { public int apply(int a, int b) { return a - b; } };
+
+        public abstract int apply(int a, int b);
+    }
+
+    public static void main(String[] args) {
+        System.out.println(Op.ADD.apply(10, 4));
+        System.out.println(Op.SUB.apply(10, 4));
+    }
+}`,
+    expectedOutput: "14\n6",
+    explanation: "Each constant has its own `apply` body. `ADD.apply(10, 4)` returns 14, and `SUB.apply(10, 4)` returns 6.",
+  },
+  endQ2: {
+    id: "eam-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Compared with a `switch` statement inside a single concrete method, what is the main advantage of using an abstract method on the enum?",
+    options: [
+      { text: "The compiler refuses to let you forget a case when you add a new constant.", correct: true, feedback: "Correct — every new constant must supply its own body, so the compiler enforces completeness. A `switch` could silently fall through to a default." },
+      { text: "Abstract methods run faster at runtime than `switch`.", correct: false, feedback: "There is no measurable speed difference. The win is correctness and maintainability, not performance." },
+      { text: "It allows enum constants to extend other enums.", correct: false, feedback: "Enums cannot extend other classes. Per-constant bodies are anonymous subclasses of the enum itself, nothing more." },
+      { text: "It removes the need for a constructor.", correct: false, feedback: "Constructors are independent of abstract methods. You can use both together." },
+    ],
+    explanation: "When the per-constant logic is non-trivial, abstract methods keep each implementation next to its constant and make the compiler your safety net. A central `switch` requires you to remember every place to update.",
+    hint: "What happens if you add a new constant and forget to update the logic?",
+  },
+  endQ3: {
+    id: "eam-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the method declaration so each constant of the enum must supply its own body:",
+    code: "public ___ int apply(int a, int b);",
+    correctAnswers: ["abstract"],
+    caseSensitive: true,
+    explanation: "Marking the method `abstract` removes its body and forces every constant to override it. Forgetting to override in any constant is a compile error.",
+  },
+  endQ4: {
+    id: "eam-end-4",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Which statement about per-constant bodies (`ADD { ... }`) is correct?",
+    options: [
+      { text: "They are anonymous subclasses of the enum class.", correct: true, feedback: "Correct — each body produces a tiny anonymous subclass. That is why each constant can have its own behavior while still being of type `Op`." },
+      { text: "They generate a separate top-level class file you can refer to by name.", correct: false, feedback: "The compiler does emit synthetic class files (`Op$1.class`, etc.), but you cannot reference them by name." },
+      { text: "They make the constant a different type from the enum, which causes `==` to fail.", correct: false, feedback: "The constant is still assignable to the enum type, and `==` works exactly as before because the constant is still a singleton." },
+      { text: "They run a static initialiser instead of a constructor.", correct: false, feedback: "The constructor still runs. The body is for *method* overrides, not for replacing initialisation." },
+    ],
+    explanation: "Each per-constant body is syntactic sugar for an anonymous subclass of the enum. The compiler synthesises classes named `Op$1`, `Op$2`, and so on, one per body. The constants you reference are instances of those subclasses.",
+    hint: "Why can each constant have a different `apply` while all sharing the same `Op` type?",
+  },
+};
+
+In the previous lesson we gave an enum *data*: each constant carried its own value in `private final` fields. That works beautifully when the data alone is enough to drive behavior — `cents()` just returns a stored number. But sometimes the work each constant has to do is genuinely different: addition is not subtraction, and a JSON serializer is not a YAML serializer. For these cases Java lets each enum constant carry its own implementation of a method through **abstract methods with per-constant bodies**.
+
+This is the closest thing Java's enums have to the classical Strategy pattern, and it is one of the most elegant features in the language once you see it in action.
+
+## The pattern
+
+Declare the method as `abstract` on the enum itself, then provide a body inside each constant's `{ ... }` block:
+
+```java
+enum Op {
+    ADD { public int apply(int a, int b) { return a + b; } },
+    SUB { public int apply(int a, int b) { return a - b; } },
+    MUL { public int apply(int a, int b) { return a * b; } };
+
+    public abstract int apply(int a, int b);
+}
+```
+
+Three rules govern this construct:
+
+1. The method is declared `abstract` once on the enum.
+2. **Every** constant must supply a body. Forgetting one constant is a compile error.
+3. Each body lives inside the curly braces immediately after the constant name, and is separated from the next constant by a comma — not a semicolon.
+
+The semicolon after the last constant body is the same one we met in lesson 2 — the boundary between the constant list and the rest of the enum body.
+
+## What is really happening: anonymous subclasses
+
+Under the hood, the compiler treats each per-constant body as an *anonymous subclass* of the enum. Conceptually, this:
+
+```java
+enum Op {
+    ADD { public int apply(int a, int b) { return a + b; } };
+    public abstract int apply(int a, int b);
+}
+```
+
+…is equivalent to writing one Op subclass per constant:
+
+```java
+abstract class Op {
+    public abstract int apply(int a, int b);
+}
+
+class OpAdd extends Op {                          // synthesized as Op$1
+    public int apply(int a, int b) { return a + b; }
+}
+
+// …and ADD is the single instance of OpAdd.
+```
+
+You will see the synthetic class files (`Op$1.class`, `Op$2.class`, ...) in your compiled output. You cannot reference those types by name, and you do not need to — the public face is still just `Op`.
+
+<Note>Because the constants are subclass instances, calling `getClass()` on them returns the synthetic subclass: `Op.ADD.getClass()` is *not* `Op.class`. If you need the declaring enum type, use `getDeclaringClass()` instead.</Note>
+
+## A second example: a tiny logger
+
+Imagine three log levels, each formatting messages a little differently:
+
+```java
+enum LogLevel {
+    INFO {
+        public String format(String msg) { return "[INFO] " + msg; }
+    },
+    WARN {
+        public String format(String msg) { return "[WARN] *** " + msg + " ***"; }
+    },
+    ERROR {
+        public String format(String msg) {
+            return "[ERROR] !!! " + msg.toUpperCase() + " !!!";
+        }
+    };
+
+    public abstract String format(String msg);
+}
+
+System.out.println(LogLevel.INFO.format("started"));     // [INFO] started
+System.out.println(LogLevel.WARN.format("low disk"));    // [WARN] *** low disk ***
+System.out.println(LogLevel.ERROR.format("crashed"));    // [ERROR] !!! CRASHED !!!
+```
+
+If a developer adds `DEBUG` tomorrow, the compiler immediately complains until they add a `format` body. The IDE points at the constant, not at some far-away `switch`.
+
+## Field-based dispatch vs. abstract methods
+
+There is more than one way to model per-constant behavior. Compare these two designs of the same operator enum:
+
+### Field-based dispatch
+
+```java
+enum Op {
+    ADD("+"), SUB("-"), MUL("*");
+
+    private final String symbol;
+    Op(String symbol) { this.symbol = symbol; }
+
+    public int apply(int a, int b) {
+        switch (this) {
+            case ADD: return a + b;
+            case SUB: return a - b;
+            case MUL: return a * b;
+            default:  throw new AssertionError("Unhandled: " + this);
+        }
+    }
+}
+```
+
+### Abstract method dispatch
+
+```java
+enum Op {
+    ADD("+") { public int apply(int a, int b) { return a + b; } },
+    SUB("-") { public int apply(int a, int b) { return a - b; } },
+    MUL("*") { public int apply(int a, int b) { return a * b; } };
+
+    private final String symbol;
+    Op(String symbol) { this.symbol = symbol; }
+
+    public abstract int apply(int a, int b);
+}
+```
+
+Both compile, both produce the same output. The differences appear when the codebase grows.
+
+| Concern                | `switch` on `this`                                      | Abstract method bodies                                       |
+| ---------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| Adding a constant      | Easy to forget the new `case`; falls through to default | Compiler error until you add the body                        |
+| Reading the logic      | One method shows everything in one place                | Logic lives next to each constant — local reasoning          |
+| Trivial operations     | Compact and fine                                        | A bit more boilerplate                                       |
+| Non-trivial operations | `switch` arm grows long, and `default` hides bugs       | Each body is self-contained; can use helpers freely          |
+
+The conventional rule of thumb: prefer a `switch` (or stored-function field) when the per-constant logic is one short line; prefer abstract methods when the logic is several lines, when there are multiple methods that each constant must implement, or when correctness on growth matters more than terse code.
+
+<Note>If you do go the `switch` route, always include a `default` that throws `AssertionError`. It will fire loudly the first time someone adds a constant without updating the switch.</Note>
+
+## Combining fields and abstract methods
+
+The two techniques compose freely. Constants can carry data *and* override methods at the same time:
+
+```java
+enum Op {
+    ADD("+") { public int apply(int a, int b) { return a + b; } },
+    SUB("-") { public int apply(int a, int b) { return a - b; } },
+    MUL("*") { public int apply(int a, int b) { return a * b; } };
+
+    private final String symbol;
+    Op(String symbol) { this.symbol = symbol; }
+
+    public String symbol() { return symbol; }
+    public abstract int apply(int a, int b);
+}
+
+System.out.println(Op.MUL.symbol() + " => " + Op.MUL.apply(3, 4));   // * => 12
+```
+
+The constructor argument is supplied *before* the body, in the form `CONSTANT(args) { body }`.
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Run the starter code. The loop walks every operator and applies it to `(3, 4)`:
+
+```
+ADD(3, 4) = 7
+SUB(3, 4) = -1
+MUL(3, 4) = 12
+```
+
+This pattern is one of the cleanest small examples of polymorphism in the language: the loop just calls `op.apply(...)` and the right body runs based on which constant `op` happens to be.
+
+## Beyond binary operators: a real-world analogy
+
+Think of each enum constant with a per-constant body as a worker on an assembly line. The line tells every worker "do your job," but each worker performs a different specialty: the welder welds, the painter paints, the inspector inspects. The orchestrator only cares that everyone has a `doYourJob()` method. From the outside it looks uniform; on the inside, each worker's body is different. That is exactly what an abstract enum method buys you in code.
+
+## Strategy pattern in miniature
+
+In classical OOP the Strategy pattern uses a separate class per strategy plus a factory or registry to choose between them. With enum abstract methods, the strategies *are* the constants: there is no registry to maintain, no naming dance, and the closed set is enforced by the type system. The downside — and it is real — is that you cannot add a new strategy without modifying the enum. Use this pattern when the set of strategies is genuinely closed and stable.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Forgetting a body for a new constant.** Adding `DIV` without a `{ public int apply(...) ... }` block produces a compile error. The error message is your friend; read it carefully.
+- **Putting the body in the wrong place.** The body belongs immediately after the constant name, before the comma. Writing it after the constructor arguments works (`MUL("*") { ... }`), but writing it before the arguments does not.
+- **Using `switch` on `this` without a `default` that throws.** A silent fall-through is the source of most "we shipped a constant without handling it" bugs. Always throw `AssertionError` from `default`.
+- **Calling `getClass()` on a per-constant body and being surprised.** Because the body is an anonymous subclass, `getClass()` returns the synthetic `Op$1`. Use `getDeclaringClass()` when you want the enum type itself.
+- **Reaching for abstract methods when one shared implementation would do.** If the logic is identical for every constant, a regular concrete method is simpler and more honest.
+
+## Recap
+
+Per-constant abstract methods turn an enum into a tiny, type-safe family of strategies.
+
+- Declare the method `abstract` on the enum and **every** constant must override it.
+- Each constant body is syntactic sugar for an anonymous subclass of the enum.
+- The compiler forces completeness: forgetting a body is a compile error, not a runtime surprise.
+- Constants can combine constructor arguments and method bodies — `MUL("*") { ... }`.
+- Prefer this style when per-constant logic is non-trivial or when correctness on growth matters; a `switch` with a throwing `default` is fine for one-line behaviors.
+
+**Up next:** Enums Implementing Interfaces — once an enum has methods, it is a small step to making it satisfy an existing API contract such as `Comparable` or `Runnable`.
+
+<Exercise>
+Run the program. Each operator constant has its own `apply` body, so the loop prints the operator name followed by the result of `apply(3, 4)`:
+
+```
+ADD(3, 4) = 7
+SUB(3, 4) = -1
+MUL(3, 4) = 12
+```
+
+```java
+public class Main {
+    enum Op {
+        ADD { public int apply(int a, int b) { return a + b; } },
+        SUB { public int apply(int a, int b) { return a - b; } },
+        MUL { public int apply(int a, int b) { return a * b; } };
+
+        public abstract int apply(int a, int b);
+    }
+
+    public static void main(String[] args) {
+        for (Op op : Op.values()) {
+            System.out.println(op + "(3, 4) = " + op.apply(3, 4));
+        }
+    }
+}
+```
+
+**What the program should do:**
+- Iterate over every constant in `Op.values()`.
+- For each constant, call its own `apply(3, 4)` body.
+- Print the constant name (via `toString()`), the literal arguments, and the computed result.
+- Demonstrate that polymorphic dispatch works through the enum type.
+
+<Note>Hint: try adding `DIV { public int apply(int a, int b) { return a / b; } }` and watch the loop pick it up automatically. Forget the body, and the compiler will tell you exactly where to add it.</Note>
+</Exercise>

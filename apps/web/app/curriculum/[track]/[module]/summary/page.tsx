@@ -499,6 +499,304 @@ public class Main {
     ];
   }
 
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-5") {
+    return [
+      {
+        id: "sum-ji5-1",
+        type: "multiple_choice",
+        difficulty: "easy",
+        question: "Which interface must a class implement so its instances can be used in a for-each loop?",
+        options: [
+          { text: "<code>Comparable&lt;T&gt;</code>", correct: false, feedback: "Comparable defines compareTo for ordering — it has nothing to do with iteration." },
+          { text: "<code>Iterable&lt;T&gt;</code>", correct: true },
+          { text: "<code>Iterator&lt;T&gt;</code>", correct: false, feedback: "Iterator describes the cursor itself; classes return an Iterator from Iterable.iterator()." },
+          { text: "<code>Collection&lt;T&gt;</code>", correct: false, feedback: "Collection works because it extends Iterable, but Iterable is the minimum requirement." },
+        ],
+        explanation: "The for-each loop is syntactic sugar for calling iterator() on an Iterable and walking it with hasNext()/next(). Arrays are also supported as a special case.",
+      },
+      {
+        id: "sum-ji5-2",
+        type: "predict_output",
+        difficulty: "medium",
+        code: `import java.util.*;
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = new ArrayList<>(Arrays.asList(1, 2, 3, 4));
+        Iterator<Integer> it = nums.iterator();
+        while (it.hasNext()) {
+            int n = it.next();
+            if (n % 2 == 0) it.remove();
+        }
+        System.out.println(nums);
+    }
+}`,
+        expectedOutput: "[1, 3]",
+        explanation: "Iterator.remove() safely deletes the element returned by the most recent next(). Even numbers (2 and 4) are removed, leaving [1, 3].",
+      },
+      {
+        id: "sum-ji5-3",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "What happens if you call <code>list.remove(item)</code> directly inside a for-each loop over <code>list</code>?",
+        options: [
+          { text: "The element is removed and iteration continues normally.", correct: false, feedback: "This would only work for very specific implementations — and even then, it's not guaranteed." },
+          { text: "It throws a <code>ConcurrentModificationException</code> on the next iteration.", correct: true },
+          { text: "It throws a <code>NoSuchElementException</code> immediately.", correct: false, feedback: "NoSuchElementException is thrown by next() when there are no more elements, not from external modification." },
+          { text: "Nothing — the modification is silently ignored.", correct: false, feedback: "Modifications are detected via a modCount counter and the iterator throws when it notices the mismatch." },
+        ],
+        explanation: "Java's collection iterators are 'fail-fast' — they detect concurrent modification by tracking a modCount field and throw ConcurrentModificationException. Use Iterator.remove() or Collection.removeIf() instead.",
+        hint: "The keyword to look up is 'fail-fast iterator'.",
+      },
+      {
+        id: "sum-ji5-4",
+        type: "fill_in_blank",
+        difficulty: "easy",
+        prompt: "<code>Iterable&lt;T&gt;</code> declares a single method, <code>___()</code>, which returns an Iterator&lt;T&gt;.",
+        correctAnswers: ["iterator"],
+        caseSensitive: true,
+        explanation: "iterator() is the only abstract method in Iterable. Implementing it makes your class for-each compatible.",
+      },
+      {
+        id: "sum-ji5-5",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "What's a key advantage of <code>Stream</code>-based processing over a classic for-each loop?",
+        options: [
+          { text: "Streams are always faster.", correct: false, feedback: "Streams have overhead; for simple cases a for-each loop is often faster." },
+          { text: "Streams allow declarative pipelines (filter, map, reduce) that read top-to-bottom as the data flows.", correct: true },
+          { text: "Streams replace the need for collections.", correct: false, feedback: "Streams operate on collections (and other sources) — they don't replace them." },
+          { text: "Streams modify the underlying collection in place.", correct: false, feedback: "Streams are non-destructive — they don't modify the source." },
+        ],
+        explanation: "Streams shine for chains of operations that would otherwise need temporary collections or nested loops. They also enable lazy evaluation and easy parallelism (parallelStream).",
+      },
+    ];
+  }
+
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-6") {
+    return [
+      {
+        id: "sum-ji6-1",
+        type: "multiple_choice",
+        difficulty: "easy",
+        question: "Why use an enum instead of a set of <code>public static final int</code> constants?",
+        options: [
+          { text: "Enums use less memory.", correct: false, feedback: "Memory is not the primary concern — type safety is." },
+          { text: "Enums provide compile-time type safety, namespacing, and built-in helpers like values() and valueOf().", correct: true },
+          { text: "Enums are faster than int constants.", correct: false, feedback: "Performance is comparable; the win is correctness, not speed." },
+          { text: "Enums let you change the constants at runtime.", correct: false, feedback: "Enum constants are fixed at compile time — that's the point." },
+        ],
+        explanation: "Pre-enum 'int constants' allowed nonsense like passing 99 where MONDAY was expected. Enums make such errors impossible at compile time.",
+      },
+      {
+        id: "sum-ji6-2",
+        type: "predict_output",
+        difficulty: "medium",
+        code: `public class Main {
+    enum Light { RED, YELLOW, GREEN }
+    public static void main(String[] args) {
+        Light l = Light.GREEN;
+        System.out.println(l.ordinal());
+        System.out.println(Light.values().length);
+        System.out.println(Light.valueOf("RED"));
+    }
+}`,
+        expectedOutput: "2\n3\nRED",
+        explanation: "GREEN is the third constant (ordinal 2, since RED=0, YELLOW=1, GREEN=2). values() has length 3. valueOf(\"RED\") returns the RED constant.",
+      },
+      {
+        id: "sum-ji6-3",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "What is the visibility of an enum's constructor?",
+        options: [
+          { text: "<code>public</code> — anyone can create new constants.", correct: false, feedback: "If anyone could create new constants, enums wouldn't be a fixed set — that contradicts the point of enums." },
+          { text: "<code>private</code> (or package-private) — implicitly. You cannot mark it <code>public</code>.", correct: true },
+          { text: "<code>protected</code> — only subclasses can call it.", correct: false, feedback: "Enums cannot be subclassed by user code, so protected makes no sense here." },
+          { text: "There is no constructor — fields are auto-set.", correct: false, feedback: "Enums absolutely have constructors when you give them fields — the constants pass arguments in their declarations." },
+        ],
+        explanation: "An enum constructor is implicitly private. Trying to mark it public is a compile error. This guarantees the set of constants is fixed at the enum declaration.",
+      },
+      {
+        id: "sum-ji6-4",
+        type: "fill_in_blank",
+        difficulty: "easy",
+        prompt: "To compare two enum constants, use <code>___</code> (the equality operator), not <code>.equals()</code>.",
+        correctAnswers: ["==", "==="],
+        caseSensitive: false,
+        explanation: "Each enum constant is a singleton, so reference equality (==) is exact, faster, and null-safe (== with null is fine; .equals() throws NullPointerException).",
+      },
+      {
+        id: "sum-ji6-5",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "Which is the most appropriate use of an <code>EnumSet</code>?",
+        options: [
+          { text: "Storing arbitrary user-supplied strings.", correct: false, feedback: "EnumSet only holds enum constants — strings won't work." },
+          { text: "Compactly representing which days of the week are 'working days'.", correct: true },
+          { text: "Counting how many times each enum constant appears in a list.", correct: false, feedback: "That's a use case for EnumMap<Day, Integer>, not EnumSet." },
+          { text: "Mapping a String key to an enum value.", correct: false, feedback: "That's a use case for HashMap<String, Day>." },
+        ],
+        explanation: "EnumSet is bit-vector backed — extremely fast and compact when you need to track 'which subset of these enum values is active'.",
+      },
+    ];
+  }
+
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-7") {
+    return [
+      {
+        id: "sum-ji7-1",
+        type: "multiple_choice",
+        difficulty: "easy",
+        question: "What is the key difference between a static nested class and an inner class?",
+        options: [
+          { text: "Static nested classes are faster.", correct: false, feedback: "Performance is comparable; the difference is structural, not runtime." },
+          { text: "An inner class holds an implicit reference to an enclosing instance; a static nested class does not.", correct: true },
+          { text: "Static nested classes can't have private members.", correct: false, feedback: "Both kinds of nested classes can have private members." },
+          { text: "Inner classes can't be instantiated outside their enclosing class.", correct: false, feedback: "They can be — using outer.new Inner() syntax — though it's uncommon." },
+        ],
+        explanation: "The implicit outer reference is the defining feature of inner classes (and a common source of memory leaks). Static nested classes behave like top-level classes that just happen to be namespaced.",
+      },
+      {
+        id: "sum-ji7-2",
+        type: "predict_output",
+        difficulty: "medium",
+        code: `public class Main {
+    private int x = 10;
+    class Inner {
+        int get() { return x; }
+    }
+    public static void main(String[] args) {
+        Main outer = new Main();
+        outer.x = 42;
+        Main.Inner inner = outer.new Inner();
+        System.out.println(inner.get());
+    }
+}`,
+        expectedOutput: "42",
+        explanation: "Inner.get() reads x from the enclosing Main instance. After outer.x = 42, inner.get() returns 42 — the inner instance shares state with its outer instance.",
+      },
+      {
+        id: "sum-ji7-3",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "A local class declared inside a method can refer to local variables of the enclosing method only if those variables are…",
+        options: [
+          { text: "declared <code>volatile</code>.", correct: false, feedback: "volatile is for cross-thread visibility — unrelated to local class capture." },
+          { text: "declared <code>final</code> or effectively final (never reassigned after initialization).", correct: true },
+          { text: "of primitive type.", correct: false, feedback: "The restriction is about reassignment, not type." },
+          { text: "fields of the enclosing class.", correct: false, feedback: "Fields are always accessible. The rule is about local variables specifically." },
+        ],
+        explanation: "Local classes (and lambdas) capture local variables by value. To prevent confusing 'which version did I capture?' questions, Java requires the variable to never change — the 'effectively final' rule.",
+        hint: "Same restriction applies to lambdas — both capture locals.",
+      },
+      {
+        id: "sum-ji7-4",
+        type: "fill_in_blank",
+        difficulty: "easy",
+        prompt: "An anonymous class can either extend exactly one class or implement exactly one ___.",
+        correctAnswers: ["interface"],
+        caseSensitive: false,
+        explanation: "Anonymous class declarations have the form `new Type() { ... }` where Type is either a single class or a single interface. Multiple supertypes aren't supported.",
+      },
+      {
+        id: "sum-ji7-5",
+        type: "multiple_choice",
+        difficulty: "hard",
+        question: "Inside a lambda, what does the keyword <code>this</code> refer to?",
+        options: [
+          { text: "The lambda object itself.", correct: false, feedback: "Lambdas don't have a 'lambda object' you can refer to with this — that's an anonymous-class-only thing." },
+          { text: "The enclosing class instance — the same as in the surrounding code.", correct: true },
+          { text: "It throws a compile error — <code>this</code> is forbidden inside lambdas.", correct: false, feedback: "this is allowed; it just doesn't refer to the lambda." },
+          { text: "<code>null</code>.", correct: false, feedback: "this is never null in valid Java." },
+        ],
+        explanation: "This is one of the key differences between lambdas and anonymous classes: anonymous classes shadow `this` (it refers to the anonymous instance), while lambdas don't shadow it (it refers to the surrounding class).",
+      },
+    ];
+  }
+
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-8") {
+    return [
+      {
+        id: "sum-ji8-1",
+        type: "multiple_choice",
+        difficulty: "easy",
+        question: "Which class represents a path in the modern (NIO.2) Java file API?",
+        options: [
+          { text: "<code>java.io.File</code>", correct: false, feedback: "File is the legacy class. Path (since Java 7) is preferred for new code." },
+          { text: "<code>java.nio.file.Path</code>", correct: true },
+          { text: "<code>java.lang.String</code>", correct: false, feedback: "String can hold a path-like value, but it's not a path type — operations like resolve and getParent live on Path." },
+          { text: "<code>java.nio.file.FileSystem</code>", correct: false, feedback: "FileSystem represents the whole file system; Path represents one location within it." },
+        ],
+        explanation: "Path is immutable, OS-independent, and has rich helper methods. It replaces the legacy File class for new code.",
+      },
+      {
+        id: "sum-ji8-2",
+        type: "fill_in_blank",
+        difficulty: "easy",
+        prompt: "To read an entire UTF-8 text file into a single String in one call (Java 11+), use <code>Files.___(path)</code>.",
+        correctAnswers: ["readString", "readstring"],
+        caseSensitive: false,
+        explanation: "Files.readString(path) returns the file's contents as a String, decoding with UTF-8 by default. For very large files, prefer Files.lines (a Stream).",
+      },
+      {
+        id: "sum-ji8-3",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "By default, <code>Files.writeString(path, content)</code> on an existing file…",
+        options: [
+          { text: "Appends content to the end of the file.", correct: false, feedback: "Append requires StandardOpenOption.APPEND — it's not the default." },
+          { text: "Truncates the file and writes the content from the start.", correct: true },
+          { text: "Throws an exception because the file already exists.", correct: false, feedback: "That would require StandardOpenOption.CREATE_NEW — not the default." },
+          { text: "Creates a backup .bak file first.", correct: false, feedback: "No file API in the JDK auto-creates backups; you'd write that yourself." },
+        ],
+        explanation: "Default behavior is CREATE + WRITE + TRUNCATE_EXISTING. Pass StandardOpenOption.APPEND if you want to keep existing content and add to it.",
+      },
+      {
+        id: "sum-ji8-4",
+        type: "multiple_choice",
+        difficulty: "medium",
+        question: "What does <code>try-with-resources</code> guarantee?",
+        options: [
+          { text: "The try block never throws.", correct: false, feedback: "Exceptions thrown in the try block still propagate normally." },
+          { text: "Resources declared in the parens are <code>close()</code>d when the try block exits, even on exception.", correct: true },
+          { text: "The resources are flushed but not closed.", correct: false, feedback: "Implementations of close() typically flush and then release the resource — both happen." },
+          { text: "Multiple resources can't be declared at once.", correct: false, feedback: "Multiple resources can be declared, separated by semicolons. They close in reverse order." },
+        ],
+        explanation: "Try-with-resources eliminates the verbose try/finally pattern for AutoCloseable resources, and correctly handles suppressed exceptions when both the try block and close() throw.",
+        hint: "Resources implement AutoCloseable.",
+      },
+      {
+        id: "sum-ji8-5",
+        type: "fill_in_blank",
+        difficulty: "medium",
+        prompt: "To create a directory and any missing parent directories in a single call, use <code>Files.___(path)</code>.",
+        correctAnswers: ["createDirectories", "createdirectories"],
+        caseSensitive: false,
+        explanation: "createDirectory creates one directory and fails if a parent is missing; createDirectories creates the whole chain. Compare with mkdir vs mkdir -p in shell.",
+      },
+      {
+        id: "sum-ji8-6",
+        type: "predict_output",
+        difficulty: "medium",
+        code: `import java.nio.file.*;
+import java.util.stream.Stream;
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Path p = Paths.get("/tmp/log.txt");
+        Files.writeString(p, "INFO ok\nERROR bad\nINFO done\nERROR boom\n");
+        long count;
+        try (Stream<String> lines = Files.lines(p)) {
+            count = lines.filter(l -> l.startsWith("ERROR")).count();
+        }
+        System.out.println(count);
+    }
+}`,
+        expectedOutput: "2",
+        explanation: "Files.lines streams the file lazily, line by line. The filter keeps only lines starting with ERROR, count returns 2 (the two ERROR lines).",
+      },
+    ];
+  }
+
   // Generic fallback
   return [
     {
@@ -582,6 +880,43 @@ function getHighlights(trackSlug: string, moduleSlug: string, fallbackLessons: s
       "HashMap — O(1) average key-value lookup",
       "TreeMap — sorted key-value map backed by a red-black tree",
       "Choosing the right collection for access patterns, ordering, and uniqueness needs",
+    ];
+  }
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-5") {
+    return [
+      "How the for-each loop desugars to Iterable.iterator() + hasNext/next",
+      "Driving an Iterator manually with hasNext() and next()",
+      "Removing elements safely during iteration via Iterator.remove()",
+      "Implementing Iterable<T> to make a custom class for-each compatible",
+      "A first taste of Streams: filter, map, collect, and sum",
+    ];
+  }
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-6") {
+    return [
+      "Defining a fixed set of named constants with the enum keyword",
+      "Adding fields, constructors, and methods to enums for richer behavior",
+      "Per-constant logic via abstract methods overridden in each constant body",
+      "Implementing interfaces from enums to plug into existing APIs",
+      "EnumSet and EnumMap — fast, compact collections keyed by enum values",
+    ];
+  }
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-7") {
+    return [
+      "Static nested classes — namespaced helpers without an outer reference",
+      "Inner classes — implicit link to the enclosing instance and its private state",
+      "Local classes scoped to a method body, capturing effectively-final locals",
+      "Anonymous classes — inline implementations of an interface or class",
+      "Lambdas as a concise replacement for single-method anonymous classes",
+    ];
+  }
+  if (trackSlug === "java-intermediate" && moduleSlug === "module-8") {
+    return [
+      "The modern NIO.2 API: Path, Paths, and Files",
+      "Reading whole files into a String or list of lines",
+      "Writing and appending text files with StandardOpenOption",
+      "Listing, creating, and deleting directories",
+      "try-with-resources for automatic, exception-safe cleanup",
+      "Streaming a file line-by-line with Files.lines for large inputs",
     ];
   }
   return fallbackLessons;

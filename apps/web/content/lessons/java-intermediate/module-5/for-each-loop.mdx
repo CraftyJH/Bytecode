@@ -1,0 +1,294 @@
+export const meta = {
+  title: "The for-each Loop and Iterable",
+  duration: 10,
+  order: 1,
+  isPremium: false,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "fel-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which of the following can you traverse with a for-each loop *without* any extra calls?",
+    options: [
+      { text: "A `Map<String, Integer>` directly", correct: false, feedback: "A raw `Map` is not `Iterable`. You must iterate `map.entrySet()`, `map.keySet()`, or `map.values()`." },
+      { text: "An `int[]` array", correct: true, feedback: "Correct — arrays are special-cased by the language. The for-each loop works on every array type." },
+      { text: "A `String` (to walk its characters)", correct: false, feedback: "`String` is not `Iterable<Character>`. You'd need `.chars()` or `.toCharArray()` first." },
+      { text: "A `java.util.Scanner`", correct: false, feedback: "`Scanner` has `hasNext()`/`next()` but does not implement `Iterable`, so for-each won't compile on it." },
+    ],
+    explanation: "The enhanced for loop accepts two kinds of right-hand sides: anything implementing `java.lang.Iterable<T>` (e.g. `List`, `Set`, `Queue`) and any array. `Map` is famously *not* `Iterable` — you must pick a view (`entrySet`, `keySet`, `values`).",
+    hint: "Two categories qualify: arrays and one specific interface.",
+  },
+  endQ1: {
+    id: "fel-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> xs = Arrays.asList(10, 20, 30);
+        int total = 0;
+        for (int x : xs) {
+            total += x;
+        }
+        System.out.println(total);
+    }
+}`,
+    expectedOutput: "60",
+    explanation: "Each iteration assigns one element of `xs` to `x` in order. Auto-unboxing converts the `Integer` to `int`, so `total` accumulates 10 + 20 + 30 = 60.",
+  },
+  endQ2: {
+    id: "fel-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which capability does the classic indexed `for` loop offer that the for-each loop does *not*?",
+    options: [
+      { text: "Reading the current element", correct: false, feedback: "Both forms read the current element — that's the whole point." },
+      { text: "Knowing the current index, or skipping/repeating elements", correct: true, feedback: "Correct — for-each gives you the value but not the position. You also can't easily go backwards or skip ahead." },
+      { text: "Iterating over a `List`", correct: false, feedback: "Both forms iterate `List`s just fine." },
+      { text: "Compiling on Java 5 and later", correct: false, feedback: "Both have been valid since Java 5, when for-each was introduced." },
+    ],
+    explanation: "The for-each loop is a clean, read-only walk: you get each value once, in order, with no index. When you need the index, want to skip, or need to mutate the collection, fall back to a classic `for` or use an explicit `Iterator`.",
+    hint: "Think about what `i` gives you in `for (int i = 0; i < n; i++)`.",
+  },
+  endQ3: {
+    id: "fel-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the loop header so it walks each element of the `List<String> names`:",
+    code: "for (String n ___ names) { System.out.println(n); }",
+    correctAnswers: [":"],
+    caseSensitive: true,
+    explanation: "The for-each separator is a single colon. Read it as 'for each String n in names'. It is not `=`, not `in`, not `,` — just `:`.",
+  },
+  endQ4: {
+    id: "fel-end-4",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why does the compiler reject `for (var e : myMap) { ... }` when `myMap` is a `HashMap<String, Integer>`?",
+    options: [
+      { text: "`HashMap` is final and cannot be iterated", correct: false, feedback: "`HashMap` is not final, and finality has nothing to do with iteration." },
+      { text: "`Map` does not implement `Iterable`, so it has no for-each support", correct: true, feedback: "Correct — `Map` was deliberately left off `Iterable` because there are three reasonable views: keys, values, and entries. You must pick one explicitly." },
+      { text: "`var` is not allowed in for-each headers", correct: false, feedback: "`var` works fine in for-each loops since Java 10." },
+      { text: "The map is empty", correct: false, feedback: "Emptiness is a runtime state; the compiler error is about types." },
+    ],
+    explanation: "The Java designers chose not to make `Map` itself `Iterable` because there is no single obvious 'thing' a map iterates. Instead you call `.entrySet()`, `.keySet()`, or `.values()` to get an `Iterable` view.",
+    hint: "What does the for-each loop require its right-hand side to be?",
+  },
+};
+
+Most code that touches a collection has the same shape: visit each element, do something, move on. Java gives you a dedicated, readable way to express exactly that — the **for-each loop**, sometimes called the *enhanced for loop*. It hides the bookkeeping (counter, length, indexing) that a classic `for` requires, and lets the reader focus on the work.
+
+In this lesson you'll learn what powers the for-each loop under the hood, which types you can use it on, and where its convenience starts to bite you back.
+
+## The shape of a for-each loop
+
+The syntax has just three slots: the element type, a name for the current element, and the source you're walking:
+
+```java
+for (ElementType name : source) {
+    // body — runs once per element
+}
+```
+
+Read the colon as the word *in*. So `for (String s : names)` is "for each String s in names". On every pass, `name` is rebound to the next element — there is no index variable.
+
+```java
+List<String> langs = List.of("Java", "Kotlin", "Scala");
+for (String lang : langs) {
+    System.out.println("- " + lang);
+}
+```
+
+That prints three lines. The loop ends when the source has no more elements, with no `i < size` check to forget.
+
+<Note>The variable on the left is a *fresh local variable* per iteration. Reassigning it inside the body has no effect on the underlying collection — it just rebinds your local name.</Note>
+
+## What types qualify?
+
+The compiler accepts a for-each loop in exactly two situations:
+
+1. The right-hand side is an **array** (`int[]`, `String[]`, `Foo[][]`, etc.).
+2. The right-hand side implements **`java.lang.Iterable<T>`**.
+
+Almost every collection in `java.util` implements `Iterable`: `ArrayList`, `LinkedList`, `HashSet`, `TreeSet`, `ArrayDeque`, `PriorityQueue`, and so on. That's why for-each "just works" on them.
+
+```java
+int[] nums = {1, 2, 3, 4, 5};
+int sum = 0;
+for (int n : nums) sum += n;          // arrays — first category
+
+Set<String> tags = Set.of("api", "java", "rest");
+for (String t : tags) System.out.println(t);  // Iterable — second category
+```
+
+## Maps need a view
+
+`Map<K, V>` deliberately does **not** implement `Iterable`. There is no single obvious way to walk a map — keys? values? key/value pairs? — so Java forces you to choose:
+
+```java
+Map<String, Integer> ages = new HashMap<>();
+ages.put("Alice", 30);
+ages.put("Bob", 25);
+
+for (Map.Entry<String, Integer> e : ages.entrySet()) {
+    System.out.println(e.getKey() + " is " + e.getValue());
+}
+
+for (String name : ages.keySet())  System.out.println(name);
+for (int age   : ages.values())    System.out.println(age);
+```
+
+Try `for (var x : ages)` and the compiler will tell you `HashMap<String,Integer>` is not iterable.
+
+<Note>`Map.Entry` is a small interface representing one key–value pair. Calling `.getKey()` and `.getValue()` is the most common way to walk a map's contents.</Note>
+
+## How does for-each actually work?
+
+The for-each loop is *syntactic sugar*. The compiler rewrites it into either an indexed loop (for arrays) or a call to `iterator()` (for `Iterable`s). For an `Iterable`, this:
+
+```java
+for (String s : names) { use(s); }
+```
+
+is roughly equivalent to:
+
+```java
+Iterator<String> $it = names.iterator();
+while ($it.hasNext()) {
+    String s = $it.next();
+    use(s);
+}
+```
+
+You'll meet `Iterator` directly in the next lesson. For now the takeaway is: **for-each is just a readable wrapper around an iterator**. That's why anything `Iterable` works, and why arrays — which aren't `Iterable` — get their own special compiled form.
+
+## Read-only by design
+
+Notice what the desugared loop does *not* expose: the iterator itself, or the index. That has consequences:
+
+- You **cannot remove** an element from the underlying collection during a for-each loop — doing so will throw `ConcurrentModificationException` at runtime (covered in lesson 3).
+- You **cannot get the current index** — there is no `i`. If you need it, fall back to a classic `for`.
+- You **cannot easily skip ahead or look back** — every element is visited exactly once, in order.
+
+```java
+// Classic for — gives you the index
+for (int i = 0; i < langs.size(); i++) {
+    System.out.println(i + ": " + langs.get(i));
+}
+
+// for-each — no index, but cleaner when you don't need one
+for (String lang : langs) {
+    System.out.println(lang);
+}
+```
+
+A handy rule of thumb: if you're not using `i` for anything except `list.get(i)`, switch to for-each.
+
+<Note>Calling `list.get(i)` on a `LinkedList` is **O(n)** because linked lists have no random access. A classic indexed loop over a `LinkedList` is therefore O(n^2). The for-each loop uses the iterator and stays O(n) — yet another reason to prefer it when you don't need the index.</Note>
+
+<Quiz data={quizzes.midQ} label="quick check" />
+
+## Try it
+
+Click **Run** on the starter code. The TODOs are already filled in for you so you can see the for-each loop in action. You should see the four languages printed with `- ` prefixes, followed by `sum=15`.
+
+## Auto-unboxing in the loop variable
+
+When the source holds wrapper objects (`Integer`, `Double`, `Boolean`, ...) and you declare the loop variable as a primitive, Java unboxes each element automatically:
+
+```java
+List<Integer> scores = List.of(90, 85, 100);
+int total = 0;
+for (int s : scores) {       // Integer → int per iteration
+    total += s;
+}
+```
+
+If any element were `null`, the auto-unbox would throw `NullPointerException`. Stick with `Integer s` if your list might contain nulls.
+
+## Nested for-each
+
+Loops nest exactly as you'd expect, and the inner loop walks its own source from scratch on every outer pass:
+
+```java
+String[][] grid = {
+    {"a", "b", "c"},
+    {"d", "e", "f"}
+};
+
+for (String[] row : grid) {
+    for (String cell : row) {
+        System.out.print(cell + " ");
+    }
+    System.out.println();
+}
+// a b c
+// d e f
+```
+
+That works because `grid` is a `String[][]` — an array whose elements are themselves arrays. Each `row` is its own iterable target.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 4" />
+<Quiz data={quizzes.endQ2} label="question 2 of 4" />
+<Quiz data={quizzes.endQ3} label="question 3 of 4" />
+<Quiz data={quizzes.endQ4} label="question 4 of 4" />
+
+---
+
+## Common mistakes
+
+- **Trying to remove during a for-each loop** — Calling `list.remove(x)` while iterating throws `ConcurrentModificationException`. Use `Iterator.remove()` or `Collection.removeIf(...)` instead. We'll cover both in lesson 3.
+- **Reaching for an index that isn't there** — There is no `i` in a for-each loop. If you need the position, either keep a manual counter (`int i = 0; for (...) { ...; i++; }`) or switch to a classic `for`.
+- **Iterating a `Map` directly** — `for (var x : myMap)` does not compile. Always pick a view: `entrySet()` for both, `keySet()` for keys only, `values()` for values only.
+- **Reassigning the loop variable expecting it to mutate the collection** — Writing `for (String s : names) { s = "X"; }` only changes the local copy. The list is untouched. Use `list.set(i, "X")` in a classic loop, or `replaceAll(...)`.
+- **Auto-unbox NullPointerException** — If a `List<Integer>` contains a `null` and you write `for (int x : list)`, the unbox fails at runtime. Declare the variable as `Integer` (or filter out nulls) when nullability is possible.
+- **Iterating a `String` directly** — `for (char c : "hello")` does not compile. `String` isn't `Iterable`. Use `"hello".toCharArray()` or `"hello".chars()`.
+
+## Recap
+
+The for-each loop is the default way to read every element of a collection or array in Java. It removes index bookkeeping, works uniformly across `List`, `Set`, `Queue` and arrays, and reads almost like English. Once you know which types qualify and what its limitations are, you'll reach for it 90% of the time.
+
+- For-each works on **arrays** and on anything implementing **`Iterable<T>`**
+- It is **read-only** in the sense that you cannot remove during iteration
+- There is **no index variable** — fall back to a classic `for` if you need one
+- `Map` is **not** `Iterable`; use `entrySet()`, `keySet()`, or `values()`
+- Behind the scenes, for-each desugars to an `Iterator`-based loop or an indexed array walk
+- Prefer for-each on `LinkedList` to avoid the O(n^2) trap of `list.get(i)`
+
+**Up next:** Using Iterator Directly — when the syntactic sugar isn't enough, you reach for the underlying tool.
+
+<Exercise>
+Use a for-each loop to print each language with a `"- "` prefix, then sum the integer array using a second for-each loop. The starter already shows one valid solution; experiment by changing the prefix or the array contents to make sure you understand each piece.
+
+```java
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> langs = Arrays.asList("Java", "Kotlin", "Scala", "Groovy");
+        // TODO: print each language using a for-each loop, prefixed with "- "
+        for (String lang : langs) {
+            System.out.println("- " + lang);
+        }
+
+        int[] nums = {1, 2, 3, 4, 5};
+        int sum = 0;
+        // TODO: sum the array using for-each
+        for (int n : nums) sum += n;
+        System.out.println("sum=" + sum);
+    }
+}
+```
+
+**What the tests check:**
+- Each language is printed on its own line, prefixed with `"- "`
+- The final line is exactly `sum=15`
+- A for-each loop is used in both cases (no manual index)
+
+<Note>Hint: the loop variable type just has to be assignable from the element type. `int n : nums` works because Java auto-unboxes/auto-widens for the primitive case.</Note>
+</Exercise>
