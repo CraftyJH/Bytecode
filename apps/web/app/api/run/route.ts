@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 30;
+
 const JUDGE0_URL = process.env.JUDGE0_URL ?? "https://ce.judge0.com";
 const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY; // optional — for RapidAPI hosted instance
 

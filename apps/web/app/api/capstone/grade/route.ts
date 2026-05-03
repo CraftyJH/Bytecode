@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const maxDuration = 30;
 import { SENTINEL, TEST_HARNESS, parseGradeOutput } from "@/lib/capstone";
 
 const JUDGE0_URL = process.env.JUDGE0_URL ?? "https://ce.judge0.com";
