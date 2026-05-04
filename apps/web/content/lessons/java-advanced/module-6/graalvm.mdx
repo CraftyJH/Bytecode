@@ -120,6 +120,59 @@ Pause times        GC-dependent  Low (no JIT deopt)
 
 <Note>Native images do still have garbage collection — GraalVM includes a serial GC, G1GC (EE), and experimental Epsilon/Shenandoah support. The difference is there is no JIT compiler overhead and no JVM startup cost.</Note>
 
+<Exercise>
+Write a program that uses reflection to call a method by name. Add a comment block explaining what `reflect-config.json` entry would be needed for this program to work as a native image, and why the closed-world assumption makes reflection problematic.
+
+```java
+import java.lang.reflect.*;
+
+public class Main {
+    public static String greet(String name) {
+        return "Hello, " + name + "!";
+    }
+
+    public static void main(String[] args) throws Exception {
+        // TODO: Use reflection to call the greet() method dynamically
+        // Step 1: get the Class object for Main
+        // Step 2: get the Method object for "greet" (takes a String parameter)
+        // Step 3: invoke the method with argument "World"
+        // Step 4: print the result
+
+        /*
+         * TODO: Write the reflect-config.json entry that would be needed for
+         * native-image to include this reflective access.
+         *
+         * The JSON structure should look like:
+         * [
+         *   {
+         *     "name": "...",          <- fully qualified class name
+         *     "methods": [
+         *       { "name": "...", "parameterTypes": ["..."] }
+         *     ]
+         *   }
+         * ]
+         *
+         * Fill in the correct values for this program.
+         */
+
+        /*
+         * TODO: Add a comment explaining the closed-world limitation:
+         * - Why does native-image need reflect-config.json?
+         * - What happens at build time if you don't provide it?
+         * - What would happen if the class name came from a config file at runtime?
+         */
+    }
+}
+```
+
+**What to verify:**
+- The program runs correctly on the JVM using reflection
+- The `reflect-config.json` entry correctly names `Main`, the method `greet`, and its parameter type `java.lang.String`
+- The comment explains that native-image's points-to analysis cannot follow string-based class/method names without hints
+
+<Note>Hint: the `reflect-config.json` entry for a method needs `"name"` (the method name) and `"parameterTypes"` (an array of fully-qualified type names). For `String` that is `"java.lang.String"`.</Note>
+</Exercise>
+
 ## The closed-world assumption
 
 Native-image performs **points-to analysis** at build time: it starts from `main()` and traces every reachable class, method, and field. Anything not reachable is excluded from the executable.

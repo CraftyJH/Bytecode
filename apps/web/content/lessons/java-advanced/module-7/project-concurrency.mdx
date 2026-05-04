@@ -446,6 +446,53 @@ public class TaskProcessor implements AutoCloseable {
 
 <Note>Using `queue.poll(100, TimeUnit.MILLISECONDS)` instead of `queue.take()` means the worker loop re-checks the `running` flag every 100 ms. This allows a clean shutdown: set `running = false`, wait up to 10 seconds for queued work to drain, then force stop.</Note>
 
+<Exercise>
+Implement a `TaskWorker` that reads `Task` objects from a `BlockingQueue<Task>` using `take()`, prints `Processing: <title>` for each one, and stops when it receives a `null` sentinel (poison pill). Test it by adding 5 real tasks and a `null` to the queue, then waiting for the worker thread to finish.
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    record Task(String title) {}
+
+    static class TaskWorker implements Runnable {
+        private final BlockingQueue<Task> queue;
+
+        TaskWorker(BlockingQueue<Task> queue) { this.queue = queue; }
+
+        @Override
+        public void run() {
+            // TODO: loop: take() from queue; stop on null; print "Processing: " + task.title()
+            // Remember to handle InterruptedException
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        BlockingQueue<Task> queue = new LinkedBlockingQueue<>();
+
+        queue.add(new Task("Task Alpha"));
+        queue.add(new Task("Task Beta"));
+        queue.add(new Task("Task Gamma"));
+        queue.add(new Task("Task Delta"));
+        queue.add(new Task("Task Epsilon"));
+        queue.add(null);  // poison pill
+
+        Thread worker = new Thread(new TaskWorker(queue));
+        worker.start();
+        worker.join(5000);  // wait up to 5 seconds
+
+        System.out.println("Worker finished: " + !worker.isAlive());
+    }
+}
+```
+
+**What to verify:**
+- `Processing: Task Alpha` through `Processing: Task Epsilon` are printed in order
+- `Worker finished: true` is printed after all tasks are consumed
+
+<Note>Hint: `Task task = queue.take();` — check `if (task == null) break;` at the top of the loop. Catch `InterruptedException`, call `Thread.currentThread().interrupt()`, and break.</Note>
+</Exercise>
+
 ## Wiring it all together
 
 In a `main` method (or an integration test in Part 5):

@@ -123,6 +123,57 @@ public class OrderService {
 // EmailNotificationService, AuditService, PdfService each implement OrderObserver
 ```
 
+<Exercise>
+The `OrderManager` God Class below handles 6 responsibilities. Split it into focused classes — `OrderValidator`, `DiscountService`, `PaymentService`, `ShippingService`, `EmailService`, and `InventoryService` — each with a single method. Wire them together in a lean `OrderProcessor.process(Order)` that delegates to each focused class. Print a line per step.
+
+```java
+public class Main {
+    // ---- Provided God Class (READ ONLY — do not modify) ----
+    static class OrderManagerGod {
+        void process(String orderId, String customer, double amount, boolean isPremium) {
+            // 1. Validate
+            if (orderId == null || orderId.isBlank()) throw new IllegalArgumentException("Bad order");
+            // 2. Discount
+            double finalAmount = isPremium ? amount * 0.9 : amount;
+            // 3. Payment
+            System.out.println("Charging " + customer + ": $" + finalAmount);
+            // 4. Shipping
+            System.out.println("Scheduling shipment for order " + orderId);
+            // 5. Email
+            System.out.println("Sending confirmation email to " + customer);
+            // 6. Inventory
+            System.out.println("Reducing inventory for order " + orderId);
+        }
+    }
+
+    // ---- TODO: refactored focused classes ----
+    // class OrderValidator    { void validate(String orderId) }
+    // class DiscountService   { double apply(double amount, boolean isPremium) }
+    // class PaymentService    { void charge(String customer, double amount) }
+    // class ShippingService   { void schedule(String orderId) }
+    // class EmailService      { void sendConfirmation(String customer) }
+    // class InventoryService  { void reduce(String orderId) }
+
+    // class OrderProcessor {
+    //     // accept all 6 services via constructor
+    //     void process(String orderId, String customer, double amount, boolean isPremium)
+    // }
+
+    public static void main(String[] args) {
+        // TODO: instantiate all focused classes and OrderProcessor, then call process()
+        // Use: orderId="ORD-42", customer="alice@example.com", amount=100.0, isPremium=true
+    }
+}
+```
+
+**What to verify:**
+- Same 4 printed lines as the God Class: charging with discounted amount (`$90.0`), shipment, email, inventory
+- Each focused class has exactly one public method and one responsibility
+- `OrderProcessor` takes all 6 services as constructor parameters
+
+<Note>Hint: Introduce each service one at a time, moving the corresponding block of code from `OrderManagerGod` into the new class.</Note>
+</Exercise>
+
 ## Primitive Obsession
 
 Using raw primitives (`double`, `String`, `int`) where a value object should exist:
