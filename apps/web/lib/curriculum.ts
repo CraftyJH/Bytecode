@@ -4229,3 +4229,30 @@ export function getPrevNext(trackSlug: string, moduleSlug: string, lessonSlug: s
     next: idx < mod.lessons.length - 1 ? mod.lessons[idx + 1] : null,
   };
 }
+
+export function getNextLessonInTrack(trackSlug: string, moduleSlug: string, lessonSlug: string) {
+  const track = getTrack(trackSlug);
+  if (!track) return null;
+
+  const moduleIdx = track.modules.findIndex((m) => m.slug === moduleSlug);
+  if (moduleIdx === -1) return null;
+
+  const mod = track.modules[moduleIdx];
+  const lessonIdx = mod.lessons.findIndex((l) => l.slug === lessonSlug);
+  if (lessonIdx === -1) return null;
+
+  if (lessonIdx < mod.lessons.length - 1) {
+    return {
+      moduleSlug: mod.slug,
+      lesson: mod.lessons[lessonIdx + 1],
+    };
+  }
+
+  const nextMod = track.modules[moduleIdx + 1];
+  if (!nextMod || nextMod.lessons.length === 0) return null;
+
+  return {
+    moduleSlug: nextMod.slug,
+    lesson: nextMod.lessons[0],
+  };
+}
