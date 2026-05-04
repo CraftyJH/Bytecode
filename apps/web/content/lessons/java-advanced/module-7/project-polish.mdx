@@ -1,0 +1,543 @@
+export const meta = {
+  title: "Capstone Part 6 — Polish, Patterns & Reflection",
+  duration: 20,
+  order: 6,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "pol-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which design pattern enables an `UndoableTaskService` that can reverse the last N operations without modifying the original `TaskService`?",
+    options: [
+      {
+        text: "Strategy — swap the algorithm for selecting the next task.",
+        correct: false,
+        feedback: "Strategy encapsulates interchangeable algorithms. It does not naturally capture history or enable reversal of past operations.",
+      },
+      {
+        text: "Command — encapsulate each operation as an object with an `execute` and an `undo` method.",
+        correct: true,
+        feedback: "Correct! The Command pattern turns each operation into a first-class object. Storing executed commands in a stack allows replaying them forward or undoing them in reverse.",
+      },
+      {
+        text: "Observer — notify listeners whenever a task changes.",
+        correct: false,
+        feedback: "Observer handles event propagation to multiple subscribers. It does not model operations as reversible objects.",
+      },
+      {
+        text: "Decorator — wrap TaskService to add extra behaviour.",
+        correct: false,
+        feedback: "A Decorator adds behaviour around a method but does not inherently track history or support reversal.",
+      },
+    ],
+    explanation: "The **Command pattern** (GoF) encapsulates a request as an object, storing all information needed to perform and reverse it. An `UndoableTaskService` holds a `Deque<Command>` as a history stack. Each time the user calls `undo()`, the top command's `undo()` method is invoked, restoring the previous state.",
+  },
+  endQ1: {
+    id: "pol-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+interface Command {
+    void execute();
+    void undo();
+}
+
+public class Main {
+    static List<String> log = new ArrayList<>();
+
+    public static void main(String[] args) {
+        Deque<Command> history = new ArrayDeque<>();
+
+        Command c1 = new Command() {
+            public void execute() { log.add("created Task A"); }
+            public void undo()    { log.remove("created Task A"); }
+        };
+        Command c2 = new Command() {
+            public void execute() { log.add("assigned Task A"); }
+            public void undo()    { log.remove("assigned Task A"); }
+        };
+
+        c1.execute(); history.push(c1);
+        c2.execute(); history.push(c2);
+        System.out.println(log.size());
+
+        history.pop().undo();
+        System.out.println(log.size());
+        System.out.println(log.get(0));
+    }
+}`,
+    expectedOutput: "2\n1\ncreated Task A",
+    explanation: "After both `execute` calls, the log has 2 entries. `history.pop()` removes `c2` (LIFO) and calls its `undo`, removing `'assigned Task A'`. The log now has 1 entry: `'created Task A'`.",
+  },
+  endQ2: {
+    id: "pol-end-2",
+    type: "fill_in_blank",
+    difficulty: "hard",
+    prompt: "Complete the `TaskQueryBuilder` so the `build()` call returns a Predicate that combines all added filters:",
+    code: `import java.util.function.Predicate;
+
+public class TaskQueryBuilder {
+    private Predicate<Task> filter = t -> true;
+
+    public TaskQueryBuilder withStatus(TaskStatus s) {
+        filter = filter.___(t -> t.status() == s);
+        return this;
+    }
+
+    public TaskQueryBuilder withPriority(Priority p) {
+        filter = filter.___(t -> t.priority() == p);
+        return this;
+    }
+
+    public Predicate<Task> build() { return filter; }
+}`,
+    correctAnswers: ["and", "and"],
+    caseSensitive: true,
+    explanation: "`Predicate.and(other)` returns a new predicate that is true only when both the original and `other` are true. Starting with `t -> true` (the identity predicate) and chaining `.and(...)` for each criterion builds a composed filter without any explicit if-else logic.",
+  },
+  endQ3: {
+    id: "pol-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class TaskEventBus<E> {
+    private final Map<Class<?>, List<Consumer<E>>> listeners = new HashMap<>();
+
+    public <T extends E> void subscribe(Class<T> eventType, Consumer<T> listener) {
+        listeners.computeIfAbsent(eventType, k -> new ArrayList<>())
+                 .add(listener);   // type-unsafe cast hidden here
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends E> void publish(T event) {
+        List<Consumer<E>> eventListeners = listeners.get(event.getClass());
+        if (eventListeners != null) {
+            eventListeners.forEach(l -> l.accept(event));
+        }
+    }
+}`,
+    buggyLine: 5,
+    issue: "The `listener` typed as `Consumer<T>` is stored in a `List<Consumer<E>>` without a cast. This compiles only because of the unchecked widening from `Consumer<T>` to `Consumer<E>`. If different listeners for the same event class are added with different `T` types that are subtypes of `E`, a `ClassCastException` can occur at `accept` time. The `@SuppressWarnings(\"unchecked\")` should be on the `subscribe` method where the unsafe cast actually happens, not on `publish`.",
+    explanation: "Move `@SuppressWarnings(\"unchecked\")` to `subscribe` and add an explicit `(Consumer<E>)` cast when adding to the list. Add a comment explaining the invariant that ensures safety: all `Consumer<T>` instances stored under `eventType` will only ever receive events of exactly type `T`.",
+  },
+};
+
+We have built a Task Management System from scratch across five lessons: domain model, repository layer, service layer with functional validation, concurrent workers, and a thorough test suite. In this final lesson we elevate the system to production quality by applying three classic design patterns, reviewing performance considerations, writing Javadoc, and reflecting on everything the Java Advanced track has covered.
+
+This is the capstone of the capstone. The patterns introduced here are not academic exercises — they solve real problems that emerge when systems grow.
+
+## Command pattern — undo/redo
+
+Every time a user creates or updates a task, they might want to undo it. The **Command pattern** encapsulates operations as objects:
+
+```java
+package com.bytecode.tasks.event;
+
+/** A reversible operation on the task system. */
+public interface TaskCommand {
+    void execute();
+    void undo();
+    String description();
+}
+```
+
+Concrete commands carry the data needed to both apply and reverse the operation:
+
+```java
+package com.bytecode.tasks.event;
+
+import com.bytecode.tasks.domain.*;
+import com.bytecode.tasks.repository.InMemoryTaskRepository;
+
+import java.util.UUID;
+
+public class CreateTaskCommand implements TaskCommand {
+
+    private final InMemoryTaskRepository repo;
+    private final Task task;
+
+    public CreateTaskCommand(InMemoryTaskRepository repo, Task task) {
+        this.repo = repo;
+        this.task = task;
+    }
+
+    @Override public void execute()           { repo.save(task); }
+    @Override public void undo()              { repo.delete(task.id()); }
+    @Override public String description()     { return "Create task: " + task.title(); }
+}
+
+public class UpdateStatusCommand implements TaskCommand {
+
+    private final InMemoryTaskRepository repo;
+    private final UUID                   taskId;
+    private final TaskStatus             previousStatus;
+    private final TaskStatus             newStatus;
+
+    public UpdateStatusCommand(InMemoryTaskRepository repo, UUID taskId,
+                               TaskStatus previous, TaskStatus next) {
+        this.repo           = repo;
+        this.taskId         = taskId;
+        this.previousStatus = previous;
+        this.newStatus      = next;
+    }
+
+    @Override
+    public void execute() {
+        repo.findById(taskId).ifPresent(t -> repo.save(t.withStatus(newStatus)));
+    }
+
+    @Override
+    public void undo() {
+        // Directly force the status back (bypasses transition guard — undo is privileged)
+        repo.findById(taskId).ifPresent(t -> {
+            Task reverted = new Task(t.id(), t.title(), t.description(),
+                                     previousStatus, t.priority(),
+                                     t.assigneeId(), t.dueDate(), t.createdAt());
+            repo.save(reverted);
+        });
+    }
+
+    @Override public String description() {
+        return "Status " + previousStatus + " → " + newStatus + " (task " + taskId + ")";
+    }
+}
+```
+
+The `UndoableTaskService` wraps `TaskService` and maintains a history stack:
+
+```java
+package com.bytecode.tasks.service;
+
+import com.bytecode.tasks.event.TaskCommand;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Optional;
+
+public class UndoableTaskService {
+
+    private final TaskService        delegate;
+    private final Deque<TaskCommand> history = new ArrayDeque<>();
+    private static final int         MAX_HISTORY = 50;
+
+    public UndoableTaskService(TaskService delegate) {
+        this.delegate = delegate;
+    }
+
+    private void record(TaskCommand cmd) {
+        cmd.execute();
+        history.push(cmd);
+        if (history.size() > MAX_HISTORY) {
+            // Remove oldest (bottom of stack)
+            ((ArrayDeque<TaskCommand>) history).removeLast();
+        }
+    }
+
+    public Optional<Task> createTask(String title, String description,
+                                     Priority priority,
+                                     Optional<String> assigneeId,
+                                     Optional<LocalDate> dueDate) {
+        return delegate.createTask(title, description, priority, assigneeId, dueDate)
+            .map(task -> {
+                history.push(new CreateTaskCommand(taskRepo, task));
+                return task;
+            });
+    }
+
+    public boolean undo() {
+        if (history.isEmpty()) return false;
+        history.pop().undo();
+        return true;
+    }
+
+    public String lastAction() {
+        return history.isEmpty() ? "(none)" : history.peek().description();
+    }
+}
+```
+
+<Note>Undo operations bypass domain transition guards intentionally — they are a privileged, system-level reversal, not a user-initiated status change. Document this clearly in the Javadoc of `undo()`.</Note>
+
+## Observer pattern — the TaskEventBus
+
+The **Observer pattern** decouples event producers from event consumers. Our generic `TaskEventBus` (which mirrors the EventBus from Module 1) broadcasts domain events to registered listeners:
+
+```java
+package com.bytecode.tasks.event;
+
+import java.util.*;
+import java.util.function.Consumer;
+
+public class TaskEventBus {
+
+    // Sealed hierarchy of domain events
+    public sealed interface TaskEvent permits
+        TaskEvent.TaskCreated, TaskEvent.StatusChanged, TaskEvent.TaskAssigned {
+
+        record TaskCreated(Task task)                           implements TaskEvent {}
+        record StatusChanged(Task task, TaskStatus previous)   implements TaskEvent {}
+        record TaskAssigned(Task task, String assigneeId)      implements TaskEvent {}
+    }
+
+    private final Map<Class<?>, List<Consumer<TaskEvent>>> listeners = new HashMap<>();
+
+    public <T extends TaskEvent> void on(Class<T> type, Consumer<T> listener) {
+        listeners.computeIfAbsent(type, k -> new ArrayList<>())
+                 .add(e -> listener.accept(type.cast(e)));
+    }
+
+    public void emit(TaskEvent event) {
+        List<Consumer<TaskEvent>> handlers = listeners.get(event.getClass());
+        if (handlers != null) {
+            handlers.forEach(h -> h.accept(event));
+        }
+    }
+}
+```
+
+Wiring it to `TaskService`:
+
+```java
+// In TaskService.createTask:
+Optional<Task> result = ...; // creation logic
+result.ifPresent(t -> eventBus.emit(new TaskEventBus.TaskEvent.TaskCreated(t)));
+return result;
+```
+
+Subscribing in the notification layer:
+
+```java
+eventBus.on(TaskEventBus.TaskEvent.TaskCreated.class, e ->
+    System.out.println("New task created: " + e.task().title()));
+
+eventBus.on(TaskEventBus.TaskEvent.StatusChanged.class, e ->
+    System.out.println("Status changed to: " + e.task().status()));
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Builder pattern — composable task queries
+
+The **Builder pattern** constructs complex queries incrementally without a constructor with 10 parameters:
+
+```java
+package com.bytecode.tasks.service;
+
+import com.bytecode.tasks.domain.*;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.function.Predicate;
+
+public class TaskQueryBuilder {
+
+    private Predicate<Task> filter = t -> true;  // identity: accept everything
+
+    public TaskQueryBuilder withStatus(TaskStatus status) {
+        filter = filter.and(t -> t.status() == status);
+        return this;
+    }
+
+    public TaskQueryBuilder withPriority(Priority priority) {
+        filter = filter.and(t -> t.priority() == priority);
+        return this;
+    }
+
+    public TaskQueryBuilder assignedTo(String assigneeId) {
+        filter = filter.and(t -> t.assigneeId()
+                                  .map(a -> a.equals(assigneeId))
+                                  .orElse(false));
+        return this;
+    }
+
+    public TaskQueryBuilder dueBefore(LocalDate date) {
+        filter = filter.and(t -> t.dueDate()
+                                  .map(d -> d.isBefore(date))
+                                  .orElse(false));
+        return this;
+    }
+
+    public TaskQueryBuilder notDone() {
+        filter = filter.and(t -> t.status() != TaskStatus.DONE);
+        return this;
+    }
+
+    /** Executes the query against the given repository. */
+    public List<Task> execute(InMemoryTaskRepository repo) {
+        return repo.findWhere(filter);
+    }
+
+    /** Returns the composed predicate for reuse outside the builder. */
+    public Predicate<Task> build() {
+        return filter;
+    }
+}
+```
+
+Usage is expressive and readable:
+
+```java
+List<Task> urgent = new TaskQueryBuilder()
+    .withStatus(TaskStatus.TODO)
+    .withPriority(Priority.CRITICAL)
+    .dueBefore(LocalDate.now().plusDays(3))
+    .execute(taskRepo);
+```
+
+## Javadoc — making the API self-documenting
+
+Production-quality code documents its public API. Key rules:
+
+```java
+/**
+ * Creates a new task and persists it if all validation rules pass.
+ *
+ * <p>Validation rules applied (in order):
+ * <ol>
+ *   <li>Title must not be null or blank.</li>
+ *   <li>Due date, if present, must not be in the past.</li>
+ *   <li>Priority must not be null.</li>
+ * </ol>
+ *
+ * @param title       the task title; must not be blank
+ * @param description a longer description; may be empty
+ * @param priority    the task priority; must not be null
+ * @param assigneeId  the id of the assigned user, or empty if unassigned
+ * @param dueDate     the deadline, or empty if open-ended
+ * @return an {@link Optional} containing the persisted task, or
+ *         {@code Optional.empty()} if any validation rule fails
+ * @see TaskValidation#ALL
+ */
+public Optional<Task> createTask(String title, String description,
+                                 Priority priority,
+                                 Optional<String> assigneeId,
+                                 Optional<LocalDate> dueDate) { ... }
+```
+
+Javadoc rules for this project:
+- Every `public` method on a service or repository gets a `@param`, `@return`, and (where relevant) `@throws` tag.
+- Domain records can use shorter one-line summaries.
+- Internal helpers (`private`) need only a brief comment, not a full doc block.
+
+## Performance review — what to profile in production
+
+When this system moves to production you would instrument these hotspots:
+
+| Hotspot | Why | Fix |
+|---|---|---|
+| `findAll()` + stream filter | Scans every task on every query | Add an index Map<TaskStatus, Set<UUID>> |
+| `findOverdue` in the scheduler | Runs every minute across all tasks | Cache result with a 30-second TTL |
+| `notifyAsync` under load | Unbounded `CachedThreadPool` can spawn thousands of threads | Use a bounded pool with back-pressure |
+| `serialize Task record` to JSON | Reflection-heavy serialisers are slow | Use a code-generated serialiser (Jackson with `@JsonCreator`) |
+
+Profiling steps: run with `-Xss512k` to surface deep stacks, use `jfr` (Java Flight Recorder) for allocation profiling, and check `jstack` output when the scheduler thread is stuck.
+
+## The complete wired-up system
+
+```java
+public class TaskManagementSystem implements AutoCloseable {
+
+    private final InMemoryTaskRepository    taskRepo;
+    private final InMemoryProjectRepository projectRepo;
+    private final TaskEventBus              eventBus;
+    private final TaskService               taskService;
+    private final UndoableTaskService       undoable;
+    private final NotificationService       notifier;
+    private final TaskNotificationService   scheduler;
+    private final TaskProcessor             processor;
+
+    public TaskManagementSystem() {
+        this.taskRepo    = new InMemoryTaskRepository();
+        this.projectRepo = new InMemoryProjectRepository();
+        this.eventBus    = new TaskEventBus();
+        this.taskService = new TaskService(taskRepo, projectRepo, eventBus);
+        this.undoable    = new UndoableTaskService(taskService, taskRepo);
+        Executor pool    = Executors.newCachedThreadPool();
+        this.notifier    = new NotificationService(pool);
+        this.scheduler   = new TaskNotificationService(taskRepo, notifier);
+        this.processor   = new TaskProcessor(4, 100);
+
+        // Wire up event-driven notifications
+        eventBus.on(TaskEventBus.TaskEvent.TaskCreated.class,
+                    e -> processor.enqueue(e.task()));
+        eventBus.on(TaskEventBus.TaskEvent.StatusChanged.class,
+                    e -> { if (e.task().status() == TaskStatus.DONE)
+                               notifier.notifyAsync(e.task()); });
+
+        scheduler.start(60, TimeUnit.SECONDS);
+    }
+
+    public UndoableTaskService tasks() { return undoable; }
+    public TaskQueryBuilder    query() { return new TaskQueryBuilder(); }
+
+    @Override
+    public void close() throws Exception {
+        scheduler.close();
+        processor.close();
+    }
+}
+```
+
+## Try it
+
+Complete the final polish pass:
+
+1. Implement `TaskCommand`, `CreateTaskCommand`, and `UpdateStatusCommand` as shown. Write a test that creates a task, undoes it, and verifies `taskRepo.count()` returns 0.
+2. Implement `TaskEventBus` with the sealed `TaskEvent` hierarchy. Wire it to `TaskService` so `TaskCreated` is emitted on every successful `createTask` call. Write a test that counts emitted events.
+3. Implement `TaskQueryBuilder`. Write a test that creates tasks with mixed statuses and priorities and verifies the builder returns only the matching subset.
+4. Add Javadoc to every `public` method on `TaskService` and `InMemoryTaskRepository`.
+5. Assemble `TaskManagementSystem` and run a full end-to-end smoke test: create three tasks, transition one to `DONE`, undo the transition, query for `TODO` tasks, verify the count.
+
+Stretch goal: Implement a `TaskSearchIndex` that maintains `Map<TaskStatus, Set<UUID>>` and `Map<Priority, Set<UUID>>` updated on every `save`/`delete`. Replace the O(n) `findByStatus` with an O(1) index lookup and benchmark both with JMH.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Commands that capture mutable state** — a `CreateTaskCommand` that stores a reference to a mutable `Task` (not a record) risks the undo using stale data if the task is modified after the command is created. Always capture an immutable snapshot in the command's constructor.
+- **Event bus without error isolation** — if one subscriber throws an exception, a naive event bus propagates it to the publisher and skips remaining subscribers. Wrap each `h.accept(event)` call in a try-catch that logs the exception and continues to the next handler.
+- **Builder that mutates the same Predicate** — `filter = filter.and(...)` creates a *new* composed predicate each time; it does not mutate the original. This is correct. If you mistakenly store predicates as mutable fields and try to reset them by assigning `filter = null`, the builder becomes non-reusable.
+- **Javadoc that repeats the code** — `@param title the title` documents nothing. Write what constraints apply (`must not be blank`), what the absence means for the return value, and cross-reference related methods with `@see`.
+
+## Recap
+
+- The **Command pattern** captures operations as first-class objects with `execute`/`undo`, enabling an arbitrary-depth undo stack without modifying the original service.
+- The **Observer pattern** via a typed `TaskEventBus` decouples event producers (services) from consumers (notifications, processors) — adding a new subscriber requires zero changes to the service.
+- The **Builder pattern** with composed `Predicate<T>` creates readable, chainable query objects that replace multi-parameter methods.
+- **Javadoc** on public APIs communicates contracts — preconditions, return semantics, and cross-references — that code alone cannot express.
+- Performance profiling targets: unbounded collections, hot O(n) scans, and unbound thread pools are the three most common production pain points in systems like this one.
+
+---
+
+## Track complete — What's next?
+
+You have reached the end of the **Java Advanced** track. Over seven modules you built expertise in:
+
+- **Generics** — generic classes, bounded types, wildcards, and type erasure
+- **Functional Java** — lambdas, streams, Optional, method references, and the functional interfaces of `java.util.function`
+- **Concurrency** — threads, executors, locks, atomic types, `CompletableFuture`, and concurrent collections
+- **Design patterns** — Strategy, Template Method, Decorator, Observer, Command, Builder, and more applied to real problems
+- **Testing** — unit, integration, parameterised, and concurrent tests with JUnit 5
+- **JVM internals** — class loading, garbage collection, the JIT compiler, and performance profiling
+- **This capstone** — a full Task Management System wiring every concept into a coherent, production-ready architecture
+
+You wrote code that a senior Java engineer would recognise and respect. The system you built is not a toy — with a persistence adapter and an HTTP layer in front of it, it would be a deployable service.
+
+**Where to go from here:**
+
+- **Kotlin** — if you enjoyed Java's expressive modern features (records, sealed classes, pattern matching), Kotlin takes them further. Kotlin's data classes, sealed hierarchies, coroutines, and extension functions will feel immediately familiar and significantly more concise. Start the Bytecode Kotlin track to make the transition.
+- **Spring Boot** — the most widely used Java application framework. Spring Boot provides dependency injection, a web layer (Spring MVC / WebFlux), JPA for database persistence, and production-grade observability. Your `TaskService` and `Repository` interfaces map directly to Spring's `@Service` and `@Repository` stereotypes — the concepts translate one-for-one.
+- **JVM performance engineering** — if the JVM internals module sparked your interest, explore Java Flight Recorder, async-profiler, and JMH (Java Microbenchmark Harness) in depth. These are the tools that distinguish engineers who write correct concurrent code from those who also write *fast* concurrent code.
+
+Well done. The hard work you put into understanding the fundamentals — not just copying patterns — is what makes the difference in production systems. Keep building.

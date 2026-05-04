@@ -1,0 +1,338 @@
+export const meta = {
+  title: "Capstone: Anti-Patterns & Refactoring",
+  duration: 16,
+  order: 10,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "ap-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "A single class called `OrderManager` has 2 000 lines of code, handles pricing, tax, shipping, inventory, notifications, PDF generation, and payment. Which anti-pattern does this represent?",
+    options: [
+      { text: "Feature Envy — the class is too interested in other classes.", correct: false, feedback: "Feature Envy is when a method uses data from another class more than its own. A 2 000-line monolith is the God Class anti-pattern." },
+      { text: "God Class — a class that knows or does too much.", correct: true, feedback: "Correct! A God Class accumulates responsibilities that should be distributed across multiple focused classes. It violates the Single Responsibility Principle." },
+      { text: "Primitive Obsession — the class uses too many primitive types.", correct: false, feedback: "Primitive Obsession describes using `int`, `String`, etc. where value objects should exist. A 2 000-line multi-responsibility class is a God Class." },
+      { text: "Anemic Domain Model — the class has no behaviour.", correct: false, feedback: "Anemic Domain Model is when domain objects have only getters/setters and no business logic — the opposite of a God Class." },
+    ],
+    explanation: "A **God Class** centralises too many responsibilities. It is the most common structural anti-pattern in Java applications and typically grows through years of 'just add it here' decisions. The fix is to split responsibilities using patterns like Strategy, Observer, and proper value objects.",
+  },
+  endQ1: {
+    id: "ap-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which pattern best fixes the 'Primitive Obsession' anti-pattern when a codebase represents money as bare `double` fields?",
+    options: [
+      { text: "Singleton — ensure one global money converter exists.", correct: false, feedback: "Singleton controls instance count. It doesn't help represent money correctly." },
+      { text: "Value Object (a small immutable class like `Money(BigDecimal amount, Currency currency)`).", correct: true, feedback: "Correct! A Money value object encapsulates the amount and currency together, prevents inconsistent pairings, can be made immutable, and carries its own arithmetic methods." },
+      { text: "Observer — notify all consumers when the money value changes.", correct: false, feedback: "Observer handles change notification. The problem is using primitives where a richer type is needed — that's a value object, not Observer." },
+      { text: "Template Method — standardise money arithmetic in a base class.", correct: false, feedback: "Template Method defines an algorithm skeleton. Value objects fix Primitive Obsession by replacing scattered primitives with cohesive types." },
+    ],
+    explanation: "**Primitive Obsession** is cured with **value objects**: small, immutable classes that bundle related data (`Money`, `PhoneNumber`, `EmailAddress`). They make invalid states unrepresentable, centralise validation, and improve readability.",
+  },
+  endQ2: {
+    id: "ap-end-2",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class OrderManager {
+    public void processOrder(Order order) {
+        // 1. Validate
+        if (order.getItems().isEmpty()) throw new IllegalArgumentException("Empty order");
+        // 2. Calculate total
+        double total = 0;
+        for (Item item : order.getItems()) total += item.getPrice() * item.getQty();
+        // 3. Apply discount
+        if (order.getCustomer().isPremium()) total *= 0.9;
+        // 4. Charge
+        PaymentGateway.INSTANCE.charge(order.getCustomer().getCardNumber(), total);
+        // 5. Send email                                  // bug: Feature Envy
+        String email = order.getCustomer().getEmail();
+        String name  = order.getCustomer().getName();
+        EmailService.INSTANCE.send(email, "Hello " + name + ", your total is " + total);
+        // 6. Update inventory
+        for (Item item : order.getItems())
+            Inventory.INSTANCE.reduce(item.getSku(), item.getQty());
+    }
+}`,
+    buggyLine: 13,
+    issue: "Feature Envy: OrderManager reaches deep into Customer to build the email, a responsibility that belongs to an EmailNotificationService or the Customer itself.",
+    explanation: "**Feature Envy** occurs when a method is more interested in another class's data than its own. Lines 13-14 pull three fields from `Customer` just to compose an email string. This logic belongs in an `OrderNotificationService.notifyCustomer(order, total)` — or even in `Customer.buildOrderConfirmationEmail(total)`. Extracting it reduces coupling and makes the notification logic independently testable.",
+  },
+  endQ3: {
+    id: "ap-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "An `Animal` hierarchy has 12 subclasses (Dog, Cat, Bird, …) and a method `makeSound()`. A new requirement needs `fly()`, `swim()`, and `run()` for various combinations. Using inheritance to handle all combinations would require how many classes, and what pattern fixes this?",
+    options: [
+      { text: "12 more classes; fix with Singleton.", correct: false, feedback: "Singleton controls instance count, not class hierarchies." },
+      { text: "Up to 96 classes (12 × 8 ability combinations); fix with Strategy (composition over inheritance).", correct: true, feedback: "Correct! With 3 binary abilities that can combine freely, 12 × 2³ = 96 subclasses. Composition via Strategy replaces combinatorial inheritance: inject `MovementStrategy` as a field." },
+      { text: "3 more abstract classes; fix with Template Method.", correct: false, feedback: "Template Method still uses inheritance. Introducing 3 ability abstract classes doesn't solve the combinatorial explosion." },
+      { text: "No extra classes needed; Java interfaces with default methods handle all combinations.", correct: false, feedback: "Interface default methods can provide implementations but don't solve the class explosion for runtime-configurable behaviour combinations." },
+    ],
+    explanation: "**Spaghetti inheritance** (combinatorial subclass explosion) occurs when you try to model behaviour combinations through class hierarchies. The fix is **composition over inheritance**: give each `Animal` a `MovementStrategy` field. Any combination of movement behaviours can be assembled at runtime without new subclasses.",
+  },
+};
+
+Before you can apply design patterns well, you need to recognise what you're refactoring away from. **Anti-patterns** are recurring poor solutions — patterns of failure that appear again and again in real codebases. This capstone lesson names the most damaging ones, shows how to identify them in code, and maps each to the pattern that fixes it.
+
+## God Class
+
+A God Class does too much. It accumulates responsibilities over years of "easiest place to add it" decisions until it becomes the centre of everything:
+
+```java
+// Anti-pattern: OrderManager with 8 responsibilities
+public class OrderManager {
+    public void validateOrder(Order o)       { /* validation logic */ }
+    public double calculateTotal(Order o)    { /* pricing, tax, discounts */ }
+    public void chargeCustomer(Order o)      { /* payment */ }
+    public void sendConfirmation(Order o)    { /* email / SMS */ }
+    public void updateInventory(Order o)     { /* stock levels */ }
+    public void generatePdf(Order o)         { /* PDF export */ }
+    public void logAuditTrail(Order o)       { /* audit */ }
+    public void scheduleDelivery(Order o)    { /* logistics */ }
+    // ... 300 more lines ...
+}
+```
+
+Every change to any concern touches this one class. Merges conflict constantly. Nothing is testable in isolation.
+
+**Fix:** apply the Single Responsibility Principle — split each responsibility into its own class. Use **Strategy** for pluggable concerns (pricing rules, discount policies) and **Observer** to decouple side-effects (email, audit, PDF) from the core order workflow:
+
+```java
+// After refactoring: each class has one reason to change
+public class OrderValidator      { public void validate(Order o)    { ... } }
+public class PricingService      { public Money calculate(Order o)  { ... } }
+public class PaymentService      { public void charge(Order o, Money total) { ... } }
+
+// Side effects driven by Observer — OrderService doesn't know about email or PDF
+public class OrderService {
+    private final OrderValidator validator;
+    private final PricingService pricer;
+    private final PaymentService payment;
+    private final List<OrderObserver> observers = new ArrayList<>();
+
+    public void processOrder(Order order) {
+        validator.validate(order);
+        Money total = pricer.calculate(order);
+        payment.charge(order, total);
+        observers.forEach(o -> o.onOrderProcessed(order, total));
+    }
+}
+// EmailNotificationService, AuditService, PdfService each implement OrderObserver
+```
+
+## Primitive Obsession
+
+Using raw primitives (`double`, `String`, `int`) where a value object should exist:
+
+```java
+// Anti-pattern
+public void transfer(String fromAccount, String toAccount, double amount, String currency) {
+    // What if currency is null? What if amount is negative?
+    // Nothing stops: transfer("ACC1", "ACC2", -500.0, "RUBISH");
+}
+
+// Fix: value objects make invalid states unrepresentable
+public record Money(BigDecimal amount, Currency currency) {
+    public Money {
+        if (amount.compareTo(BigDecimal.ZERO) < 0)
+            throw new IllegalArgumentException("Amount cannot be negative");
+    }
+}
+
+public record AccountId(String value) {
+    public AccountId { if (value == null || value.isBlank()) throw new IllegalArgumentException("Invalid account id"); }
+}
+
+public void transfer(AccountId from, AccountId to, Money amount) { ... }
+```
+
+<Note>Java **records** (Java 16+) are the fastest way to create value objects. They are immutable, provide `equals`, `hashCode`, and `toString` automatically, and compact constructors let you add validation concisely.</Note>
+
+## Feature Envy
+
+A method is more interested in another class's data than its own. It calls getter after getter on a foreign object to do work that belongs there:
+
+```java
+// Anti-pattern: OrderManager envies Customer
+public class OrderManager {
+    public String buildGreeting(Order order) {
+        String name    = order.getCustomer().getName();
+        String tier    = order.getCustomer().getLoyaltyTier();
+        String address = order.getCustomer().getShippingAddress().getCity();
+        // This logic belongs in Customer or a dedicated service
+        return "Dear " + tier + " member " + name + " in " + address;
+    }
+}
+
+// Fix: move behaviour to where the data lives
+public class Customer {
+    public String buildGreeting() {
+        return "Dear " + loyaltyTier + " member " + name
+               + " in " + shippingAddress.getCity();
+    }
+}
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Anemic Domain Model
+
+Domain objects are pure data bags — all getters/setters, zero behaviour. All logic lives in service classes:
+
+```java
+// Anti-pattern: Order is just a DTO
+public class Order {
+    private List<Item> items;
+    private double total;
+    private String status;
+    // only getters and setters — no behaviour
+}
+
+// All logic scattered in service
+public class OrderService {
+    public double getTotal(Order o) { /* calculates here */ }
+    public boolean canCancel(Order o) { /* decides here */ }
+}
+
+// Fix: move domain logic into Order
+public class Order {
+    private final List<Item> items;
+    private OrderStatus status = OrderStatus.PENDING;
+
+    public Money calculateTotal(DiscountPolicy policy) {
+        // Logic belongs here — Order owns its items
+        return items.stream()
+            .map(Item::subtotal)
+            .reduce(Money.ZERO, Money::add)
+            .apply(policy);
+    }
+
+    public void cancel() {
+        if (status != OrderStatus.PENDING)
+            throw new IllegalStateException("Cannot cancel a " + status + " order");
+        this.status = OrderStatus.CANCELLED;
+    }
+}
+```
+
+## Spaghetti inheritance
+
+Modelling every behaviour combination through subclasses:
+
+```java
+// Anti-pattern: class explosion
+class Dog                 extends Animal { }
+class FlyingDog           extends Dog    { }   // hypothetical
+class SwimmingDog         extends Dog    { }
+class FlyingSwimmingDog   extends Dog    { }   // ...
+
+// Fix: Strategy (composition over inheritance)
+public interface MovementBehaviour { void move(); }
+public class Walk  implements MovementBehaviour { public void move() { System.out.println("walks"); } }
+public class Swim  implements MovementBehaviour { public void move() { System.out.println("swims"); } }
+public class Fly   implements MovementBehaviour { public void move() { System.out.println("flies"); } }
+
+public class Animal {
+    private final MovementBehaviour movement;
+    public Animal(MovementBehaviour movement) { this.movement = movement; }
+    public void move() { movement.move(); }
+}
+
+Animal duck = new Animal(new Fly());
+Animal dog  = new Animal(new Swim());
+```
+
+## Try it — Refactor the God Class
+
+Refactor the provided `OrderManager` by splitting it into `OrderValidator`, `PricingService`, `PaymentService`, and an Observer-driven notification pipeline:
+
+```java
+// Step 1: Observer interface for post-processing side effects
+public interface OrderObserver {
+    void onOrderProcessed(Order order, Money total);
+}
+
+// Step 2: Concrete observers
+public class EmailNotifier implements OrderObserver {
+    public void onOrderProcessed(Order order, Money total) {
+        System.out.println("Email sent to " + order.getCustomer().getEmail()
+                + " for " + total);
+    }
+}
+
+public class AuditLogger implements OrderObserver {
+    public void onOrderProcessed(Order order, Money total) {
+        System.out.println("AUDIT: order " + order.getId() + " processed, " + total);
+    }
+}
+
+// Step 3: Strategy for pricing
+public interface DiscountStrategy {
+    Money apply(Money subtotal, Order order);
+}
+
+public class PremiumDiscount implements DiscountStrategy {
+    public Money apply(Money subtotal, Order order) {
+        return order.getCustomer().isPremium()
+            ? subtotal.multiply(0.9)
+            : subtotal;
+    }
+}
+
+// Step 4: Lean OrderService — orchestrates, does not implement
+public class OrderService {
+    private final DiscountStrategy discount;
+    private final List<OrderObserver> observers;
+
+    public OrderService(DiscountStrategy discount, List<OrderObserver> observers) {
+        this.discount  = discount;
+        this.observers = observers;
+    }
+
+    public void process(Order order) {
+        if (order.getItems().isEmpty()) throw new IllegalArgumentException("Empty order");
+        Money total = order.calculateTotal(discount);
+        observers.forEach(o -> o.onOrderProcessed(order, total));
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Refactoring too aggressively at once** — break one responsibility out at a time. Large-scale rewrites introduce regressions and make code review impossible.
+- **Replacing one God Class with several Feature Envy services** — distributing behaviour into services that all reach back into domain objects is not a real improvement. Move logic to where the data lives.
+- **Over-applying patterns as the fix** — not every God Class becomes a Strategy + Observer + Builder. Use the simplest fix that eliminates the problem.
+- **Forgetting to test the seams** — before refactoring, write characterisation tests that capture current behaviour. After, verify they still pass.
+
+## Recap
+
+- **God Class** — split into focused classes using SRP; use Strategy for algorithms and Observer for side effects
+- **Primitive Obsession** — introduce value objects (`Money`, `EmailAddress`, `AccountId`) — Java records make this cheap
+- **Feature Envy** — move methods to the class that owns the data they consume
+- **Anemic Domain Model** — put domain logic back into domain objects; services should orchestrate, not implement
+- **Spaghetti Inheritance** — replace class hierarchies of behaviour combinations with **composition over inheritance** (Strategy)
+
+## Module recap
+
+Module 4 — Design Patterns in Java — is complete. Here is what you now know:
+
+- **Creational:** Singleton (enum form), Factory Method, Abstract Factory, Builder (fluent + immutable)
+- **Structural:** Adapter (object + class form), Decorator (layer-based), Proxy (virtual, protection, dynamic), Facade
+- **Behavioral:** Observer, Strategy, Command (undo queue), Iterator, Template Method
+- **JDK recognition:** every major pattern is visible in `java.io`, `java.util`, `java.lang.reflect`, and the Stream API
+- **Anti-patterns:** God Class, Primitive Obsession, Feature Envy, Anemic Domain Model, spaghetti inheritance — and the patterns that fix each one
+
+The skill of pattern recognition — knowing which structural shape solves which recurring problem — is what separates junior developers who write code from senior engineers who design systems.

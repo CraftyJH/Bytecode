@@ -1,0 +1,265 @@
+export const meta = {
+  title: "GraalVM & Native Image",
+  duration: 13,
+  order: 7,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "graal-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the primary advantage of GraalVM native-image compilation for serverless functions?",
+    options: [
+      { text: "Higher peak throughput than a JIT-compiled JVM for long-running workloads.", correct: false, feedback: "This is actually the opposite — JIT compilation typically achieves higher peak throughput than AOT because it can apply runtime profile-guided optimizations that AOT cannot." },
+      { text: "Near-instant startup time (milliseconds) and low memory footprint, which reduces cold-start latency and function cost.", correct: true, feedback: "Correct. Serverless functions are billed per invocation and may start from cold frequently. Native images start in ~10–50 ms vs ~500 ms–2 s for a JVM, directly reducing cold-start latency and costs." },
+      { text: "Automatic reflection support for all classes without any configuration.", correct: false, feedback: "Native image requires explicit reflection configuration. The closed-world assumption means it cannot discover reflective access at runtime without hints." },
+      { text: "Compatibility with all Java libraries without any modification.", correct: false, feedback: "Some libraries use reflection, dynamic proxies, or JVM-specific APIs that require native-image configuration hints or may not be supported at all." },
+    ],
+    explanation: "Serverless platforms charge by compute time and penalize cold starts with user-visible latency. A JVM application may take 1–3 seconds to start and warm up; a native image starts in under 100 ms with a fraction of the memory. This makes native image the dominant choice for serverless Java workloads.",
+  },
+  endQ1: {
+    id: "graal-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What does the 'closed-world assumption' in GraalVM native-image mean?",
+    options: [
+      { text: "The application cannot access the internet at runtime.", correct: false, feedback: "Closed-world has nothing to do with network access. It is about class loading and code reachability at build time." },
+      { text: "All code, classes, and resources that the application will ever use must be known and reachable at build time.", correct: true, feedback: "Correct. Native-image performs a reachability analysis at build time. Any class loaded dynamically at runtime (via reflection, class loading by name, etc.) must be declared in configuration hints or it will be missing from the executable." },
+      { text: "The native image cannot be updated or recompiled after deployment.", correct: false, feedback: "You can rebuild a native image at any time. The term refers to analysis scope, not deployment immutability." },
+      { text: "The application is compiled for one specific CPU architecture and cannot run on others.", correct: false, feedback: "While native images are architecture-specific, this is not what 'closed-world assumption' refers to." },
+    ],
+    explanation: "Because there is no JVM at runtime, native-image cannot dynamically load classes from the classpath. The build-time analysis must discover all reachable code. Reflection, serialization, JNI, and resource loading all require explicit configuration so the analysis can include them.",
+  },
+  endQ2: {
+    id: "graal-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the `native-image` flag that passes a JSON reflection configuration file to the build:",
+    code: `native-image ___ reflect-config.json -jar myapp.jar`,
+    correctAnswers: ["-H:ReflectionConfigurationFiles="],
+    caseSensitive: true,
+    explanation: "`-H:ReflectionConfigurationFiles=path/to/reflect-config.json` tells native-image which classes and methods need to be accessible via reflection at runtime. The JSON file lists class names, methods, fields, and constructors that should be included in the image.",
+  },
+  endQ3: {
+    id: "graal-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Which Spring Boot feature directly enables native-image compilation without requiring manual reflection configuration for Spring beans?",
+    options: [
+      { text: "Spring Boot DevTools", correct: false, feedback: "DevTools is for development-time hot reload, not native compilation." },
+      { text: "Spring AOT (Ahead-of-Time) engine introduced in Spring Boot 3", correct: true, feedback: "Correct. Spring Boot 3's AOT engine analyzes the application context at build time and automatically generates native-image hints for beans, components, and configuration classes." },
+      { text: "Spring Data JPA", correct: false, feedback: "Spring Data JPA works with native images but requires its own configuration. The general native support comes from the AOT engine in Spring Boot 3." },
+      { text: "Spring Boot Actuator", correct: false, feedback: "Actuator adds production monitoring endpoints but is not related to native-image compilation support." },
+    ],
+    explanation: "Spring Boot 3 (with Spring Framework 6) introduced a built-in AOT processing engine that introspects the application context at build time and emits GraalVM native-image configuration hints automatically. This is what makes `./mvnw -Pnative native:compile` work for Spring Boot apps with minimal extra configuration.",
+  },
+};
+
+For the first 25 years of Java's life, every deployment came with the cost of a JVM startup, a warm-up period, and significant baseline memory. That was an acceptable tradeoff for long-running servers. Then serverless computing changed the equation: functions that start per-request, containers that scale to zero, CLI tools that users expect to launch instantly. GraalVM's native-image addresses all of these by compiling Java ahead-of-time into a standalone executable — no JVM required.
+
+## GraalVM CE vs EE
+
+GraalVM comes in two editions:
+
+| Edition | License | Features |
+|---------|---------|----------|
+| Community Edition (CE) | GPLv2 + CE | native-image, polyglot, Graal JIT |
+| Enterprise Edition (EE) | Commercial | All CE + G1/ZGC in native, PGO, compressed images |
+
+For most teams, **GraalVM CE** is sufficient. It is available as a drop-in replacement for standard OpenJDK builds and powers the `native-image` tool.
+
+```bash
+# Install GraalVM CE via SDKMAN
+sdk install java 21.0.3-graal
+
+# Verify
+java -version
+# openjdk version "21.0.3" 2024-04-16
+# OpenJDK Runtime Environment GraalVM CE 21.0.3+7.1 (build ...)
+
+# Install native-image toolchain
+gu install native-image
+```
+
+## Building a native image
+
+```bash
+# Compile Java source
+javac Hello.java
+
+# Build native executable (requires a C compiler in PATH)
+native-image Hello -o hello
+
+# Run — no JVM needed
+./hello
+# Startup: ~15 ms
+# vs: java Hello  → Startup: ~150–300 ms
+```
+
+For Maven projects:
+
+```bash
+# Using the Native Build Tools plugin
+./mvnw -Pnative native:compile
+
+# Result: target/myapp  (self-contained executable)
+./target/myapp
+```
+
+## Startup and memory tradeoffs
+
+```
+                   JVM (JIT)     Native Image
+Startup time       200–1000 ms   10–80 ms
+Memory at startup  100–300 MB    20–80 MB
+Peak throughput    Very high     Moderate (no JIT)
+Pause times        GC-dependent  Low (no JIT deopt)
+```
+
+<Note>Native images do still have garbage collection — GraalVM includes a serial GC, G1GC (EE), and experimental Epsilon/Shenandoah support. The difference is there is no JIT compiler overhead and no JVM startup cost.</Note>
+
+## The closed-world assumption
+
+Native-image performs **points-to analysis** at build time: it starts from `main()` and traces every reachable class, method, and field. Anything not reachable is excluded from the executable.
+
+This breaks features that load code dynamically:
+
+| Feature | Issue | Fix |
+|---------|-------|-----|
+| Reflection (`Class.forName`, `getDeclaredMethods`) | Classes not in analysis | `reflect-config.json` |
+| JNI | Native bindings unknown | `jni-config.json` |
+| Dynamic proxies | Proxy classes generated at runtime | `proxy-config.json` |
+| Resources (`getResourceAsStream`) | Files not bundled | `resource-config.json` |
+| Serialization | Classes serialized by name | `serialization-config.json` |
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Reflection configuration
+
+```json
+// reflect-config.json
+[
+  {
+    "name": "com.example.MyService",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.example.dto.UserDTO",
+    "allDeclaredFields": true
+  }
+]
+```
+
+```bash
+native-image -H:ReflectionConfigurationFiles=reflect-config.json -jar myapp.jar
+```
+
+**Tracing agent** — GraalVM includes an agent that runs your tests and generates all configuration files automatically:
+
+```bash
+# Run with tracing agent to auto-generate config
+java -agentlib:native-image-agent=config-output-dir=src/main/resources/META-INF/native-image \
+     -jar myapp.jar
+
+# Now run your test suite or exercise all code paths
+# Agent writes reflect-config.json, proxy-config.json, etc.
+
+# Build native image using generated configs
+native-image -jar myapp.jar
+```
+
+## Spring Boot 3 native
+
+Spring Boot 3 + Spring Framework 6 has first-class native support via an AOT engine that automatically generates native-image hints for all Spring-managed beans:
+
+```xml
+<!-- pom.xml -->
+<plugin>
+    <groupId>org.graalvm.buildtools</groupId>
+    <artifactId>native-maven-plugin</artifactId>
+</plugin>
+```
+
+```bash
+# Build Spring Boot native image
+./mvnw -Pnative native:compile
+
+# Run the native Spring Boot app
+./target/myapp
+# Started MyApplication in 0.087 seconds (process running for 0.1)
+```
+
+Compare that to the JVM version which typically reports 1–3 seconds startup time.
+
+## Use cases: when to choose native image
+
+**Good fit:**
+- Serverless functions (AWS Lambda, Google Cloud Functions)
+- CLI tools and dev tooling
+- Microservices with strict startup SLAs
+- Short-lived containers that scale to zero
+
+**Poor fit:**
+- Long-running services with complex reflection/serialization libraries
+- Applications requiring maximum sustained throughput (JIT wins here)
+- Teams using dynamic languages features heavily (Groovy scripts, runtime code gen)
+
+## Try it
+
+Identify which of these Java features would require native-image configuration hints:
+
+```java
+// 1. Jackson ObjectMapper deserializing into a POJO
+ObjectMapper mapper = new ObjectMapper();
+MyDTO dto = mapper.readValue(json, MyDTO.class);
+// → Requires: reflect-config.json for MyDTO (all fields)
+
+// 2. Class.forName by name from config file
+String className = config.get("processor.class");
+Class<?> clazz = Class.forName(className);
+// → Requires: reflect-config.json — AND the class name must be known at build time
+
+// 3. Enum.values() via reflection
+MyEnum.class.getMethod("values").invoke(null);
+// → Requires: reflect-config.json for MyEnum with allDeclaredMethods
+
+// 4. Spring @Autowired injection
+@Component
+public class OrderService {
+    @Autowired private PaymentClient client;
+}
+// → Spring Boot 3 AOT engine handles this automatically
+```
+
+The tracing agent can generate all of these except case 2, where the class name is truly dynamic at runtime (unknown at build time) — that case may require an architectural rethink.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Not running the tracing agent** — manually writing reflection configuration is error-prone and incomplete. Always run the agent against a comprehensive test suite to generate config automatically.
+- **Assuming all libraries are native-image compatible** — some libraries use aggressive reflection, class generation, or JVM internals that are hard to configure. Check GraalVM's compatibility list before adopting native image for a complex app.
+- **Choosing native image for peak throughput** — a warm JIT consistently outperforms AOT for sustained high-load services. Native image wins on startup and memory, not on throughput.
+- **Ignoring the build time cost** — native-image compilation can take 2–10 minutes depending on application size. Factor this into your CI pipeline planning.
+
+## Recap
+
+- GraalVM **native-image** compiles Java AOT into a standalone executable with no JVM required at runtime.
+- Native images start in milliseconds and use less memory — ideal for serverless and CLI tools.
+- The **closed-world assumption** requires all reflective, JNI, proxy, and resource access to be declared in configuration files.
+- The **tracing agent** generates configuration automatically by observing a live run.
+- **Spring Boot 3** AOT engine handles native-image hints for Spring-managed components automatically.
+
+**Up next:** Capstone — profile and optimize a real slow program using everything learned in this module.

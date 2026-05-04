@@ -1,0 +1,267 @@
+export const meta = {
+  title: "Patterns in the JDK — Recognition Exercise",
+  duration: 13,
+  order: 9,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "jdk-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which JDK class is a classic example of the Decorator pattern?",
+    options: [
+      { text: "`java.lang.StringBuilder`", correct: false, feedback: "`StringBuilder` is a Builder-style API, not a Decorator. It does not wrap another `CharSequence` to add behaviour." },
+      { text: "`java.util.Collections.unmodifiableList(...)`", correct: false, feedback: "The wrapper returned by `unmodifiableList` is closer to a Proxy (access control) than a Decorator (behaviour addition)." },
+      { text: "`java.io.BufferedInputStream`", correct: true, feedback: "Correct! `BufferedInputStream` wraps any `InputStream` and adds a read buffer. It implements `InputStream` and holds a reference to another `InputStream` — the textbook Decorator structure." },
+      { text: "`java.util.TreeMap`", correct: false, feedback: "`TreeMap` is a concrete sorted map implementation — it extends `AbstractMap`, not a Decorator wrapping another Map." },
+    ],
+    explanation: "`BufferedInputStream` is the canonical JDK Decorator: it implements `InputStream`, holds a reference to another `InputStream`, and adds buffering behaviour layer by layer. The entire `java.io` stream hierarchy is built on this pattern.",
+  },
+  endQ1: {
+    id: "jdk-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "The `Comparator` interface passed to `List.sort()` is an example of which pattern?",
+    options: [
+      { text: "Observer — it listens for comparison events.", correct: false, feedback: "`Comparator` is not a listener. It provides an algorithm (comparison) on demand." },
+      { text: "Template Method — `List.sort()` defines a skeleton and `Comparator` fills in a step.", correct: false, feedback: "`List.sort()` does not define an overridable skeleton. The sort algorithm is self-contained; `Comparator` is purely a pluggable behaviour." },
+      { text: "Strategy — `Comparator` is a pluggable, interchangeable ordering algorithm.", correct: true, feedback: "Correct! Every `Comparator` is a Strategy. `List.sort()` accepts any implementation of the `Comparator` interface, making the ordering algorithm a runtime-configurable object." },
+      { text: "Command — the comparison is an encapsulated request.", correct: false, feedback: "Command encapsulates a request that can be queued and undone. `Comparator` is a pure algorithm with no side effects, queuing, or reversal — that's Strategy." },
+    ],
+    explanation: "`java.util.Comparator<T>` is arguably the most-used Strategy in the JDK. It encapsulates one ordering algorithm behind the `compare(T a, T b)` method. `Collections.sort`, `TreeMap`, `PriorityQueue`, and streams all accept a `Comparator` as a pluggable strategy.",
+  },
+  endQ2: {
+    id: "jdk-end-2",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Builder-style Stream pipeline (Builder / Strategy patterns)
+        List<String> result = Stream.of("banana", "apple", "cherry", "fig", "kiwi")
+            .filter(s -> s.length() > 3)       // Strategy: predicate
+            .sorted(Comparator.naturalOrder())  // Strategy: comparator
+            .map(String::toUpperCase)           // Strategy: function
+            .collect(Collectors.toList());
+
+        System.out.println(result);
+    }
+}`,
+    expectedOutput: "[APPLE, BANANA, CHERRY, KIWI]",
+    explanation: "`filter` removes `\"fig\"` (length 3, not > 3). The remaining four strings are sorted alphabetically (`apple, banana, cherry, kiwi`), then mapped to uppercase. The result is `[APPLE, BANANA, CHERRY, KIWI]`.",
+  },
+  endQ3: {
+    id: "jdk-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "`Runtime.getRuntime()` is the classic JDK example of which pattern? Fill in the pattern name.",
+    code: `// java.lang.Runtime source (simplified)
+public class Runtime {
+    private static final Runtime currentRuntime = new Runtime();
+
+    public static Runtime getRuntime() {
+        return currentRuntime;
+    }
+
+    private Runtime() {}   // private constructor
+
+    public void gc() { /* ... */ }
+    public long freeMemory() { /* ... */ return 0; }
+}
+
+// Pattern: ___`,
+    correctAnswers: ["Singleton", "singleton"],
+    caseSensitive: false,
+    explanation: "`Runtime` has a private constructor, a private static field holding the single instance, and a public static factory method `getRuntime()`. This is exactly the eager-initialisation Singleton pattern. The JVM guarantees one `Runtime` instance per process.",
+  },
+};
+
+The most durable way to cement your knowledge of design patterns is to spot them in code you already use every day. The Java standard library is built almost entirely from the patterns covered in this module. This lesson maps each pattern to its JDK incarnation so you can see the theory in production-grade code — and recognise patterns instantly when you encounter them in any large codebase.
+
+## Pattern map — JDK at a glance
+
+| Pattern | JDK Example | Key signal |
+|---|---|---|
+| **Decorator** | `BufferedInputStream`, `InputStreamReader` | Wraps same interface, adds behaviour |
+| **Observer** | `PropertyChangeListener`, `EventListener` | `addXxxListener` / `removeXxxListener` |
+| **Strategy** | `Comparator`, `Predicate`, `Function` | Single-method interface, passed as argument |
+| **Builder** | `StringBuilder`, `Stream`, `ProcessBuilder` | Fluent chain ending in a terminal method |
+| **Proxy** | `java.lang.reflect.Proxy`, `Collections.unmodifiableList` | Wraps same interface, controls access |
+| **Singleton** | `Runtime.getRuntime()`, `System.getSecurityManager()` | Private constructor + static accessor |
+| **Iterator** | `java.util.Iterator`, enhanced for-each | `hasNext()` / `next()` protocol |
+| **Template Method** | `AbstractList`, `AbstractMap`, `HttpServlet` | `final` method calling abstract hooks |
+| **Factory Method** | `Calendar.getInstance()`, `NumberFormat.getInstance()` | Static method returning interface/abstract type |
+
+## Decorator — java.io streams
+
+```java
+import java.io.*;
+
+// FileInputStream → BufferedInputStream → DataInputStream
+// Each layer adds one responsibility, same InputStream interface throughout
+try (DataInputStream in = new DataInputStream(
+        new BufferedInputStream(
+        new FileInputStream("scores.bin")))) {
+
+    int score = in.readInt();    // DataInputStream adds typed reads
+    System.out.println(score);
+}
+// FileInputStream  — raw bytes from disk
+// BufferedInputStream — adds an 8 KB buffer (fewer OS calls)
+// DataInputStream  — adds readInt(), readDouble(), readUTF()
+```
+
+Adding a checksum layer requires only wrapping with `CheckedInputStream` — zero changes to the inner classes.
+
+## Observer — PropertyChangeListener
+
+```java
+import java.beans.*;
+
+public class Temperature {
+    private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
+    private double value;
+
+    public void addChangeListener(PropertyChangeListener l) { pcs.addPropertyChangeListener(l); }
+    public void removeChangeListener(PropertyChangeListener l) { pcs.removePropertyChangeListener(l); }
+
+    public void setValue(double newVal) {
+        double old = this.value;
+        this.value = newVal;
+        pcs.firePropertyChange("value", old, newVal);
+    }
+}
+
+Temperature temp = new Temperature();
+temp.addChangeListener(e ->
+    System.out.println("Changed: " + e.getOldValue() + " -> " + e.getNewValue())
+);
+temp.setValue(22.5);
+// Changed: 0.0 -> 22.5
+```
+
+<Note>`PropertyChangeSupport` is the JDK's ready-made observer list. It is the standard convention in JavaBeans and Swing. In modern code, custom typed Observer interfaces (as taught in Lesson 6) are often cleaner.</Note>
+
+## Strategy — Comparator and Stream
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+List<String> words = Arrays.asList("banana", "fig", "cherry", "kiwi", "apple");
+
+// Comparator IS a strategy: plug in any ordering algorithm
+words.sort(Comparator.comparingInt(String::length)
+                     .thenComparing(Comparator.naturalOrder()));
+System.out.println(words);  // [fig, kiwi, apple, banana, cherry]
+
+// Stream pipeline: each lambda is a pluggable strategy
+long count = words.stream()
+    .filter(w -> w.length() > 4)       // Predicate strategy
+    .map(String::toUpperCase)          // Function strategy
+    .peek(System.out::println)         // Consumer strategy
+    .count();
+System.out.println("Count: " + count);
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Builder — StringBuilder and ProcessBuilder
+
+```java
+// StringBuilder is a classic Builder (mutable, fluent chain)
+String result = new StringBuilder()
+    .append("Hello")
+    .append(", ")
+    .append("World")
+    .append("!")
+    .toString();  // final "build" step
+System.out.println(result);  // Hello, World!
+
+// ProcessBuilder shows Builder for configuration
+ProcessBuilder pb = new ProcessBuilder("ls", "-la")
+    .directory(new java.io.File("/tmp"))
+    .redirectErrorStream(true);
+// pb.start() would launch the process
+```
+
+## Singleton — Runtime
+
+```java
+// Runtime.getRuntime() — the classic eager Singleton
+Runtime rt = Runtime.getRuntime();
+System.out.println("Processors: " + rt.availableProcessors());
+System.out.println("Free memory: " + rt.freeMemory() / 1024 / 1024 + " MB");
+
+// Same instance every time — reference equality is true
+System.out.println(Runtime.getRuntime() == Runtime.getRuntime()); // true
+```
+
+## Try it
+
+Use three JDK patterns in one program: `Comparator` strategy, `BufferedReader` decorator chain, and a builder-style `Stream` pipeline:
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // 1. Strategy: custom Comparator
+        List<String> fruits = Arrays.asList("banana", "apple", "cherry", "fig");
+        fruits.sort(Comparator.comparingInt(String::length)
+                              .thenComparing(Comparator.naturalOrder()));
+        System.out.println("Sorted: " + fruits);
+        // Sorted: [fig, apple, banana, cherry]
+
+        // 2. Decorator: BufferedReader wraps a StringReader (no file I/O needed)
+        String data = "one\ntwo\nthree";
+        try (var reader = new java.io.BufferedReader(new java.io.StringReader(data))) {
+            reader.lines()
+                  .map(String::toUpperCase)
+                  .forEach(System.out::println);
+        } catch (Exception e) { e.printStackTrace(); }
+        // ONE  TWO  THREE
+
+        // 3. Builder-style Stream pipeline
+        long longWords = Stream.of("design", "patterns", "in", "Java", "are", "powerful")
+            .filter(w -> w.length() > 4)
+            .peek(w -> System.out.println("Kept: " + w))
+            .count();
+        System.out.println("Long words: " + longWords);
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Confusing `StringBuilder` with GoF Builder** — `StringBuilder` is a fluent accumulator, not the immutable-object-from-named-parameters pattern. Recognise it as a Builder-style API, not a strict GoF Builder.
+- **Calling `Collections.unmodifiableList` a Decorator** — it controls access (throws on mutation), making it a Protection Proxy, not a Decorator. The interface is the same but the intent is access control.
+- **Assuming every static factory method is a Singleton** — `Calendar.getInstance()` creates a new instance each call. It's Factory Method, not Singleton. Only methods that always return the same instance are Singleton.
+- **Missing the Template Method in `AbstractList`** — `AbstractList.indexOf()` calls `listIterator()`, which calls `get()` — an abstract method you override. That's Template Method calling back into your subclass.
+
+## Recap
+
+- `BufferedInputStream`, `InputStreamReader` → **Decorator**
+- `PropertyChangeListener`, `EventListener` → **Observer**
+- `Comparator`, `Predicate`, `Function` → **Strategy**
+- `StringBuilder`, `Stream`, `ProcessBuilder` → **Builder-style API**
+- `java.lang.reflect.Proxy`, `Collections.unmodifiableList` → **Proxy**
+- `Runtime.getRuntime()` → **Singleton**
+- `AbstractList.get()` / `AbstractMap.entrySet()` → **Template Method**
+
+**Up next:** Capstone — Anti-Patterns & Refactoring — learning to identify what went wrong in real code and which patterns fix it.

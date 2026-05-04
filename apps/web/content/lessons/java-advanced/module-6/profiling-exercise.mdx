@@ -1,0 +1,369 @@
+export const meta = {
+  title: "Capstone: Profile & Optimize a Slow Program",
+  duration: 18,
+  order: 8,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "opt-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What should be the **first** step when investigating a performance problem in production?",
+    options: [
+      { text: "Rewrite the slowest method using lower-level constructs.", correct: false, feedback: "Rewriting before measuring often fixes the wrong thing. You must first confirm what is actually slow." },
+      { text: "Add indexes to the database.", correct: false, feedback: "Database indexes may help, but adding them without data is guesswork. You first need to confirm that database access is the bottleneck." },
+      { text: "Define and measure a baseline: what is the current performance, and what is the target?", correct: true, feedback: "Correct. Without a baseline you cannot tell if an optimization helped, how much it helped, or whether you've reached the target. Measure first, then profile, then optimize." },
+      { text: "Increase the heap size with -Xmx.", correct: false, feedback: "Increasing the heap may hide a memory leak temporarily but will not fix algorithmic or CPU bottlenecks. Measure first." },
+    ],
+    explanation: "Every performance investigation starts with measurement. Define: what metric is bad (latency? throughput? memory?), what the current value is, and what acceptable looks like. This baseline guides where to profile and tells you when to stop optimizing.",
+  },
+  endQ1: {
+    id: "opt-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A service has a memory leak: heap usage grows 50 MB per hour and never falls. What is the most likely root cause?",
+    options: [
+      { text: "The heap size is too small and needs `-Xmx` increased.", correct: false, feedback: "Increasing `-Xmx` delays the OutOfMemoryError but does not fix the leak. The problem is objects being retained unnecessarily." },
+      { text: "A collection (Map, List, or cache) is accumulating entries and never evicting them.", correct: true, feedback: "Correct. The most common memory leak pattern in Java is a static or long-lived collection that grows without bound — a cache with no eviction policy, a listener list that never unregisters, or an event log that is never trimmed." },
+      { text: "Too many threads are being created.", correct: false, feedback: "Thread leaks cause memory growth (each thread's stack is ~512 KB), but the pattern is usually more sudden and tied to concurrency rather than a smooth 50 MB/hour growth." },
+      { text: "GC is not running frequently enough.", correct: false, feedback: "If objects are genuinely unreachable, GC will collect them. The GC not running is not the cause — the leak means objects are still reachable through some reference chain." },
+    ],
+    explanation: "Memory leaks in Java are always caused by strong references preventing GC. The most common culprit is a collection that grows without an eviction mechanism. Take a heap dump, open it in JDK Mission Control or Eclipse MAT, and find the largest retained object graph.",
+  },
+  endQ2: {
+    id: "opt-end-2",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class WordFrequency {
+    public Map<String, Integer> count(List<String> words) {
+        Map<String, Integer> freq = new HashMap<>();
+        for (String word : words) {
+            String lower = word.toLowerCase();          // (1)
+            boolean found = false;
+            for (String key : freq.keySet()) {          // bug here
+                if (key.equals(lower)) {
+                    freq.put(key, freq.get(key) + 1);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) freq.put(lower, 1);
+        }
+        return freq;
+    }
+}`,
+    buggyLine: 6,
+    issue: "The inner loop over `freq.keySet()` makes this O(n × m) where n is the word count and m is the number of distinct words. The entire purpose of `HashMap` is O(1) key lookup — the manual scan of keys defeats this completely.",
+    explanation: "Replace the inner loop and manual search with `freq.merge(lower, 1, Integer::sum)`. `HashMap.merge` does an O(1) lookup, inserts if absent, or applies the merging function if the key exists — collapsing the entire inner loop and the `found` flag into one method call.",
+  },
+  endQ3: {
+    id: "opt-end-3",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class OptimizedWordFrequency {
+    public static Map<String, Integer> count(String[] words) {
+        Map<String, Integer> freq = new HashMap<>();
+        for (String word : words) {
+            freq.merge(word.toLowerCase(), 1, Integer::sum);
+        }
+        return freq;
+    }
+
+    public static void main(String[] args) {
+        String[] words = {"The", "cat", "sat", "on", "the", "mat", "the"};
+        Map<String, Integer> result = count(words);
+        // Print in sorted key order
+        new TreeMap<>(result).forEach((k, v) ->
+            System.out.println(k + "=" + v));
+    }
+}`,
+    expectedOutput: "cat=1\nmat=1\non=1\nsat=1\nthe=3",
+    explanation: "`TreeMap` sorts keys alphabetically. 'the' appears 3 times (\"The\" + \"the\" + \"the\" all normalize to \"the\"). All other words appear once. `merge` correctly accumulates counts with O(1) per word.",
+  },
+};
+
+This capstone lesson ties together everything from Module 6 — GC, the memory model, profiling tools, benchmarking, and performance traps — into a single realistic optimization exercise. We start with a working but slow word-frequency analyzer, identify each bottleneck systematically, and apply targeted fixes with measured improvements. By the end, you will have a repeatable mental model for any performance investigation.
+
+## The optimization workflow
+
+Before touching code, always follow this sequence:
+
+```
+1. Define the problem     → what metric? what target?
+2. Establish a baseline   → measure current performance
+3. Profile                → find the actual bottleneck
+4. Hypothesize            → why is this slow?
+5. Fix ONE thing          → targeted change
+6. Measure again          → did it improve? by how much?
+7. Repeat                 → until target is met or returns diminish
+```
+
+Skipping step 3 leads to fixing the wrong thing. Skipping step 6 leads to not knowing if the fix worked. The workflow is a loop, not a one-shot.
+
+## Memory leaks — the silent killer
+
+A memory leak in Java means objects are reachable (via some reference chain) but will never be used again. GC cannot collect them. Common sources:
+
+```java
+// Pattern 1: Static cache with no eviction
+public class UserCache {
+    private static final Map<Long, User> CACHE = new HashMap<>();  // grows forever
+    public static void put(Long id, User u) { CACHE.put(id, u); }
+}
+
+// Fix: use bounded cache with eviction
+private static final Map<Long, User> CACHE =
+    Collections.synchronizedMap(new LinkedHashMap<>(1000, 0.75f, true) {
+        protected boolean removeEldestEntry(Map.Entry e) {
+            return size() > 1000;
+        }
+    });
+// Or: Caffeine / Guava Cache with maximumSize and expiry
+
+// Pattern 2: Listener never unregistered
+button.addActionListener(expensiveListener);  // holds reference to listener + its closure
+// Fix: keep a reference and call removeActionListener when done
+```
+
+## CPU hot spots — algorithmic first
+
+CPU profiling reveals *where* time is spent, but the fix often requires changing the *algorithm*, not micro-optimizing the hot method:
+
+```java
+// O(n²) duplicate detection — slow
+public List<String> removeDuplicates(List<String> input) {
+    List<String> result = new ArrayList<>();
+    for (String s : input) {
+        if (!result.contains(s)) {  // O(n) per element → O(n²) total
+            result.add(s);
+        }
+    }
+    return result;
+}
+
+// O(n) with LinkedHashSet — preserves insertion order
+public List<String> removeDuplicates(List<String> input) {
+    return new ArrayList<>(new LinkedHashSet<>(input));
+}
+```
+
+## I/O blocking
+
+I/O is often the real bottleneck that CPU profiling misses. Use wall-clock profiling (`async-profiler -e wall`) or JFR socket/file events:
+
+```java
+// Blocking I/O on main thread — blocks the calling thread
+List<User> users = new ArrayList<>();
+for (long id : ids) {
+    users.add(userService.fetchById(id));  // synchronous HTTP per ID — serial
+}
+
+// Parallel I/O with CompletableFuture
+List<CompletableFuture<User>> futures = ids.stream()
+    .map(id -> CompletableFuture.supplyAsync(
+            () -> userService.fetchById(id), executor))
+    .collect(Collectors.toList());
+
+List<User> users = futures.stream()
+    .map(CompletableFuture::join)
+    .collect(Collectors.toList());
+```
+
+For 100 IDs with 50 ms each: serial = 5 seconds; parallel with 20 threads = ~250 ms.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## The slow WordFrequency program
+
+Here is an intentionally slow implementation. Read it carefully and identify each problem before looking at the fixes below:
+
+```java
+import java.util.*;
+
+public class SlowWordFrequency {
+    /**
+     * Counts word frequencies in a list of words.
+     * Intentionally written with multiple performance problems.
+     */
+    public static Map<String, Integer> count(List<String> words) {
+        Map<String, Integer> freq = new HashMap<>();
+
+        for (String word : words) {
+            // Problem 1: toLowerCase() allocates a new String every iteration
+            String lower = word.toLowerCase();
+
+            // Problem 2: Manual scan of keySet defeats HashMap's O(1) lookup
+            boolean found = false;
+            for (String key : freq.keySet()) {
+                if (key.equals(lower)) {
+                    // Problem 3: freq.get() + freq.put() = two hash lookups per hit
+                    freq.put(key, freq.get(key) + 1);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                freq.put(lower, 1);
+            }
+        }
+        return freq;
+    }
+
+    public static void main(String[] args) {
+        // Simulate loading a large text
+        List<String> words = generateWords(500_000);
+        long start = System.nanoTime();
+        Map<String, Integer> result = count(words);
+        long ms = (System.nanoTime() - start) / 1_000_000;
+        System.out.println("Distinct words: " + result.size());
+        System.out.printf("Time: %d ms%n", ms);
+    }
+
+    static List<String> generateWords(int n) {
+        String[] vocab = {"The", "cat", "sat", "on", "the", "mat",
+                          "A", "dog", "ran", "through", "a", "field"};
+        List<String> words = new ArrayList<>(n);
+        Random rng = new Random(42);
+        for (int i = 0; i < n; i++) words.add(vocab[rng.nextInt(vocab.length)]);
+        return words;
+    }
+}
+```
+
+## Step-by-step optimization
+
+**Step 1: Fix the O(n×m) keySet scan**
+
+The worst offender. Iterating `freq.keySet()` to find a key makes this O(n × distinct_words). Replace with `HashMap.getOrDefault`:
+
+```java
+// Before: manual keySet scan + get + put
+// After: single getOrDefault + put
+String lower = word.toLowerCase();
+freq.put(lower, freq.getOrDefault(lower, 0) + 1);
+```
+
+This is already dramatically faster because `HashMap` uses hashing, not linear scan.
+
+**Step 2: Use `merge` to eliminate double lookup**
+
+`getOrDefault` + `put` is two hash lookups. `merge` does it in one:
+
+```java
+freq.merge(word.toLowerCase(), 1, Integer::sum);
+```
+
+`merge` looks up the key once, inserts `1` if absent, or applies `Integer::sum` if present. It also avoids boxing/unboxing by using the `Integer` sum function directly.
+
+**Step 3: Reduce `toLowerCase` allocations**
+
+`toLowerCase()` allocates a new `String` every time. If most words are already lowercase (common in practice), use a check:
+
+```java
+// Only allocate if necessary
+String lower = isLowerCase(word) ? word : word.toLowerCase();
+```
+
+For mostly-lowercase input this halves `String` allocations in the hot path. Profile to confirm before adding this complexity.
+
+**The optimized version:**
+
+```java
+import java.util.*;
+
+public class FastWordFrequency {
+    public static Map<String, Integer> count(List<String> words) {
+        // Pre-size the map to avoid rehashing
+        Map<String, Integer> freq = new HashMap<>(words.size() * 2);
+        for (String word : words) {
+            freq.merge(word.toLowerCase(), 1, Integer::sum);
+        }
+        return freq;
+    }
+
+    public static void main(String[] args) {
+        List<String> words = SlowWordFrequency.generateWords(500_000);
+
+        // Warm up (important for fair comparison)
+        for (int i = 0; i < 3; i++) count(words);
+
+        long start = System.nanoTime();
+        Map<String, Integer> result = count(words);
+        long ms = (System.nanoTime() - start) / 1_000_000;
+        System.out.println("Distinct words: " + result.size());
+        System.out.printf("Time: %d ms%n", ms);
+    }
+}
+```
+
+Expected result on typical hardware: `SlowWordFrequency` ~400–800 ms; `FastWordFrequency` ~30–60 ms — a 10–20× improvement from algorithmic fixes alone, with no JVM flags or micro-optimization tricks.
+
+## Try it
+
+Run both versions and record the times. Then extend the exercise:
+
+```java
+// Challenge 1: Make it parallel using streams
+public static Map<String, Integer> countParallel(List<String> words) {
+    return words.parallelStream()
+        .collect(Collectors.toConcurrentMap(
+            w -> w.toLowerCase(),
+            w -> 1,
+            Integer::sum
+        ));
+}
+// Is it faster? Profile to find out — the parallel overhead may dominate for < 1M words.
+
+// Challenge 2: Find the top-5 most frequent words
+freq.entrySet().stream()
+    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+    .limit(5)
+    .forEach(e -> System.out.println(e.getKey() + ": " + e.getValue()));
+
+// Challenge 3: Add a memory leak — store results in a static list
+// and watch heap grow with VisualVM. Then fix it.
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Optimizing without a baseline** — if you don't know the before, you can't measure the after. Always record the baseline time before making changes.
+- **Fixing the wrong bottleneck** — the slow `toLowerCase()` is visible and tempting to optimize, but the keySet scan is 100× more impactful. Profile to rank bottlenecks before fixing them.
+- **Parallelizing before fixing serial code** — `parallelStream` on the slow O(n²) version would add thread overhead on top of the algorithmic waste. Fix the algorithm first, then parallelize if needed.
+- **Not re-running after optimization** — JIT behavior can shift after code changes. Always warm up and measure multiple times after each optimization to confirm the improvement is real and stable.
+
+## Recap
+
+- Every performance investigation follows **measure → profile → fix ONE thing → measure again**.
+- **Memory leaks** in Java are caused by strong references in long-lived containers; find them with heap dumps.
+- **Algorithmic improvements** (O(n²) → O(n)) dwarf all micro-optimizations — fix the algorithm first.
+- **I/O bottlenecks** require wall-clock profiling or JFR event analysis, not CPU profiling.
+- The `WordFrequency` exercise showed that `HashMap.merge` is both more correct and dramatically faster than a manual keySet scan — a pattern that appears constantly in real codebases.
+
+---
+
+## Module recap
+
+You have completed **Module 6: JVM Internals & Performance**. Here is what you now know how to do:
+
+- **Explain the JVM pipeline** — ClassLoader hierarchy, bytecode, tiered JIT compilation (C1/C2), and GraalVM AOT.
+- **Reason about GC** — generational heap, GC roots, minor vs major GC, G1/ZGC/Shenandoah, and reading GC logs.
+- **Write safe concurrent code** — applying happens-before rules with `volatile`, `synchronized`, and `final` correctly.
+- **Profile a JVM application** — using async-profiler, JFR, and VisualVM; reading flame graphs; applying Amdahl's Law.
+- **Write honest microbenchmarks** — with JMH, proper warm-up, dead-code prevention, and fork isolation.
+- **Recognize and fix common traps** — autoboxing, String concatenation, `List.contains()`, regex recompilation.
+- **Evaluate native-image** — understand the closed-world assumption, configure reflection hints, and know when AOT is the right choice.
+- **Conduct a full optimization cycle** — from baseline measurement through profiling, algorithmic fix, and verification.
