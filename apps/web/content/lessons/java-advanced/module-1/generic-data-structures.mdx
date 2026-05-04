@@ -1,0 +1,278 @@
+export const meta = {
+  title: "Building Generic Data Structures",
+  duration: 16,
+  order: 7,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "gds-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    static class Stack<T> {
+        private Object[] data = new Object[4];
+        private int top = -1;
+
+        void push(T item) { data[++top] = item; }
+
+        @SuppressWarnings("unchecked")
+        T pop() { return (T) data[top--]; }
+
+        @SuppressWarnings("unchecked")
+        T peek() { return (T) data[top]; }
+
+        boolean isEmpty() { return top == -1; }
+    }
+
+    public static void main(String[] args) {
+        Stack<String> s = new Stack<>();
+        s.push("a");
+        s.push("b");
+        s.push("c");
+        System.out.println(s.pop());
+        System.out.println(s.peek());
+        System.out.println(s.isEmpty());
+    }
+}`,
+    expectedOutput: "c\nb\nfalse",
+    explanation: "push adds a, b, c. pop removes and returns the top element c. peek returns the new top b without removing it. isEmpty returns false because a and b remain.",
+  },
+  endQ1: {
+    id: "gds-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why is `new T[n]` illegal in Java, and what is the standard workaround?",
+    options: [
+      { text: "It's illegal because T might be a primitive type; the workaround is to use a wrapper type.", correct: false, feedback: "Type parameters are always reference types, so primitives aren't the issue. The problem is erasure." },
+      { text: "It's illegal because the JVM needs the exact type at runtime to allocate the array, and erasure removes T; the workaround is `(T[]) new Object[n]`.", correct: true, feedback: "Correct. Array creation requires a runtime type token. Since T is erased, the standard pattern is to create Object[] and cast it to T[] with an unchecked cast." },
+      { text: "It's illegal in older Java but legal since Java 8.", correct: false, feedback: "Generic array creation has never been legal in Java. The restriction has not changed." },
+      { text: "It's illegal; the only workaround is to use ArrayList instead.", correct: false, feedback: "ArrayList is a valid alternative, but the Object-array pattern is widely used when you want a fixed backing array without the ArrayList overhead." },
+    ],
+    explanation: "Due to type erasure, `new T[n]` would produce a `new Object[n]` at runtime, but the array's component type wouldn't be T — it would be Object. Java prohibits this to avoid misleading array type information. The workaround `(T[]) new Object[n]` is an unchecked cast that the compiler warns about but accepts.",
+  },
+  endQ2: {
+    id: "gds-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the `size` method that returns the number of elements currently in the stack (top starts at -1):",
+    code: `public int size() { return ___ + 1; }`,
+    correctAnswers: ["top"],
+    caseSensitive: true,
+    explanation: "When top == -1 the stack is empty (size 0). When top == 0 there is one element (size 1). In general, size = top + 1.",
+  },
+  endQ3: {
+    id: "gds-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Stack<T> {
+    private Object[] data;
+    private int top = -1;
+
+    public Stack(int capacity) {
+        data = new Object[capacity];
+    }
+
+    public void push(T item) {
+        data[top] = item;   // bug here
+        top++;
+    }
+
+    @SuppressWarnings("unchecked")
+    public T pop() {
+        return (T) data[--top];
+    }
+}`,
+    buggyLine: 10,
+    issue: "`data[top]` writes to index -1 on the first push, causing ArrayIndexOutOfBoundsException. The correct pattern is `data[++top] = item` (pre-increment) or `top++; data[top] = item;`.",
+    explanation: "top starts at -1. Writing to `data[top]` before incrementing tries to write to index -1. Pre-incrementing `data[++top] = item` advances top to 0 first, then writes to the valid first slot.",
+  },
+};
+
+Writing your own generic data structures is one of the best exercises for cementing your understanding of generics, erasure, and the Object-array workaround. It's also the foundation of frameworks: `ArrayList`, `LinkedList`, `ArrayDeque`, and `PriorityQueue` are all generic data structures implemented with exactly the patterns you'll learn here. Even if you never ship your own Stack to production, understanding how the JDK builds its data structures makes you a significantly better user of them.
+
+## The generic stack design
+
+A stack is LIFO (Last-In, First-Out). The core operations are `push`, `pop`, `peek`, `isEmpty`, and `size`. Internally we'll back it with a resizable `Object[]` array.
+
+```java
+@SuppressWarnings("unchecked")
+public class Stack<T> {
+    private static final int DEFAULT_CAPACITY = 8;
+    private Object[] data;
+    private int top = -1;   // index of the top element (-1 means empty)
+
+    public Stack() {
+        data = new Object[DEFAULT_CAPACITY];
+    }
+
+    public Stack(int initialCapacity) {
+        if (initialCapacity < 1) throw new IllegalArgumentException();
+        data = new Object[initialCapacity];
+    }
+```
+
+## Why `Object[]` instead of `T[]`
+
+Due to type erasure, `new T[n]` is illegal (the JVM doesn't know T at runtime). The standard workaround is:
+
+```java
+Object[] data = new Object[capacity];
+
+// When reading back, cast to T — safe because we only ever stored T:
+T item = (T) data[top];
+```
+
+The `@SuppressWarnings("unchecked")` annotation tells the compiler "I know about this cast — I've verified it's correct". This suppression should be applied narrowly (on the specific method or field, not the whole class) and only when you genuinely control all writes to the array.
+
+<Note>An alternative is `(T[]) new Object[n]` and storing as T[]. Both patterns produce unchecked warnings. The Object[] field approach is slightly preferred because it avoids the problematic type tag on the array object itself.</Note>
+
+## Push, pop, and auto-resize
+
+```java
+    public void push(T item) {
+        ensureCapacity();
+        data[++top] = item;
+    }
+
+    public T pop() {
+        if (isEmpty()) throw new java.util.EmptyStackException();
+        T item = (T) data[top];
+        data[top--] = null;  // null out for GC
+        return item;
+    }
+
+    public T peek() {
+        if (isEmpty()) throw new java.util.EmptyStackException();
+        return (T) data[top];
+    }
+
+    public boolean isEmpty() { return top == -1; }
+    public int     size()    { return top + 1; }
+
+    private void ensureCapacity() {
+        if (top + 1 == data.length) {
+            data = java.util.Arrays.copyOf(data, data.length * 2);
+        }
+    }
+```
+
+Setting the popped slot to `null` is important: leaving the old reference alive is a **memory leak** — the array holds a strong reference even after the element is logically removed. The JDK's `ArrayDeque` does the same null-clearing.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Adding an iterator
+
+A generic data structure becomes much more useful when it implements `Iterable<T>`, enabling for-each loops:
+
+```java
+    @Override
+    public java.util.Iterator<T> iterator() {
+        return new java.util.Iterator<T>() {
+            private int cursor = top;
+
+            @Override public boolean hasNext() { return cursor >= 0; }
+
+            @Override
+            public T next() {
+                if (!hasNext()) throw new java.util.NoSuchElementException();
+                return (T) data[cursor--];
+            }
+        };
+    }
+```
+
+Usage:
+
+```java
+Stack<String> stack = new Stack<>();
+stack.push("a"); stack.push("b"); stack.push("c");
+for (String s : stack) {
+    System.out.print(s + " ");  // c b a
+}
+```
+
+## Complete Stack implementation
+
+```java
+import java.util.*;
+
+@SuppressWarnings("unchecked")
+public class Stack<T> implements Iterable<T> {
+    private Object[] data = new Object[8];
+    private int top = -1;
+
+    public void push(T item)   { ensureCapacity(); data[++top] = item; }
+    public T    pop()          { checkNonEmpty(); T v = (T)data[top]; data[top--] = null; return v; }
+    public T    peek()         { checkNonEmpty(); return (T) data[top]; }
+    public boolean isEmpty()   { return top == -1; }
+    public int  size()         { return top + 1; }
+
+    private void ensureCapacity() {
+        if (top + 1 == data.length) data = Arrays.copyOf(data, data.length * 2);
+    }
+    private void checkNonEmpty() {
+        if (isEmpty()) throw new EmptyStackException();
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+        return new Iterator<T>() {
+            int cursor = top;
+            public boolean hasNext() { return cursor >= 0; }
+            public T next()          { if (!hasNext()) throw new NoSuchElementException(); return (T) data[cursor--]; }
+        };
+    }
+}
+```
+
+## Try it
+
+Use the Stack to evaluate a simple expression (reverse a string by pushing characters, then popping them):
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Stack<Character> stack = new Stack<>();
+
+        String input = "hello";
+        for (char c : input.toCharArray()) stack.push(c);
+
+        StringBuilder sb = new StringBuilder();
+        while (!stack.isEmpty()) sb.append(stack.pop());
+
+        System.out.println(sb);  // olleh
+        System.out.println(stack.size()); // 0
+    }
+}
+```
+
+Extend the Try It: add a `toList()` method that returns the elements bottom-to-top as a `java.util.List<T>`.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Not null-clearing popped slots** — the backing array holds a strong reference to the object even after logical removal. Always set `data[slot] = null` after popping to allow the GC to collect the element.
+- **Off-by-one in `top`** — the convention where `top` starts at -1 and is pre-incremented on push (`data[++top]`) is the safest: the empty condition `top == -1` is unambiguous.
+- **Forgetting `@SuppressWarnings("unchecked")`** — the unchecked cast is intentional and correct. Without the annotation, the warning noise can obscure real warnings elsewhere. Apply it to the smallest scope (the method, not the class) so genuine warnings aren't hidden.
+- **Implementing `Iterable` but not removing elements** — the iterator above is read-only. That's typically what you want for a stack; document this clearly so callers don't assume iteration is destructive.
+
+## Recap
+
+- Back a generic container with `Object[]`; cast to `T` on reads with `@SuppressWarnings("unchecked")`.
+- `new T[n]` is illegal — use `new Object[n]` and cast.
+- **Null out removed slots** to avoid memory leaks.
+- Pre-increment `top` on push (`data[++top]`), post-decrement on pop (`data[top--]`).
+- Implement `Iterable<T>` to enable for-each iteration.
+
+**Up next:** Generic search and sort algorithms — writing binarySearch and mergeSort over any Comparable type.

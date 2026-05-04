@@ -1,0 +1,279 @@
+export const meta = {
+  title: "Comparable vs Comparator — Chaining & Reversal",
+  duration: 14,
+  order: 6,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "cc-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which interface defines the *natural ordering* of a class?",
+    options: [
+      { text: "`Comparator<T>`", correct: false, feedback: "`Comparator<T>` is a separate strategy object used for custom or alternative orderings. It does not define the natural order." },
+      { text: "`Comparable<T>`", correct: true, feedback: "Correct. A class implements `Comparable<T>` to declare its own natural ordering via `compareTo`. This is what `Collections.sort` and `TreeSet` use by default." },
+      { text: "`Sortable<T>`", correct: false, feedback: "There is no `Sortable` interface in the Java standard library." },
+      { text: "`Ordered<T>`", correct: false, feedback: "There is no `Ordered` interface in the Java standard library. You may be thinking of Spring's `Ordered` interface, which is framework-specific." },
+    ],
+    explanation: "`Comparable<T>` is implemented by a class to define its **natural ordering** — the default sort order used by `Collections.sort`, `TreeMap`, `TreeSet`, and array sorting without an explicit comparator.",
+  },
+  endQ1: {
+    id: "cc-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    record Employee(String name, String dept, int salary) {}
+
+    public static void main(String[] args) {
+        List<Employee> employees = new ArrayList<>(List.of(
+            new Employee("Zara", "Engineering", 90_000),
+            new Employee("Alice", "Engineering", 75_000),
+            new Employee("Bob",  "Marketing",   80_000),
+            new Employee("Eve",  "Engineering", 90_000)
+        ));
+
+        employees.sort(
+            Comparator.comparing(Employee::dept)
+                      .thenComparingInt(Employee::salary).reversed()
+                      .thenComparing(Employee::name)
+        );
+
+        employees.forEach(e -> System.out.println(e.name()));
+    }
+}`,
+    expectedOutput: "Bob\nZara\nEve\nAlice",
+    explanation: "The comparator reverses the combined dept+salary comparison, then breaks ties by name. After reversal: Marketing (Bob) sorts before Engineering, and within Engineering higher salaries (90k: Zara, Eve) sort before lower (75k: Alice). Zara and Eve tie on salary so name order (Eve < Zara alphabetically) applies — but reversed() flips that too, giving Zara before Eve.",
+  },
+  endQ2: {
+    id: "cc-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the Comparator that sorts strings by length, then alphabetically for equal lengths:",
+    code: `Comparator<String> c = Comparator.comparingInt(String::length)
+                               .___(Comparator.naturalOrder());`,
+    correctAnswers: ["thenComparing"],
+    caseSensitive: true,
+    explanation: "`thenComparing` chains a secondary comparator that is only consulted when the primary comparator returns 0 (equal). `Comparator.naturalOrder()` provides the alphabetical fallback.",
+  },
+  endQ3: {
+    id: "cc-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    record Product(String name, double price) {}
+
+    public static void main(String[] args) {
+        List<Product> products = new ArrayList<>(List.of(
+            new Product("Banana", 0.5),
+            new Product("Apple",  1.2),
+            new Product("Cherry", 3.0)
+        ));
+        products.sort(Comparator.comparing(p -> p.price()));  // bug here
+        products.forEach(p -> System.out.println(p.name()));
+    }
+}`,
+    buggyLine: 11,
+    issue: "Lambda parameter `p` is inferred as Object when chaining with `Comparator.comparing`, causing a compile error. Provide an explicit type: `(Product p) -> p.price()` or use the method reference `Product::price`.",
+    explanation: "Inside a lambda passed to `Comparator.comparing`, type inference can fail to resolve the record accessor because the lambda's target type isn't sufficiently constrained. The fix is either an explicit cast `(Product p) ->` or a method reference `Product::price`.",
+  },
+};
+
+Almost every real-world Java application needs to sort objects: sort orders by date, employees by department, products by price and name. Java provides two complementary tools. `Comparable` bakes the natural order *into the class* — a class that implements `Comparable` tells the world "here is my default sort order". `Comparator` is an external strategy object — reusable, composable, and reversible without touching the original class. Production code almost always ends up using `Comparator.comparing().thenComparing().reversed()` chains, which are expressive enough to replace hundreds of lines of hand-written comparison code.
+
+## `Comparable<T>` — the natural order
+
+A class implements `Comparable<T>` to define how its instances compare to each other by default:
+
+```java
+public class Temperature implements Comparable<Temperature> {
+    private final double celsius;
+
+    public Temperature(double celsius) { this.celsius = celsius; }
+
+    @Override
+    public int compareTo(Temperature other) {
+        // Negative → this is smaller; 0 → equal; positive → this is larger
+        return Double.compare(this.celsius, other.celsius);
+    }
+
+    @Override
+    public String toString() { return celsius + "°C"; }
+}
+```
+
+Once a class implements `Comparable`, it works with all standard JDK sorting and searching:
+
+```java
+List<Temperature> temps = new ArrayList<>(List.of(
+    new Temperature(100), new Temperature(-10), new Temperature(37)
+));
+Collections.sort(temps);
+System.out.println(temps);   // [-10.0°C, 37.0°C, 100.0°C]
+```
+
+<Note>Always use `Double.compare(a, b)`, `Integer.compare(a, b)`, etc. instead of subtraction (`a - b`). Subtraction overflows for large integers and produces NaN for certain doubles, leading to incorrect sort orders.</Note>
+
+## `Comparator<T>` — external, composable ordering
+
+`Comparator` is a functional interface — you can create one with a lambda or method reference. The `Comparator.comparing` factory is the modern entry point:
+
+```java
+import java.util.*;
+
+record Person(String name, int age) {}
+
+List<Person> people = new ArrayList<>(List.of(
+    new Person("Zara", 28),
+    new Person("Alice", 35),
+    new Person("Bob", 28)
+));
+
+// Sort by age
+people.sort(Comparator.comparingInt(Person::age));
+System.out.println(people);
+// [Person[name=Zara, age=28], Person[name=Bob, age=28], Person[name=Alice, age=35]]
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Chaining with `thenComparing`
+
+`thenComparing` adds a secondary sort key that breaks ties:
+
+```java
+// Sort by age ascending, then name alphabetically for equal ages
+Comparator<Person> byAgeThenName =
+    Comparator.comparingInt(Person::age)
+              .thenComparing(Person::name);
+
+people.sort(byAgeThenName);
+System.out.println(people);
+// [Person[name=Bob, age=28], Person[name=Zara, age=28], Person[name=Alice, age=35]]
+```
+
+You can chain as many `thenComparing` calls as needed.
+
+## `reversed()` and `reverseOrder()`
+
+```java
+// Sort by age descending
+Comparator<Person> byAgeDesc = Comparator.comparingInt(Person::age).reversed();
+
+// Sort strings by length descending, then alphabetically
+Comparator<String> c = Comparator.comparingInt(String::length)
+                                  .reversed()
+                                  .thenComparing(Comparator.naturalOrder());
+```
+
+`Comparator.reverseOrder()` gives the reverse of natural order for directly comparable types:
+
+```java
+List<Integer> nums = new ArrayList<>(List.of(3, 1, 4, 1, 5));
+nums.sort(Comparator.reverseOrder());
+System.out.println(nums);  // [5, 4, 3, 1, 1]
+```
+
+## Practical example: multi-key Employee sort
+
+A classic production scenario — sort employees by department ascending, then salary descending, then name ascending:
+
+```java
+import java.util.*;
+
+public class Main {
+    record Employee(String name, String dept, int salary) {}
+
+    public static void main(String[] args) {
+        List<Employee> employees = new ArrayList<>(List.of(
+            new Employee("Zara",  "Engineering", 90_000),
+            new Employee("Alice", "Engineering", 75_000),
+            new Employee("Bob",   "Marketing",   80_000),
+            new Employee("Dave",  "Marketing",   80_000),
+            new Employee("Eve",   "Engineering", 90_000)
+        ));
+
+        Comparator<Employee> order =
+            Comparator.comparing(Employee::dept)               // dept A→Z
+                      .thenComparing(
+                          Comparator.comparingInt(Employee::salary).reversed()  // salary Z→A
+                      )
+                      .thenComparing(Employee::name);          // name A→Z (tie-break)
+
+        employees.sort(order);
+        employees.forEach(e ->
+            System.out.printf("%-12s %-14s %,d%n", e.name(), e.dept(), e.salary())
+        );
+    }
+}
+```
+
+## Try it
+
+Build the comparator chain above and experiment with reversing individual levels:
+
+```java
+import java.util.*;
+
+public class Main {
+    record Employee(String name, String dept, int salary) {}
+
+    public static void main(String[] args) {
+        List<Employee> employees = new ArrayList<>(List.of(
+            new Employee("Zara",  "Engineering", 90_000),
+            new Employee("Alice", "Engineering", 75_000),
+            new Employee("Bob",   "Marketing",   80_000),
+            new Employee("Dave",  "Marketing",   80_000),
+            new Employee("Eve",   "Engineering", 90_000)
+        ));
+
+        employees.sort(
+            Comparator.comparing(Employee::dept)
+                      .thenComparing(Comparator.comparingInt(Employee::salary).reversed())
+                      .thenComparing(Employee::name)
+        );
+
+        employees.forEach(e -> System.out.println(e.name() + " / " + e.dept() + " / " + e.salary()));
+    }
+}
+```
+
+Expected output:
+```
+Eve / Engineering / 90000
+Zara / Engineering / 90000
+Alice / Engineering / 75000
+Bob / Marketing / 80000
+Dave / Marketing / 80000
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Subtracting instead of using `Integer.compare`** — `return a.age - b.age` overflows for large negative ages and gives wrong results. Always use `Integer.compare(a.age, b.age)` or `Comparator.comparingInt(...)`.
+- **Implementing `Comparable` inconsistently with `equals`** — the contract says if `a.compareTo(b) == 0`, then `a.equals(b)` should be `true`. Violating this breaks `TreeSet` and `TreeMap` (they use `compareTo` as equality).
+- **Applying `reversed()` to the whole chain when you only want one key reversed** — `comparator.reversed()` flips every level. Wrap only the relevant level: `thenComparing(Comparator.comparingInt(Employee::salary).reversed())`.
+- **Forgetting `List.sort` vs `Collections.sort`** — both work on `ArrayList`, but `List.sort(comparator)` is the modern API (Java 8+) and accepts `null` as a comparator (uses natural order). Prefer `list.sort(comparator)`.
+
+## Recap
+
+- `Comparable<T>` is implemented by a class to define its **natural ordering**; used by default in `sort`, `TreeSet`, `TreeMap`.
+- `Comparator<T>` is an **external strategy** — create it with `Comparator.comparing()`, chain with `thenComparing()`, flip with `reversed()`.
+- Use `Integer.compare`, `Double.compare`, etc. — never subtraction.
+- Keep `compareTo` consistent with `equals` to avoid surprises in sorted collections.
+
+**Up next:** Building generic data structures — a generic Stack backed by an array.

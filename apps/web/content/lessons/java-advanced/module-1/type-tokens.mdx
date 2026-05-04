@@ -1,0 +1,260 @@
+export const meta = {
+  title: "Type Tokens — Class<T> as a Runtime Key",
+  duration: 13,
+  order: 9,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "tt-mid-1",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Why does `Class<T>` work as a type-safe key even after type erasure?",
+    options: [
+      { text: "Because Class<T> stores the generic type argument T in a special JVM slot that survives erasure.", correct: false, feedback: "The JVM has no such special slot. The generic parameter T in `Class<T>` is erased just like any other generic." },
+      { text: "Because `Class<T>` is a concrete object (e.g., `String.class`) that exists at runtime and uniquely identifies T via `Class.getName()`, independently of erasure.", correct: true, feedback: "Correct. `String.class` is a `Class<String>` object that exists at runtime. Using it as a key preserves the type relationship between the Class object and the values stored under it." },
+      { text: "Because the compiler treats Class<T> specially and never erases its T.", correct: false, feedback: "`Class<T>` is erased to `Class` just like any other generic. The type safety comes from how the *values* (Class objects like String.class) carry identity at runtime." },
+      { text: "Because Class<T> implements Comparable<T>, giving it type information.", correct: false, feedback: "`Class` does not implement `Comparable`. The type safety of `Class<T>` tokens comes from their identity as singleton objects for each type." },
+    ],
+    explanation: "`Class<T>` survives erasure because it's a **concrete object** — `String.class` is the unique `Class<String>` instance that represents String at runtime. Storing it as a map key lets you retrieve a value and cast it back to T with `type.cast()`, which does a real runtime check using the Class object itself.",
+  },
+  endQ1: {
+    id: "tt-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    static class TypedMap {
+        private final Map<Class<?>, Object> map = new HashMap<>();
+
+        public <T> void put(Class<T> type, T value) {
+            map.put(type, value);
+        }
+
+        public <T> T get(Class<T> type) {
+            return type.cast(map.get(type));
+        }
+    }
+
+    public static void main(String[] args) {
+        TypedMap tm = new TypedMap();
+        tm.put(String.class, "hello");
+        tm.put(Integer.class, 42);
+
+        System.out.println(tm.get(String.class));
+        System.out.println(tm.get(Integer.class) * 2);
+    }
+}`,
+    expectedOutput: "hello\n84",
+    explanation: "`get(String.class)` retrieves the stored Object and casts it to String via `String.class.cast(...)`. `get(Integer.class)` retrieves 42 as Integer, which auto-unboxes to int for the multiplication.",
+  },
+  endQ2: {
+    id: "tt-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the safe retrieval that uses `Class<T>` to cast the stored value:",
+    code: `public <T> T get(Class<T> type) {
+    return type.___(map.get(type));
+}`,
+    correctAnswers: ["cast"],
+    caseSensitive: true,
+    explanation: "`Class.cast(obj)` performs a checked cast: it throws ClassCastException immediately if `obj` is not an instance of the class, rather than deferring the error to wherever the return value is used.",
+  },
+  endQ3: {
+    id: "tt-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `import java.util.*;
+
+public class TypedMap {
+    private final Map<Class<?>, Object> store = new HashMap<>();
+
+    public <T> void put(Class<T> key, T value) {
+        store.put(key, value);
+    }
+
+    public <T> T get(Class<T> key) {
+        return (T) store.get(key);   // bug here
+    }
+}`,
+    buggyLine: 10,
+    issue: "The unchecked cast `(T)` erases to `(Object)` at runtime and performs no real check. A wrong type in the store would only fail at the distant call site. Use `key.cast(store.get(key))` instead.",
+    explanation: "`(T)` is erased at runtime and doesn't verify the stored type. `key.cast(value)` calls the real `Class.cast` which checks `key.isInstance(value)` and throws `ClassCastException` immediately if the cast is invalid — making bugs far easier to trace.",
+  },
+};
+
+Type tokens are one of the most elegant patterns in Java's generic toolbox. The idea is simple: `Class<T>` is a concrete object (`String.class`, `Integer.class`) that uniquely identifies a type at runtime — surviving type erasure. By using `Class<T>` as a map key and `Class.cast()` for retrieval, you can build a **type-safe heterogeneous container** that stores values of different types in the same map without any raw-Object gymnastics. This pattern is the foundation of Jackson's `ObjectMapper.readValue(json, MyClass.class)`, Spring's `ApplicationContext.getBean(MyService.class)`, and Google Guice's typed bindings.
+
+## `Class<T>` as a value
+
+Every reference type in Java has an associated `Class<T>` object, accessed via the class literal:
+
+```java
+Class<String>  sc = String.class;
+Class<Integer> ic = Integer.class;
+
+System.out.println(sc.getName());        // java.lang.String
+System.out.println(ic.getSimpleName()); // Integer
+System.out.println(sc == String.class); // true — singleton per class
+```
+
+Because `String.class` is always the exact same object, it can serve as a unique, type-safe map key. The generic parameter `T` in `Class<T>` connects the key to the value at compile time.
+
+## The `cast` method
+
+`Class<T>.cast(Object obj)` performs a **checked cast**:
+
+```java
+Object o = "hello";
+String s = String.class.cast(o);    // returns "hello" — no ClassCastException
+System.out.println(s.toUpperCase()); // HELLO
+
+try {
+    Integer n = Integer.class.cast(o);  // throws ClassCastException immediately
+} catch (ClassCastException e) {
+    System.out.println("caught: " + e.getMessage());
+}
+```
+
+Compared to the raw `(T)` unchecked cast:
+
+```java
+// Unchecked cast — no runtime check; error deferred to use site:
+T value = (T) map.get(key);
+
+// Type-token cast — immediate check at the get() call:
+T value = key.cast(map.get(key));
+```
+
+The immediate failure from `key.cast` makes bugs much easier to diagnose.
+
+<Note>`Class.cast` throws `NullPointerException` if the Class itself is null, and returns `null` gracefully if the value is null (a null is considered assignment-compatible with any type). This matches Java casting rules.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Building a TypedMap
+
+A type-safe heterogeneous container stores at most one value per type:
+
+```java
+import java.util.*;
+
+public class TypedMap {
+    private final Map<Class<?>, Object> store = new HashMap<>();
+
+    /** Store a value under its type key. */
+    public <T> void put(Class<T> type, T value) {
+        store.put(type, value);
+    }
+
+    /**
+     * Retrieve the value stored under this type.
+     * Returns null if no value has been put for this type.
+     */
+    public <T> T get(Class<T> type) {
+        return type.cast(store.get(type));
+    }
+
+    public boolean contains(Class<?> type) {
+        return store.containsKey(type);
+    }
+
+    public <T> T getOrDefault(Class<T> type, T defaultValue) {
+        T value = get(type);
+        return value != null ? value : defaultValue;
+    }
+}
+```
+
+Usage:
+
+```java
+TypedMap config = new TypedMap();
+config.put(String.class,  "jdbc:postgresql://localhost/mydb");
+config.put(Integer.class, 5432);
+config.put(Boolean.class, true);
+
+String  url  = config.get(String.class);   // no cast, compile-time safe
+Integer port = config.get(Integer.class);
+Boolean ssl  = config.get(Boolean.class);
+
+System.out.println(url);   // jdbc:postgresql://localhost/mydb
+System.out.println(port);  // 5432
+System.out.println(ssl);   // true
+```
+
+## Real-world use: framework-style API
+
+In frameworks like Jackson and Spring, type tokens power the `readValue` / `getBean` pattern:
+
+```java
+// Jackson (conceptual):
+MyDto dto = mapper.readValue(json, MyDto.class);
+
+// Spring ApplicationContext (conceptual):
+UserService svc = ctx.getBean(UserService.class);
+
+// Guice typed binding (conceptual):
+bind(PaymentGateway.class).to(StripeGateway.class);
+```
+
+All three use `Class<T>` as the key to retrieve or convert to the right type at runtime.
+
+## Try it
+
+Build a `TypedMap` and populate it with several types, then retrieve them safely:
+
+```java
+public class Main {
+    static class TypedMap {
+        private final java.util.Map<Class<?>, Object> store = new java.util.HashMap<>();
+        public <T> void put(Class<T> type, T value) { store.put(type, value); }
+        public <T> T get(Class<T> type) { return type.cast(store.get(type)); }
+    }
+
+    public static void main(String[] args) {
+        TypedMap map = new TypedMap();
+        map.put(String.class, "production");
+        map.put(Integer.class, 100);
+        map.put(Double.class, 3.14);
+
+        String  env     = map.get(String.class);
+        int     threads = map.get(Integer.class);
+        double  ratio   = map.get(Double.class);
+
+        System.out.println(env);                    // production
+        System.out.println(threads * 2);            // 200
+        System.out.printf("%.2f%n", ratio * 2);     // 6.28
+    }
+}
+```
+
+Extend the exercise: add a `remove(Class<T>)` method and verify that `get` returns null after removal.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using `(T)` instead of `type.cast()`** — the unchecked cast `(T)` does nothing at runtime (it erases to `(Object)`). The error surfaces at the distant call site. Always use `type.cast()` for a genuine checked cast.
+- **Trying to store multiple values per type** — `TypedMap` as designed stores at most one value per type. If you need multiple values of the same type, key by `Class<?> + String` name, or use a `Multimap`.
+- **Using parameterised types as tokens** — `List<String>.class` doesn't compile. `List.class` gives `Class<List>`, which loses the element type. For parameterised tokens, libraries like Guava's `TypeToken` or Jackson's `TypeReference` provide super-type tokens. That pattern is out of scope here.
+- **Forgetting null handling** — `type.cast(null)` returns null. If null is not a valid value in your container, check before storing and after retrieval.
+
+## Recap
+
+- `Class<T>` (e.g., `String.class`) is a concrete runtime object that uniquely identifies type T and survives erasure.
+- `type.cast(obj)` performs a **checked cast** that fails immediately on type mismatch — far safer than `(T)`.
+- A **`TypedMap`** stores at most one value per type; `Class<T>` as the key gives compile-time type safety without raw casts in application code.
+- Frameworks like Jackson, Spring, and Guice rely on this pattern for `readValue`, `getBean`, and dependency injection.
+
+**Up next:** Capstone — build a type-safe event bus applying everything from this module.

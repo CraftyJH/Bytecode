@@ -1,0 +1,333 @@
+export const meta = {
+  title: "Capstone: Type-Safe Event Bus",
+  duration: 18,
+  order: 10,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "eb-mid-1",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "In a type-safe event bus backed by `Map<Class<?>, Consumer<?>>`, how do you register a handler that only fires for `UserCreated` events?",
+    options: [
+      { text: "Store the handler under key `Object.class` and check the event type manually inside the lambda.", correct: false, feedback: "This defeats the purpose of a type-safe bus — you'd need instanceof checks inside the handler and lose compile-time guarantees." },
+      { text: "Store the handler under key `UserCreated.class`, so only `emit` calls that provide a `UserCreated` instance will look up and invoke that entry.", correct: true, feedback: "Correct. `UserCreated.class` is the unique runtime key for that event type. `emit` looks up `event.getClass()`, finds the matching Consumer, and calls it with the correctly-typed event." },
+      { text: "Use a wildcard `Class<?>` key and rely on the generic parameter T to route at runtime.", correct: false, feedback: "The wildcard `Class<?>` is the declared type of the key in the map, not the key itself. The actual key value is `UserCreated.class`, which is what gives you type-specific routing." },
+      { text: "Annotate the handler method with @EventListener and let reflection handle routing.", correct: false, feedback: "Annotation-driven dispatch (as in Spring) is one approach, but this lesson builds the pure-generics version. The map-keyed approach needs no reflection annotations." },
+    ],
+    explanation: "The type-specific routing works because `UserCreated.class` (a `Class<UserCreated>` instance) is a unique, stable key. `emit(event)` looks up `event.getClass()` in the map and retrieves the Consumer registered for that exact type.",
+  },
+  endQ1: {
+    id: "eb-end-1",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `import java.util.*;
+import java.util.function.*;
+
+public class Main {
+    static class EventBus {
+        private final Map<Class<?>, Consumer<?>> handlers = new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        public <T> void on(Class<T> eventType, Consumer<T> handler) {
+            handlers.put(eventType, handler);
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> void emit(T event) {
+            Consumer<T> handler = (Consumer<T>) handlers.get(event.getClass());
+            if (handler != null) handler.accept(event);
+        }
+    }
+
+    record Login(String user) {}
+    record Logout(String user) {}
+
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+        bus.on(Login.class,  e -> System.out.println("Login:  " + e.user()));
+        bus.on(Logout.class, e -> System.out.println("Logout: " + e.user()));
+
+        bus.emit(new Login("Alice"));
+        bus.emit(new Logout("Bob"));
+        bus.emit(new Login("Carol"));
+    }
+}`,
+    expectedOutput: "Login:  Alice\nLogout: Bob\nLogin:  Carol",
+    explanation: "Each emit looks up `event.getClass()` in the handlers map and invokes the matching Consumer. Login events route to the login handler; Logout events route to the logout handler. Unregistered event types are silently ignored.",
+  },
+  endQ2: {
+    id: "eb-end-2",
+    type: "fill_in_blank",
+    difficulty: "hard",
+    prompt: "Complete `emit` so it looks up the handler by the event's runtime class:",
+    code: `public <T> void emit(T event) {
+    Consumer<T> h = (Consumer<T>) handlers.get(event.___());
+    if (h != null) h.accept(event);
+}`,
+    correctAnswers: ["getClass"],
+    caseSensitive: true,
+    explanation: "`event.getClass()` returns the `Class<?>` of the actual runtime type of the event object. This is the same key used when registering with `on(Login.class, handler)`, so the lookup is exact.",
+  },
+  endQ3: {
+    id: "eb-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `import java.util.*;
+import java.util.function.*;
+
+public class EventBus {
+    private final Map<Class<?>, List<Consumer<?>>> handlers = new HashMap<>();
+
+    public <T> void on(Class<T> type, Consumer<T> handler) {
+        handlers.put(type, handler);   // bug here
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> void emit(T event) {
+        List<Consumer<?>> list = handlers.get(event.getClass());
+        if (list != null) list.forEach(h -> ((Consumer<T>) h).accept(event));
+    }
+}`,
+    buggyLine: 7,
+    issue: "The map stores `List<Consumer<?>>` but `on` puts a bare `Consumer<T>` directly. It should wrap in a list or use `computeIfAbsent` to add to the list. Also the type signature mismatch causes a compile error.",
+    explanation: "When the value type is `List<Consumer<?>>`, registration must either create a new list (`handlers.put(type, new ArrayList<>(List.of(handler)))`) or append: `handlers.computeIfAbsent(type, k -> new ArrayList<>()).add(handler)`. Putting a bare Consumer where a List is expected doesn't compile.",
+  },
+};
+
+This capstone lesson builds a **type-safe event bus** — a publish/subscribe system where publishers emit events and subscribers receive only the event types they registered for, all without a single unchecked cast in application code. Event buses appear in Android (EventBus library), Spring (ApplicationEventPublisher), Guava (EventBus), and custom microservice frameworks. Building one from scratch shows exactly how every concept from this module — generic classes, type tokens, wildcards, `Class<T>` keys, and `Consumer<T>` handlers — combines into a coherent, production-quality design.
+
+## What an event bus does
+
+An event bus decouples producers from consumers: the producer emits an event object; the bus routes it to every registered handler for that event type; handlers never know who emitted the event.
+
+```
+Publisher              EventBus                  Subscriber
+──────────             ─────────                 ──────────────
+emit(new UserCreated()) ──▶  on(UserCreated.class, handler) ──▶ handler.accept(event)
+emit(new OrderPlaced()) ──▶  no handler registered → ignored
+```
+
+## Design: `Map<Class<?>, Consumer<?>>` as the registry
+
+The registry maps each event *class* to its handler. `Class<?>` is the key (the type token), `Consumer<?>` is the value. The generic methods use `T` to tie the key and value together at compile time:
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class EventBus {
+    // Keys are Class<?> objects; values are Consumer<?> for the matching type
+    private final Map<Class<?>, Consumer<?>> handlers = new HashMap<>();
+
+    /**
+     * Register a handler for events of type T.
+     * A second registration for the same type replaces the first.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> void on(Class<T> eventType, Consumer<T> handler) {
+        handlers.put(eventType, handler);
+    }
+
+    /**
+     * Emit an event. The handler registered for event.getClass() is invoked,
+     * if one exists. Unregistered event types are silently dropped.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> void emit(T event) {
+        Consumer<T> handler = (Consumer<T>) handlers.get(event.getClass());
+        if (handler != null) {
+            handler.accept(event);
+        }
+    }
+}
+```
+
+The `@SuppressWarnings("unchecked")` on `emit` is safe because `on` enforces the invariant: the handler stored under `Class<T>` is always a `Consumer<T>`. The `(Consumer<T>)` cast cannot fail as long as no one bypasses `on`.
+
+<Note>The single-handler-per-type design is intentional for simplicity. The multi-subscriber variant (next section) stores a `List<Consumer<?>>` per type — the bus delivers to all registered handlers.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Supporting multiple subscribers per event type
+
+Replace the single `Consumer<?>` with a `List<Consumer<?>>`:
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class EventBus {
+    private final Map<Class<?>, List<Consumer<?>>> handlers = new HashMap<>();
+
+    @SuppressWarnings("unchecked")
+    public <T> void on(Class<T> eventType, Consumer<T> handler) {
+        handlers.computeIfAbsent(eventType, k -> new ArrayList<>())
+                .add(handler);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> void emit(T event) {
+        List<Consumer<?>> list = handlers.get(event.getClass());
+        if (list != null) {
+            for (Consumer<?> h : list) {
+                ((Consumer<T>) h).accept(event);
+            }
+        }
+    }
+
+    /** Remove all handlers for an event type. */
+    public void off(Class<?> eventType) {
+        handlers.remove(eventType);
+    }
+}
+```
+
+`computeIfAbsent` creates the list on first registration and returns the (possibly new) list for immediate `.add(handler)`. This is the `HashMap` grouping pattern from lesson 6.
+
+## Defining event types
+
+Keep event types as immutable records — lightweight, clearly named, carry only what subscribers need:
+
+```java
+record UserCreated(String id, String email) {}
+record UserDeleted(String id) {}
+record OrderPlaced(String orderId, double amount) {}
+record PaymentReceived(String orderId) {}
+```
+
+## Complete worked example
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class Main {
+    // --- Event types ---
+    record UserCreated(String id, String email) {}
+    record OrderPlaced(String orderId, double total) {}
+    record PaymentReceived(String orderId) {}
+
+    // --- EventBus (multi-subscriber) ---
+    static class EventBus {
+        private final Map<Class<?>, List<Consumer<?>>> handlers = new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        public <T> void on(Class<T> type, Consumer<T> handler) {
+            handlers.computeIfAbsent(type, k -> new ArrayList<>()).add(handler);
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> void emit(T event) {
+            List<Consumer<?>> list = handlers.get(event.getClass());
+            if (list != null) list.forEach(h -> ((Consumer<T>) h).accept(event));
+        }
+    }
+
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+
+        // Audit log — listens to everything interesting
+        bus.on(UserCreated.class, e ->
+            System.out.println("[AUDIT] New user: " + e.email()));
+        bus.on(OrderPlaced.class, e ->
+            System.out.println("[AUDIT] Order " + e.orderId() + " for $" + e.total()));
+        bus.on(PaymentReceived.class, e ->
+            System.out.println("[AUDIT] Payment for " + e.orderId()));
+
+        // Email service — only user events
+        bus.on(UserCreated.class, e ->
+            System.out.println("[EMAIL] Welcome email → " + e.email()));
+
+        // Inventory service — only order events
+        bus.on(OrderPlaced.class, e ->
+            System.out.println("[INVENTORY] Reserve stock for " + e.orderId()));
+
+        // Trigger the workflow
+        bus.emit(new UserCreated("u1", "alice@example.com"));
+        bus.emit(new OrderPlaced("o42", 199.99));
+        bus.emit(new PaymentReceived("o42"));
+    }
+}
+```
+
+Expected output:
+```
+[AUDIT] New user: alice@example.com
+[EMAIL] Welcome email → alice@example.com
+[AUDIT] Order o42 for $199.99
+[INVENTORY] Reserve stock for o42
+[AUDIT] Payment for o42
+```
+
+## Try it
+
+Build the `EventBus` class above, define three event records, register multiple handlers, and emit events:
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class Main {
+    record Tick(int second) {}
+    record Alarm(String message) {}
+
+    static class EventBus {
+        private final Map<Class<?>, List<Consumer<?>>> handlers = new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        public <T> void on(Class<T> type, Consumer<T> h) {
+            handlers.computeIfAbsent(type, k -> new ArrayList<>()).add(h);
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> void emit(T event) {
+            List<Consumer<?>> list = handlers.get(event.getClass());
+            if (list != null) list.forEach(h -> ((Consumer<T>) h).accept(event));
+        }
+    }
+
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+        bus.on(Tick.class,  t -> System.out.println("tick " + t.second()));
+        bus.on(Alarm.class, a -> System.out.println("ALARM: " + a.message()));
+
+        for (int i = 1; i <= 3; i++) bus.emit(new Tick(i));
+        bus.emit(new Alarm("low battery"));
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Putting a bare Consumer into a List-valued map** — if the map value type is `List<Consumer<?>>`, calling `handlers.put(type, handler)` passes a Consumer where a List is expected, causing a compile error. Always use `computeIfAbsent(...).add(handler)`.
+- **Emitting an event whose type is a subclass** — `event.getClass()` returns the *concrete* class. If you register under a parent class (`on(Event.class, h)`) and emit a subclass (`emit(new SpecificEvent())`), the handler won't be found. Design event hierarchies carefully or walk the class hierarchy when looking up handlers.
+- **Forgetting `@SuppressWarnings("unchecked")` on `emit`** — the cast from `Consumer<?>` to `Consumer<T>` produces an unchecked warning. The cast is safe by design (enforced by `on`), but without the annotation the warning noise obscures other real warnings.
+- **Mutating the handler list while emitting** — if a handler modifies the bus (registers or removes a handler), and you're iterating the list in `emit`, you'll get a `ConcurrentModificationException`. Copy the list before iteration: `new ArrayList<>(list).forEach(...)`.
+
+## Module recap
+
+You've completed Module 1: Generics In Depth. Here's what you can now do:
+
+- **Write generic classes** with one or more type parameters, including `Pair<A, B>` and `Box<T>`.
+- **Apply upper bounds** (`<T extends Comparable<T>>`) to call methods on unknown types.
+- **Use wildcards** correctly — `? extends T` for read-only covariant views, `? super T` for write-capable contravariant views, and `<?>` unbounded for type-agnostic code.
+- **Declare generic methods** with their own `<T>` and infer type arguments from context.
+- **Explain type erasure** and its consequences: no `new T[]`, no `instanceof Box<String>`, raw types cause heap pollution.
+- **Chain Comparators** with `comparing().thenComparing().reversed()` for multi-key sorting.
+- **Build generic data structures** (Stack) backed by `Object[]` with the unchecked-cast pattern.
+- **Implement generic algorithms** — binary search, merge sort — with Comparable and Comparator bounds.
+- **Use `Class<T>` as a type token** for runtime-safe heterogeneous containers.
+- **Compose all of the above** into a type-safe event bus with `Consumer<T>` handlers and `Class<?>` keys.

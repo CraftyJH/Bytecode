@@ -1,0 +1,271 @@
+export const meta = {
+  title: "Generic Search & Sort Algorithms",
+  duration: 14,
+  order: 8,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "ga-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the invariant that binary search requires of its input?",
+    options: [
+      { text: "The list must contain only positive numbers.", correct: false, feedback: "Binary search works on any comparable type, not just positive numbers." },
+      { text: "The list must be sorted in ascending order (or descending, with a matching comparator).", correct: true, feedback: "Correct. Binary search exploits the sorted order to halve the search space each step. On an unsorted list it can miss the target even if it's present." },
+      { text: "The list must have no duplicate elements.", correct: false, feedback: "Duplicates are allowed. Binary search may return any index pointing to the target, not necessarily the first or last." },
+      { text: "The list must have a size that is a power of two.", correct: false, feedback: "Binary search works on any size. The `(lo + hi) / 2` midpoint calculation handles odd sizes correctly." },
+    ],
+    explanation: "Binary search divides the search range in half each iteration based on whether the target is less or greater than the midpoint. This only works if the array is **sorted** — otherwise the algorithm can't tell which half to discard.",
+  },
+  endQ1: {
+    id: "ga-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    static <T extends Comparable<T>> int binarySearch(List<T> list, T target) {
+        int lo = 0, hi = list.size() - 1;
+        while (lo <= hi) {
+            int mid = lo + (hi - lo) / 2;
+            int cmp = target.compareTo(list.get(mid));
+            if (cmp < 0)      hi = mid - 1;
+            else if (cmp > 0) lo = mid + 1;
+            else              return mid;
+        }
+        return -1;
+    }
+
+    public static void main(String[] args) {
+        List<Integer> sorted = List.of(2, 5, 8, 12, 16, 23, 38, 56, 72, 91);
+        System.out.println(binarySearch(sorted, 23));
+        System.out.println(binarySearch(sorted, 10));
+    }
+}`,
+    expectedOutput: "5\n-1",
+    explanation: "23 is at index 5 in the sorted list. 10 is not present, so the method returns -1. The `lo + (hi - lo) / 2` midpoint formula avoids integer overflow.",
+  },
+  endQ2: {
+    id: "ga-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the merge step that compares elements from two sorted sublists using a Comparator:",
+    code: `if (comparator.___(left.get(i), right.get(j)) <= 0) {
+    result.add(left.get(i++));
+} else {
+    result.add(right.get(j++));
+}`,
+    correctAnswers: ["compare"],
+    caseSensitive: true,
+    explanation: "`Comparator.compare(a, b)` returns negative if a < b, zero if equal, positive if a > b. Using `<= 0` picks the left element when it is less than or equal to the right, producing a stable sort.",
+  },
+  endQ3: {
+    id: "ga-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public static <T extends Comparable<T>> int binarySearch(List<T> list, T target) {
+    int lo = 0, hi = list.size();    // bug here
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        int cmp = target.compareTo(list.get(mid));
+        if (cmp < 0)      hi = mid - 1;
+        else if (cmp > 0) lo = mid + 1;
+        else              return mid;
+    }
+    return -1;
+}`,
+    buggyLine: 2,
+    issue: "`hi` should be initialised to `list.size() - 1`, not `list.size()`. When `hi == list.size()` and the midpoint lands there, `list.get(mid)` throws IndexOutOfBoundsException.",
+    explanation: "Valid indices are 0 to size-1 inclusive. Setting `hi = list.size()` allows `mid` to be `size`, which is out of bounds. Also, the midpoint formula `(lo + hi) / 2` can overflow for large lists; prefer `lo + (hi - lo) / 2`.",
+  },
+};
+
+Generic algorithms are where everything in this module converges: type parameters provide flexibility, bounds (`T extends Comparable<T>`) provide the capability to compare, and Comparators provide pluggable ordering. The JDK's `Collections.binarySearch` and `Arrays.sort` are essentially the algorithms you'll build here, implemented generically so they work on any type. Writing them from scratch — rather than just calling them — reveals exactly why the bounded-type-parameter design choices were made.
+
+## Generic binary search
+
+Binary search finds a target in a sorted list in O(log n) time. The bound `T extends Comparable<T>` gives access to `compareTo`:
+
+```java
+import java.util.*;
+
+public class Search {
+    /**
+     * Returns the index of target in a sorted list, or -1 if not found.
+     */
+    public static <T extends Comparable<T>> int binarySearch(List<T> list, T target) {
+        int lo = 0, hi = list.size() - 1;
+        while (lo <= hi) {
+            int mid = lo + (hi - lo) / 2;   // avoids integer overflow
+            int cmp = target.compareTo(list.get(mid));
+            if (cmp < 0)      hi = mid - 1; // target is in left half
+            else if (cmp > 0) lo = mid + 1; // target is in right half
+            else              return mid;   // found
+        }
+        return -1;
+    }
+}
+```
+
+The `lo + (hi - lo) / 2` midpoint formula is safer than `(lo + hi) / 2`: the latter overflows when both indices exceed `Integer.MAX_VALUE / 2`.
+
+```java
+List<Integer> ints = List.of(1, 3, 5, 7, 9, 11, 13);
+System.out.println(Search.binarySearch(ints, 7));   // 3
+System.out.println(Search.binarySearch(ints, 6));   // -1
+
+List<String> words = List.of("ant", "bee", "cat", "dog", "elk");
+System.out.println(Search.binarySearch(words, "cat"));  // 2
+```
+
+<Note>Binary search only works on a **sorted** list. Calling it on an unsorted list produces undefined results — it may return -1 even when the element is present.</Note>
+
+## Comparator-based binary search
+
+A second overload accepts a `Comparator<T>`, enabling search on non-Comparable types or with a custom ordering:
+
+```java
+public static <T> int binarySearch(List<T> list, T target, Comparator<T> cmp) {
+    int lo = 0, hi = list.size() - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        int result = cmp.compare(target, list.get(mid));
+        if (result < 0)      hi = mid - 1;
+        else if (result > 0) lo = mid + 1;
+        else                 return mid;
+    }
+    return -1;
+}
+```
+
+Usage with a record sorted by a specific field:
+
+```java
+record Product(String name, double price) {}
+
+List<Product> products = List.of(
+    new Product("Apple", 1.0),
+    new Product("Banana", 0.5),
+    new Product("Cherry", 3.0)
+);
+// sorted by price ascending
+List<Product> sorted = products.stream()
+    .sorted(Comparator.comparingDouble(Product::price))
+    .toList();
+
+int idx = binarySearch(sorted, new Product("?", 1.0),
+                       Comparator.comparingDouble(Product::price));
+System.out.println(sorted.get(idx).name()); // Apple
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Generic merge sort
+
+Merge sort is O(n log n) and stable. The recursive structure maps cleanly to generic code:
+
+```java
+public static <T> List<T> mergeSort(List<T> list, Comparator<T> cmp) {
+    if (list.size() <= 1) return new ArrayList<>(list);
+    int mid = list.size() / 2;
+    List<T> left  = mergeSort(list.subList(0, mid), cmp);
+    List<T> right = mergeSort(list.subList(mid, list.size()), cmp);
+    return merge(left, right, cmp);
+}
+
+private static <T> List<T> merge(List<T> left, List<T> right, Comparator<T> cmp) {
+    List<T> result = new ArrayList<>(left.size() + right.size());
+    int i = 0, j = 0;
+    while (i < left.size() && j < right.size()) {
+        if (cmp.compare(left.get(i), right.get(j)) <= 0) {
+            result.add(left.get(i++));
+        } else {
+            result.add(right.get(j++));
+        }
+    }
+    // Drain remaining elements
+    while (i < left.size())  result.add(left.get(i++));
+    while (j < right.size()) result.add(right.get(j++));
+    return result;
+}
+```
+
+## Merging two sorted lists
+
+The `merge` helper above is itself a useful standalone utility — combine two pre-sorted lists into one sorted list in O(n + m) time:
+
+```java
+List<Integer> a = List.of(1, 3, 5, 7);
+List<Integer> b = List.of(2, 4, 6, 8, 10);
+List<Integer> merged = merge(a, b, Comparator.naturalOrder());
+System.out.println(merged);  // [1, 2, 3, 4, 5, 6, 7, 8, 10]
+```
+
+## Try it
+
+Implement and test both algorithms:
+
+```java
+import java.util.*;
+
+public class Main {
+    static <T extends Comparable<T>> int binarySearch(List<T> list, T target) {
+        int lo = 0, hi = list.size() - 1;
+        while (lo <= hi) {
+            int mid = lo + (hi - lo) / 2;
+            int cmp = target.compareTo(list.get(mid));
+            if (cmp < 0) hi = mid - 1;
+            else if (cmp > 0) lo = mid + 1;
+            else return mid;
+        }
+        return -1;
+    }
+
+    static <T> List<T> merge(List<T> a, List<T> b, Comparator<T> cmp) {
+        List<T> result = new ArrayList<>();
+        int i = 0, j = 0;
+        while (i < a.size() && j < b.size())
+            result.add(cmp.compare(a.get(i), b.get(j)) <= 0 ? a.get(i++) : b.get(j++));
+        while (i < a.size())  result.add(a.get(i++));
+        while (j < b.size())  result.add(b.get(j++));
+        return result;
+    }
+
+    public static void main(String[] args) {
+        List<String> words = List.of("ant", "bee", "cat", "dog");
+        System.out.println(binarySearch(words, "cat"));  // 2
+        System.out.println(binarySearch(words, "fox"));  // -1
+
+        List<Integer> merged = merge(List.of(1, 3, 5), List.of(2, 4, 6), Comparator.naturalOrder());
+        System.out.println(merged);  // [1, 2, 3, 4, 5, 6]
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Off-by-one in binary search** — initialising `hi = list.size()` instead of `list.size() - 1` causes an `IndexOutOfBoundsException` when the midpoint lands at the last-plus-one index.
+- **Using `(lo + hi) / 2` without overflow protection** — for large lists where `lo + hi > Integer.MAX_VALUE`, this overflows to a negative number. Use `lo + (hi - lo) / 2`.
+- **Calling binary search on an unsorted list** — there is no exception; the algorithm simply silently returns wrong results. Document the precondition clearly.
+- **Unstable sort losing equal-element order** — the `<=` in `cmp.compare(left.get(i), right.get(j)) <= 0` is what makes merge sort stable (left takes priority on ties). Changing `<=` to `<` makes it unstable.
+
+## Recap
+
+- **Binary search** is O(log n) and requires a sorted list; bound `T extends Comparable<T>` or accept a `Comparator<T>`.
+- **Midpoint formula** `lo + (hi - lo) / 2` avoids integer overflow.
+- **Merge** combines two sorted lists in O(n + m); `<=` in the comparison produces a stable merge.
+- **Merge sort** uses the merge helper recursively; bound on `Comparator<T>` instead of `Comparable` makes it more flexible.
+
+**Up next:** Type tokens — using `Class<T>` as a runtime key for type-safe heterogeneous containers.

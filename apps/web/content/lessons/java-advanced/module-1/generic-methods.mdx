@@ -1,0 +1,257 @@
+export const meta = {
+  title: "Generic Methods & Type Inference",
+  duration: 13,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "gm-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    static <T> List<T> repeat(T value, int times) {
+        List<T> list = new ArrayList<>();
+        for (int i = 0; i < times; i++) list.add(value);
+        return list;
+    }
+
+    public static void main(String[] args) {
+        List<String> words = repeat("hi", 3);
+        List<Integer> nums = repeat(7, 2);
+        System.out.println(words);
+        System.out.println(nums);
+    }
+}`,
+    expectedOutput: "[hi, hi, hi]\n[7, 7]",
+    explanation: "`repeat(\"hi\", 3)` infers T=String and builds a list of three \"hi\" strings. `repeat(7, 2)` infers T=Integer and builds [7, 7]. Type inference picks the most specific type that matches the argument.",
+  },
+  endQ1: {
+    id: "gm-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Where does the type parameter `<T>` appear in a generic method declaration?",
+    options: [
+      { text: "After the method name, before the parameter list.", correct: false, feedback: "That's where you'd write throws clauses. The type parameter list comes before the return type." },
+      { text: "Before the return type, after any access modifier or `static`.", correct: true, feedback: "Correct: `public static <T> T method(T arg)` — the type parameter list `<T>` precedes the return type `T`." },
+      { text: "Inside the method body, next to the first variable that uses it.", correct: false, feedback: "Type parameters are declared in the method signature, not the body. The body just uses T as if it were a known type." },
+      { text: "At the end of the method signature, after the parameter list.", correct: false, feedback: "That position in Java is used for `throws` declarations. Type parameter lists always precede the return type." },
+    ],
+    explanation: "A generic method declares its type parameters **before the return type**: `<T> T identity(T x)` or `public static <T extends Comparable<T>> T max(T a, T b)`. The type parameter list `<…>` is part of the method's signature.",
+  },
+  endQ2: {
+    id: "gm-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the generic method signature that filters a list, keeping elements that satisfy a Predicate:",
+    code: `public static <___> List<T> filter(List<T> list, java.util.function.Predicate<T> pred) {
+    List<T> result = new ArrayList<>();
+    for (T item : list) if (pred.test(item)) result.add(item);
+    return result;
+}`,
+    correctAnswers: ["T"],
+    caseSensitive: true,
+    explanation: "The method introduces its own type parameter `<T>` before the return type. T is then used in the parameter types and return type to bind them together.",
+  },
+  endQ3: {
+    id: "gm-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.function.Function;
+
+public class Utils {
+    public static List<R> map(List<T> list, Function<T, R> fn) { // bug here
+        List<R> result = new ArrayList<>();
+        for (T item : list) result.add(fn.apply(item));
+        return result;
+    }
+}`,
+    buggyLine: 5,
+    issue: "T and R are used as type parameters but not declared on the method. The signature should be `public static <T, R> List<R> map(...)`.",
+    explanation: "Every type parameter used in a method must be declared in the method's own `<…>` list (or inherited from the enclosing class). Without the declaration, T and R are unresolved symbols and the code won't compile.",
+  },
+};
+
+Generic methods are the building blocks of every reusable Java utility. `Collections.sort`, `Optional.map`, `Stream.collect` — all of these are generic methods. The ability to write a method that works on *any* type while preserving compile-time safety is what separates Java's generics from simple Object-based polymorphism. In this lesson you'll learn to declare generic methods, understand how the compiler infers type arguments, and write higher-order utilities like `filter` and `map` from scratch.
+
+## Declaring a generic method
+
+A generic method declares its type parameters in angle brackets **before the return type**, regardless of whether the enclosing class is itself generic:
+
+```java
+public class Utils {
+    // T is the method's own type parameter
+    public static <T> T identity(T value) {
+        return value;
+    }
+}
+```
+
+The caller rarely needs to specify T explicitly — the compiler infers it from the argument:
+
+```java
+String  s = Utils.identity("hello");  // T inferred as String
+Integer n = Utils.identity(42);       // T inferred as Integer
+```
+
+You can also specify T explicitly with a *witness* when inference would be ambiguous:
+
+```java
+// Explicit type witness (rarely needed):
+String s = Utils.<String>identity("hello");
+```
+
+## Type inference in practice
+
+The compiler infers type arguments by looking at argument types, target types, and return contexts — a process called **target typing** (introduced in Java 8):
+
+```java
+public static <T> List<T> emptyList() {
+    return new ArrayList<>();
+}
+
+// Inferred from the variable declaration:
+List<String> names = emptyList();   // T inferred as String
+
+// Inferred from method argument:
+void process(List<String> list) { ... }
+process(emptyList());               // T inferred as String from parameter type
+```
+
+The diamond operator on constructors works the same way: `new ArrayList<>()` infers the element type from the left-hand side or the enclosing expression.
+
+<Note>When the compiler cannot infer a type, it falls back to `Object`. This often produces an unchecked warning. If you see `List<Object>` where you expected something more specific, you may need an explicit type witness or a better-structured expression.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## The `filter` and `map` pattern
+
+Two generic methods that appear in almost every utility class — and that power the Stream API internally:
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class ListUtils {
+
+    /** Returns a new list containing only elements that satisfy pred. */
+    public static <T> List<T> filter(List<T> list, Predicate<T> pred) {
+        List<T> result = new ArrayList<>();
+        for (T item : list) {
+            if (pred.test(item)) result.add(item);
+        }
+        return result;
+    }
+
+    /** Returns a new list by applying fn to every element. */
+    public static <T, R> List<R> map(List<T> list, Function<T, R> fn) {
+        List<R> result = new ArrayList<>(list.size());
+        for (T item : list) {
+            result.add(fn.apply(item));
+        }
+        return result;
+    }
+}
+```
+
+Usage:
+
+```java
+List<String> names = List.of("Alice", "Bob", "Anna", "Brian");
+
+List<String> aNames = ListUtils.filter(names, s -> s.startsWith("A"));
+System.out.println(aNames);   // [Alice, Anna]
+
+List<Integer> lengths = ListUtils.map(names, String::length);
+System.out.println(lengths);  // [5, 3, 4, 5]
+```
+
+Notice how `map` uses **two independent type parameters**, `T` and `R`. The compiler infers `T=String` from `names` and `R=Integer` from the `String::length` method reference.
+
+## Generic methods vs generic classes
+
+A generic method is the right choice when:
+- The generic behaviour is specific to one method, not the whole class.
+- The method is static (static methods can't access the enclosing class's type parameters).
+- Different callers need different type substitutions for the same method.
+
+A generic class is better when multiple methods and fields need to share the same type parameter.
+
+```java
+// Generic method on a plain class — correct for static utilities
+public class Pair {
+    public static <A, B> Map.Entry<A, B> of(A a, B b) {
+        return Map.entry(a, b);
+    }
+}
+
+// Generic class — correct when all methods share the type
+public class Pair<A, B> {
+    public final A first;
+    public final B second;
+    // ...
+}
+```
+
+## Try it
+
+Implement both `filter` and `map`, then chain them to process a list of integers:
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class Main {
+    static <T> List<T> filter(List<T> list, Predicate<T> pred) {
+        List<T> out = new ArrayList<>();
+        for (T item : list) if (pred.test(item)) out.add(item);
+        return out;
+    }
+
+    static <T, R> List<R> map(List<T> list, Function<T, R> fn) {
+        List<R> out = new ArrayList<>();
+        for (T item : list) out.add(fn.apply(item));
+        return out;
+    }
+
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(1, 2, 3, 4, 5, 6, 7, 8);
+
+        List<Integer> evens   = filter(nums, n -> n % 2 == 0);
+        List<String>  doubled = map(evens, n -> "val=" + (n * 2));
+
+        System.out.println(evens);    // [2, 4, 6, 8]
+        System.out.println(doubled);  // [val=4, val=8, val=12, val=16]
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting to declare the type parameter** — writing `List<R> map(List<T> list, ...)` without `<T, R>` before the return type gives a compile error. T and R aren't automatically in scope just because they appear in parameter types.
+- **Shadowing a class-level type parameter** — if the class declares `<T>`, writing `<T>` on a method creates a *new*, independent T that hides the class-level one. Use a different letter (e.g., `<R>`) for method-level parameters.
+- **Ignoring inference failures** — when the compiler inserts `Object` for an inferred type, the result may compile but produce `List<Object>` instead of `List<String>`. Read inferred types carefully; use explicit witnesses when needed.
+- **Using raw types in method signatures** — `List map(List list, Function fn)` compiles with warnings and defeats the purpose of generics. Always include type parameters.
+
+## Recap
+
+- A generic method declares `<T>` (or `<T, R>`, etc.) **before the return type**.
+- The compiler **infers** type arguments from arguments, targets, and return contexts.
+- A single generic method (`filter`, `map`) replaces many overloaded type-specific versions.
+- Static utility methods on plain classes are a natural home for generic methods.
+
+**Up next:** Type erasure, bridge methods, and raw types — how generics look at runtime.

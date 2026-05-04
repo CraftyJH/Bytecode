@@ -1,0 +1,263 @@
+export const meta = {
+  title: "Type Erasure, Bridge Methods & Raw Types",
+  duration: 14,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "te-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What happens to generic type parameters at runtime due to type erasure?",
+    options: [
+      { text: "They are preserved in a hidden metadata table that the JVM can query.", correct: false, feedback: "Reflection can access generic signatures on class/method declarations (stored in the .class file), but at the level of individual instances, type arguments are not retained." },
+      { text: "They are replaced by Object (or the upper bound) in the compiled bytecode, and all casts are inserted by the compiler where needed.", correct: true, feedback: "Correct. The compiler strips type parameters and inserts casts at every point where a typed value is extracted from a generic structure." },
+      { text: "They are boxed into wrapper objects that carry the type at runtime.", correct: false, feedback: "Autoboxing converts primitives to wrapper types, but that's unrelated to erasure. No wrapper exists for generic type parameters." },
+      { text: "They are checked at every method call by the JVM using runtime type tags.", correct: false, feedback: "The JVM performs no generic type checks at runtime. All generic safety is a compile-time guarantee only." },
+    ],
+    explanation: "**Type erasure** means the Java compiler removes all generic type information from bytecode. `Box<String>` and `Box<Integer>` compile to identical bytecode for the class itself. The compiler inserts casts at read sites and verifies type safety at compile time so the JVM never needs to.",
+  },
+  endQ1: {
+    id: "te-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> strings = new ArrayList<>();
+        strings.add("hello");
+
+        // Raw type — bypasses compile-time checks
+        List raw = strings;
+        raw.add(42);   // compiles with unchecked warning
+
+        System.out.println(strings.get(0));
+        System.out.println(strings.size());
+        try {
+            String s = strings.get(1);   // ClassCastException here
+        } catch (ClassCastException e) {
+            System.out.println("ClassCastException");
+        }
+    }
+}`,
+    expectedOutput: "hello\n2\nClassCastException",
+    explanation: "Adding 42 via the raw reference corrupts the List<String>. The first get() works because \"hello\" is indeed a String. The second get() retrieves the Integer 42 and the hidden cast to String throws ClassCastException.",
+  },
+  endQ2: {
+    id: "te-end-2",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Why is `if (obj instanceof Box<String>)` a compile error in Java?",
+    options: [
+      { text: "Because Box is not a concrete class.", correct: false, feedback: "Box is a concrete class — it's the type argument that's the problem, not Box itself." },
+      { text: "Because at runtime, type erasure removes `<String>`, so the JVM cannot distinguish Box<String> from Box<Integer>.", correct: true, feedback: "Correct. After erasure, all parameterisations of Box are the same class. The runtime check `instanceof Box<String>` would always behave as `instanceof Box`, making the check meaningless and misleading." },
+      { text: "Because instanceof only works with interfaces.", correct: false, feedback: "instanceof works with any reference type — classes and interfaces. The restriction is specifically about parameterised types." },
+      { text: "Because you must use a cast before instanceof.", correct: false, feedback: "instanceof can be used without a prior cast. The issue is that the generic type argument `<String>` is not present at runtime." },
+    ],
+    explanation: "Type erasure removes all generic type information from instances at runtime. A `Box<String>` instance and a `Box<Integer>` instance are identical to the JVM — both are just `Box`. The pattern `instanceof Box<String>` would be a lie, so the compiler rejects it.",
+  },
+  endQ3: {
+    id: "te-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class TypedCache {
+    private final java.util.Map<String, Object> cache = new java.util.HashMap<>();
+
+    public <T> void put(String key, T value) {
+        cache.put(key, value);
+    }
+
+    public <T> T get(String key) {
+        return (T) cache.get(key);   // bug here
+    }
+}`,
+    buggyLine: 9,
+    issue: "The unchecked cast `(T)` is erased to `(Object)` at runtime. The actual ClassCastException will be deferred to the call site where the return value is assigned, making errors harder to trace.",
+    explanation: "The cast at line 9 only succeeds at compile time — at runtime T is Object, so the cast is a no-op and nothing is verified. The real fix is to store `Class<T>` as a key and use `type.cast(cache.get(key))` for a checked cast (see lesson 9 on type tokens).",
+  },
+};
+
+Type erasure is the reason Java generics have several surprising limitations: you can't write `new T()`, `T.class`, or `instanceof List<String>`. Understanding *why* these restrictions exist — and how the JVM actually executes generic code — turns frustrating compiler errors into clear design decisions. It also explains heap pollution, bridge methods, and why mixing generic and legacy (raw-type) code can produce `ClassCastException` far from the original bug.
+
+## What type erasure does
+
+When the Java compiler compiles a generic class, it replaces every type parameter with its **erasure**:
+
+- An unbounded `T` becomes `Object`.
+- A bounded `T extends Comparable<T>` becomes `Comparable`.
+- All casts that preserve type safety at call sites are inserted automatically.
+
+After compilation, `Box<String>` and `Box<Integer>` produce identical bytecode:
+
+```java
+// Source
+public class Box<T> {
+    private T value;
+    public T get() { return value; }
+}
+
+// Bytecode equivalent (what the compiler emits)
+public class Box {
+    private Object value;
+    public Object get() { return value; }
+}
+
+// Call site — compiler inserts the cast automatically:
+Box<String> b = new Box<>("hi");
+String s = b.get();           // source code
+
+// Compiled as:
+String s = (String) b.get();  // inserted by compiler
+```
+
+The JVM sees no generics — all safety is a compile-time guarantee.
+
+## What you cannot do because of erasure
+
+```java
+// ILLEGAL — T is not available at runtime:
+T obj = new T();             // cannot instantiate T
+T[] arr = new T[10];        // cannot create generic array
+if (x instanceof Box<String>) { ... }  // cannot check parameterised type
+Class<T> c = T.class;       // no class literal for type parameters
+```
+
+Each of these requires a runtime representation of T, which erasure removes.
+
+<Note>You *can* use `instanceof Box<?>` (unbounded wildcard) because it doesn't depend on knowing the type argument — it just checks that the object is a `Box`.</Note>
+
+## Raw types and heap pollution
+
+A **raw type** is a generic class used without type arguments. Raw types exist for backward compatibility with pre-generics code:
+
+```java
+// Raw type — avoid in new code
+List raw = new ArrayList();
+raw.add("hello");
+raw.add(42);           // compiles with unchecked warning
+
+List<String> strings = raw;   // unchecked assignment
+String s = strings.get(1);   // ClassCastException at runtime!
+```
+
+This is **heap pollution**: a `List<String>` reference points to a list that actually contains an Integer. The cast fails far from where the bad element was inserted, making the bug hard to find.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Bridge methods
+
+When a generic class overrides a method from a non-generic parent, the compiler may insert a **bridge method** to maintain polymorphism correctly:
+
+```java
+public interface Comparable<T> {
+    int compareTo(T other);
+}
+
+public class StringWrapper implements Comparable<StringWrapper> {
+    private final String value;
+    StringWrapper(String value) { this.value = value; }
+
+    @Override
+    public int compareTo(StringWrapper other) {
+        return this.value.compareTo(other.value);
+    }
+    // Compiler also generates the bridge method:
+    // public int compareTo(Object other) {
+    //     return compareTo((StringWrapper) other);
+    // }
+}
+```
+
+The bridge method preserves the `compareTo(Object)` signature from the erased `Comparable` interface. You never write bridge methods; the compiler generates them silently. They appear in stack traces and can occasionally cause confusion.
+
+## `Box<?>` and type tokens
+
+Two common patterns for working with generic types at runtime:
+
+**Pattern 1 — Unbounded wildcard for containers of unknown type:**
+
+```java
+static void printBox(Box<?> box) {
+    System.out.println(box.get());   // Object — safe, prints anything
+}
+```
+
+**Pattern 2 — `Class<T>` as a type token (preview for lesson 9):**
+
+```java
+public static <T> T cast(Object obj, Class<T> type) {
+    return type.cast(obj);   // throws ClassCastException immediately if wrong
+}
+
+// Usage:
+String s = cast(someObject, String.class);
+```
+
+`Class<T>` survives erasure because it's a regular object — not a type parameter. This pattern is used in Jackson, Spring, and most serialization frameworks.
+
+## Try it
+
+Observe erasure in action and use the type-token pattern:
+
+```java
+import java.util.*;
+
+public class Main {
+    static class Box<T> {
+        private final T value;
+        Box(T value) { this.value = value; }
+        T get() { return value; }
+    }
+
+    static <T> T safeCast(Object obj, Class<T> type) {
+        return type.cast(obj);  // immediate, clear ClassCastException if wrong
+    }
+
+    public static void main(String[] args) {
+        Box<String> boxStr = new Box<>("hello");
+        Box<Integer> boxInt = new Box<>(42);
+
+        // Both boxes are the same raw class after erasure:
+        System.out.println(boxStr.getClass() == boxInt.getClass()); // true
+
+        // Safe cast with type token:
+        System.out.println(safeCast("world", String.class));  // world
+        try {
+            safeCast("world", Integer.class);
+        } catch (ClassCastException e) {
+            System.out.println("caught: " + e.getMessage());
+        }
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Mixing raw and generic types** — assigning a raw `List` to a `List<String>` reference compiles with warnings and causes heap pollution. Enable `-Xlint:unchecked` and treat all warnings as errors in new code.
+- **Casting to a type parameter** — `(T) someObject` at runtime erases to `(Object)` — the cast does nothing and defers the error to wherever the result is used. Use a `Class<T>` type token and `type.cast()` for genuine runtime safety.
+- **Expecting `getClass()` to return the parameterised type** — `new ArrayList<String>().getClass()` returns `class java.util.ArrayList`, not `ArrayList<String>`. The parameter is gone.
+- **Trying `new T[n]`** — create `Object[]` and cast the array reference: `T[] arr = (T[]) new Object[n]`. This is an unchecked cast but is the standard workaround (see lesson 7).
+
+## Recap
+
+- **Type erasure** replaces type parameters with `Object` (or the bound) in bytecode; the compiler inserts casts at read sites.
+- `Box<String>` and `Box<Integer>` are the **same class** at runtime.
+- `instanceof Box<String>` is illegal; use `instanceof Box<?>`.
+- **Raw types** bypass generic safety and can cause heap pollution.
+- **Bridge methods** are compiler-generated to maintain polymorphism with erased signatures.
+- `Class<T>` as a type token is the safe way to do generic operations at runtime.
+
+**Up next:** Comparable vs Comparator — chaining and reversing sort orders.
