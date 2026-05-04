@@ -29,7 +29,7 @@ export function LessonColumns({ children, codePanel, hasCode }: LessonColumnsPro
           <div
             className={`${
               tab === "code" ? "flex" : "hidden lg:flex"
-            } flex-col w-full lg:w-[38%] shrink-0 pb-14 lg:pb-0`}
+            } flex-col w-full lg:w-[42%] shrink-0 pb-14 lg:pb-0`}
           >
             {codePanel}
           </div>

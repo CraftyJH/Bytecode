@@ -1,54 +1,55 @@
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Pill } from "@/components/ui/Pill";
+import { getTrack } from "@/lib/curriculum";
 
 const tracks = [
   {
     num: "01",
+    slug: "java-beginner",
     title: "Java Beginner",
-    description: "Variables, control flow, methods, arrays, strings.",
+    description: "Foundations in Java 21: variables, control flow, methods, arrays, and strings.",
     tag: "Free, forever.",
     variant: "free" as const,
-    example: "lesson: Hello, Java",
   },
   {
     num: "02",
+    slug: "java-intermediate",
     title: "Java Intermediate",
-    description: "Classes, OOP, interfaces, generics, collections.",
-    tag: "Half free.",
+    description: "Object-oriented Java: classes, interfaces, exceptions, collections, and files.",
+    tag: "Fully free.",
     variant: "free" as const,
-    example: "lesson: Interfaces vs Abstract Classes",
   },
   {
     num: "03",
+    slug: "java-advanced",
     title: "Java Advanced",
-    description: "Lambdas, streams, concurrency, JVM internals, design patterns.",
+    description: "Advanced Java: streams, concurrency, design patterns, testing, and JVM internals.",
     tag: "Premium.",
     variant: "premium" as const,
-    example: "lesson: Thread Safety with synchronized",
   },
   {
     num: "04",
+    slug: "kotlin-bridge",
     title: "Kotlin Bridge",
-    description: "Java → Kotlin in days, not weeks. Built for experienced Java devs.",
+    description: "Bridge from Java to idiomatic Kotlin: null safety, data classes, and interop.",
     tag: "Premium.",
     variant: "premium" as const,
-    example: "lesson: Data Classes and sealed when",
   },
   {
     num: "05",
+    slug: "kotlin-advanced",
     title: "Kotlin Advanced",
-    description: "Coroutines, DSLs, extension functions, multiplatform.",
+    description: "Advanced Kotlin topics including coroutines, DSL patterns, and language internals.",
     tag: "Premium.",
     variant: "premium" as const,
-    example: "lesson: Structured Concurrency with Flow",
   },
   {
     num: "06",
+    slug: "projects",
     title: "Projects",
-    description: "Spring Boot API. Android Weather App. Multi-threaded scraper.",
-    tag: "First one free.",
+    description: "Applied portfolio work across backend, app, and systems-style projects.",
+    tag: "Mixed access.",
     variant: "free" as const,
-    example: "project: Spring Boot Bookmarks API",
   },
 ];
 
@@ -66,7 +67,11 @@ export function ThePath() {
         />
 
         <div className="space-y-0">
-          {tracks.map(({ num, title, description, tag, variant, example }, idx) => (
+          {tracks.map(({ num, slug, title, description, tag, variant }) => {
+            const track = getTrack(slug);
+            const moduleCount = track?.modules.length ?? 0;
+            const lessonCount = track?.modules.reduce((sum, m) => sum + m.lessons.length, 0) ?? 0;
+            return (
             <div
               key={num}
               className="group flex flex-col sm:flex-row sm:items-center gap-4 py-5 border-b"
@@ -98,11 +103,16 @@ export function ThePath() {
                   className="text-xs text-prose-faint group-hover:text-prose-muted transition-colors duration-100"
                   style={{ fontFamily: "var(--font-mono)" }}
                 >
-                  {`// ${example}`}
+                  {"// "}
+                  <span className="text-accent font-semibold tabular-nums">{moduleCount}</span>
+                  {" modules covering "}
+                  <span className="text-accent font-semibold tabular-nums">{lessonCount}</span>
+                  {" lessons"}
                 </span>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
     </section>

@@ -4,7 +4,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import path from "path";
 import fs from "fs";
-import { getLesson, getModule, getTrack, getPrevNext } from "@/lib/curriculum";
+import { getLesson, getModule, getTrack, getPrevNext, getNextLessonInTrack } from "@/lib/curriculum";
 import { buildMdxComponents } from "@/components/mdx/MdxComponents";
 import { LessonSidebar } from "@/components/lesson/LessonSidebar";
 import { CodePanel } from "@/components/lesson/CodePanel";
@@ -60,7 +60,8 @@ export default async function LessonPage({ params }: LessonPageProps) {
   const source = await getLessonSource(trackSlug, moduleSlug, lessonSlug);
   if (!source) notFound();
 
-  const { prev, next } = getPrevNext(trackSlug, moduleSlug, lessonSlug);
+  const { prev } = getPrevNext(trackSlug, moduleSlug, lessonSlug);
+  const nextInTrack = getNextLessonInTrack(trackSlug, moduleSlug, lessonSlug);
   const supabase = await createClient();
   const {
     data: { session },
@@ -187,12 +188,12 @@ export default async function LessonPage({ params }: LessonPageProps) {
                   <ChevronLeft size={14} /> {prev.title}
                 </a>
               )}
-              {next && (
+              {nextInTrack && (
                 <a
-                  href={`/curriculum/${trackSlug}/${moduleSlug}/lesson/${next.slug}`}
+                  href={`/curriculum/${trackSlug}/${nextInTrack.moduleSlug}/lesson/${nextInTrack.lesson.slug}`}
                   className="flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-warm transition-colors duration-100"
                 >
-                  {next.title} <ChevronRight size={14} />
+                  {nextInTrack.lesson.title} <ChevronRight size={14} />
                 </a>
               )}
             </div>
