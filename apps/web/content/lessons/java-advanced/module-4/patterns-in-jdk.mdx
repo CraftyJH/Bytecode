@@ -237,6 +237,96 @@ public class Main {
 }
 ```
 
+<Exercise>
+Write a single `main` program that uses three JDK patterns: (1) sort a list of strings with a `Comparator` (Strategy), (2) wrap a `StringReader` in a `BufferedReader` and read lines uppercased (Decorator), (3) build a Stream pipeline filtering words longer than 4 characters and printing each (Builder-style). Print all outputs clearly labelled.
+
+```java
+import java.io.BufferedReader;
+import java.io.StringReader;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Stream;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        // 1. Strategy — sort by length then alphabetically
+        List<String> words = Arrays.asList("banana", "fig", "cherry", "kiwi", "apple");
+        words.sort(Comparator.comparingInt(String::length)
+                             .thenComparing(Comparator.naturalOrder()));
+        System.out.println("Sorted: " + words);
+
+        // 2. Decorator — BufferedReader wrapping StringReader
+        String data = "design\npatterns\nin\njava";
+        // TODO: wrap data in StringReader then BufferedReader
+        //       read each line, print it uppercased
+        System.out.println("Lines:");
+        // ... your code here
+
+        // 3. Builder-style Stream pipeline
+        long count = Stream.of("design", "patterns", "in", "Java", "are", "powerful")
+                // TODO: filter words with length > 4
+                // TODO: print each kept word with prefix "Kept: "
+                .count();
+        System.out.println("Words longer than 4 chars: " + count);
+    }
+}
+```
+
+**What to verify:**
+- Sorted list: `[fig, kiwi, apple, banana, cherry]`
+- Uppercase lines: `DESIGN`, `PATTERNS`, `IN`, `JAVA`
+- Count output: `Words longer than 4 chars: 4` (design, patterns, Java, powerful)
+
+<Note>Hint: Use `try (BufferedReader br = new BufferedReader(new StringReader(data)))` and `br.lines().map(String::toUpperCase).forEach(...)` for step 2.</Note>
+</Exercise>
+
+<Exercise>
+Use `java.beans.PropertyChangeSupport` to implement a simple observable `Counter` that fires a property change event every time its value is incremented. Register two listeners and call `increment()` three times, printing old and new values from each listener.
+
+```java
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
+
+public class Main {
+    // TODO: class Counter
+    //         private int value = 0
+    //         private PropertyChangeSupport pcs = new PropertyChangeSupport(this)
+    //         addListener(PropertyChangeListener l)  -> pcs.addPropertyChangeListener(l)
+    //         removeListener(PropertyChangeListener l)
+    //         increment() -> int old = value; value++; pcs.firePropertyChange("value", old, value)
+
+    public static void main(String[] args) {
+        Counter counter = new Counter();
+
+        // Listener A
+        counter.addListener(evt ->
+            System.out.println("A: " + evt.getOldValue() + " -> " + evt.getNewValue()));
+        // Listener B
+        counter.addListener(evt ->
+            System.out.println("B sees count = " + evt.getNewValue()));
+
+        counter.increment();  // 0 -> 1
+        counter.increment();  // 1 -> 2
+        counter.increment();  // 2 -> 3
+
+        // NOTE: java.util.Observer/Observable were deprecated in Java 9 because:
+        // Observable is a class (not an interface), forcing single-inheritance;
+        // the update() method is weakly typed (passes Object); and there is no
+        // concurrency model or error channel. PropertyChangeSupport is the
+        // JavaBeans-standard alternative for simple property notifications.
+    }
+}
+```
+
+**What to verify:**
+- Each `increment()` fires both listeners in subscription order
+- Listener A prints `A: 0 -> 1`, `A: 1 -> 2`, `A: 2 -> 3`
+- Listener B prints `B sees count = 1`, `B sees count = 2`, `B sees count = 3`
+
+<Note>Hint: `PropertyChangeSupport.firePropertyChange(String propertyName, int oldValue, int newValue)` automatically boxes the ints and notifies all registered listeners.</Note>
+</Exercise>
+
 ## End-of-lesson quiz
 
 <Quiz data={quizzes.endQ1} label="question 1 of 3" />

@@ -104,6 +104,42 @@ public void process(String value) {
 
 100% line coverage is achievable by only passing a non-null value. Branch coverage exposes the untested null case.
 
+<Exercise>
+Given `classifyAge(int age)` that returns `"child"` for age < 18, `"adult"` for 18–64, and `"senior"` for age >= 65, write the minimum set of checks to cover all 3 branches.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    static String classifyAge(int age) {
+        if (age < 18)  return "child";
+        if (age >= 65) return "senior";
+        return "adult";
+    }
+
+    public static void main(String[] args) {
+        // Branch 1: age < 18  → "child"
+        check("child".equals(classifyAge(10)),  "classifyAge(10)  == \"child\"");
+
+        // Branch 2: 18 <= age < 65 → "adult"
+        check("adult".equals(classifyAge(30)),  "classifyAge(30)  == \"adult\"");
+
+        // Branch 3: age >= 65 → "senior"
+        check("senior".equals(classifyAge(70)), "classifyAge(70)  == \"senior\"");
+    }
+}
+```
+
+**What to verify:**
+- All 3 checks print `PASS:` — that's 100% branch coverage with the minimum number of tests
+- Removing the `age >= 65` branch (returning `"adult"` for seniors) causes the third check to fail
+
+<Note>Hint: one representative input per branch is sufficient — `classifyAge(10)`, `classifyAge(30)`, and `classifyAge(70)` each exercise a distinct code path.</Note>
+</Exercise>
+
 ## JaCoCo basics
 
 JaCoCo (Java Code Coverage) is the standard coverage tool for Maven and Gradle projects. Add it to `pom.xml`:
@@ -169,6 +205,71 @@ if (age > 18) return "adult";
 ```
 
 If no test checks the boundary value `age == 18`, this mutant survives. The test suite has 100% line coverage but misses the boundary condition that matters most.
+
+<Exercise>
+Given a buggy `bubbleSort` with a deliberate off-by-one in the comparison, write a check that catches the mutation — then fix the bug.
+
+```java
+import java.util.Arrays;
+
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    // Buggy version: loop limit is < arr.length - 1  (off-by-one — skips last swap)
+    static int[] bubbleSortBuggy(int[] arr) {
+        arr = arr.clone();
+        for (int i = 0; i < arr.length - 1; i++) {
+            for (int j = 0; j < arr.length - 1; j++) { // BUG: should be arr.length - 1 - i
+                if (arr[j] > arr[j + 1]) {
+                    int tmp = arr[j]; arr[j] = arr[j + 1]; arr[j + 1] = tmp;
+                }
+            }
+        }
+        return arr;
+    }
+
+    // Fixed version
+    static int[] bubbleSort(int[] arr) {
+        arr = arr.clone();
+        for (int i = 0; i < arr.length - 1; i++) {
+            for (int j = 0; j < arr.length - 1 - i; j++) {
+                if (arr[j] > arr[j + 1]) {
+                    int tmp = arr[j]; arr[j] = arr[j + 1]; arr[j + 1] = tmp;
+                }
+            }
+        }
+        return arr;
+    }
+
+    public static void main(String[] args) {
+        int[] input    = {5, 3, 1, 4, 2};
+        int[] expected = {1, 2, 3, 4, 5};
+
+        // This check KILLS the mutation — it passes with fixed, fails with buggy
+        check(Arrays.equals(bubbleSort(input), expected),
+              "bubbleSort sorts [5,3,1,4,2] to [1,2,3,4,5]");
+
+        // Demonstrate the buggy version ALSO passes trivial inputs (mutation survives)
+        // For a 2-element array the off-by-one doesn't matter:
+        check(Arrays.equals(bubbleSortBuggy(new int[]{2, 1}), new int[]{1, 2}),
+              "buggy sort still works on 2-element input (mutation survives here)");
+
+        // But the boundary check with 5 elements kills it:
+        boolean buggyFails = !Arrays.equals(bubbleSortBuggy(input), expected);
+        check(buggyFails, "mutation in buggy sort is caught by the 5-element check");
+    }
+}
+```
+
+**What to verify:**
+- `bubbleSort` passes the sort check and prints `PASS:`
+- The last check confirms that `bubbleSortBuggy` produces the wrong output for the 5-element input (the mutation is killed)
+
+<Note>Hint: simple 2-element tests often miss inner-loop off-by-ones. Choosing a 5-element array forces the inner loop to run enough iterations that the off-by-one actually triggers.</Note>
+</Exercise>
 
 ## Try it
 

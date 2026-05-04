@@ -105,6 +105,84 @@ public class Counter {
 
 <Note>Always release a `ReentrantLock` in a `finally` block. If an exception escapes the `try` and there is no `finally`, the lock is never released and every other thread waiting for it will block forever.</Note>
 
+<Exercise>
+Implement a thread-safe `Stack<Integer>` using `ReentrantLock` instead of `synchronized`. The stack should support `push(int)` and `pop()` operations. Test it with multiple threads pushing and popping concurrently.
+
+```java
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.ArrayDeque;
+import java.util.Deque;
+
+public class Main {
+    static class SafeStack {
+        private final Deque<Integer> data = new ArrayDeque<>();
+        private final ReentrantLock lock = new ReentrantLock();
+
+        public void push(int value) {
+            lock.lock();
+            try {
+                // TODO: push value onto data
+                data.push(value);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        public Integer pop() {
+            lock.lock();
+            try {
+                // TODO: return data.poll() (returns null if empty)
+                return data.poll();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        public int size() {
+            lock.lock();
+            try { return data.size(); }
+            finally { lock.unlock(); }
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        SafeStack stack = new SafeStack();
+
+        // 4 threads each push 250 items
+        Thread[] pushers = new Thread[4];
+        for (int t = 0; t < 4; t++) {
+            final int base = t * 250;
+            pushers[t] = new Thread(() -> {
+                for (int i = base; i < base + 250; i++) stack.push(i);
+            });
+        }
+        for (Thread t : pushers) t.start();
+        for (Thread t : pushers) t.join();
+
+        System.out.println("Stack size after pushes: " + stack.size());  // 1000
+
+        // 4 threads each pop 250 items
+        Thread[] poppers = new Thread[4];
+        for (int t = 0; t < 4; t++) {
+            poppers[t] = new Thread(() -> {
+                for (int i = 0; i < 250; i++) stack.pop();
+            });
+        }
+        for (Thread t : poppers) t.start();
+        for (Thread t : poppers) t.join();
+
+        System.out.println("Stack size after pops: " + stack.size());    // 0
+    }
+}
+```
+
+**What to verify:**
+- `"Stack size after pushes: 1000"` is printed
+- `"Stack size after pops: 0"` is printed
+
+<Note>Hint: always call `lock.unlock()` in a `finally` block — if the critical section throws and the lock is not released, all other threads waiting for it will block forever.</Note>
+</Exercise>
+
 ## tryLock — non-blocking and timed acquisition
 
 ```java
@@ -225,6 +303,84 @@ public class BoundedBuffer<T> {
 ```
 
 The two `Condition` objects mean producers only wake consumers and consumers only wake producers — no spurious wake-ups of the wrong party.
+
+<Exercise>
+Implement a `BoundedBuffer<String>` with capacity 3 using `ReentrantLock` and two `Condition` objects: `notFull` (producer waits here when the buffer is full) and `notEmpty` (consumer waits here when the buffer is empty). Test it with a producer putting 6 items and a consumer taking 6 items.
+
+```java
+import java.util.concurrent.locks.*;
+
+public class Main {
+    static class BoundedBuffer {
+        private final String[] buf = new String[3];
+        private int head, tail, count;
+        private final ReentrantLock lock = new ReentrantLock();
+        private final Condition notFull  = lock.newCondition();
+        private final Condition notEmpty = lock.newCondition();
+
+        public void put(String item) throws InterruptedException {
+            lock.lock();
+            try {
+                while (count == buf.length) notFull.await();  // wait if full
+                buf[tail] = item;
+                tail = (tail + 1) % buf.length;
+                count++;
+                notEmpty.signal();   // wake a waiting consumer
+            } finally { lock.unlock(); }
+        }
+
+        public String take() throws InterruptedException {
+            lock.lock();
+            try {
+                while (count == 0) notEmpty.await();   // wait if empty
+                String item = buf[head];
+                head = (head + 1) % buf.length;
+                count--;
+                notFull.signal();    // wake a waiting producer
+                return item;
+            } finally { lock.unlock(); }
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        BoundedBuffer buffer = new BoundedBuffer();
+
+        Thread producer = new Thread(() -> {
+            try {
+                for (int i = 1; i <= 6; i++) {
+                    buffer.put("item-" + i);
+                    System.out.println("Put:  item-" + i);
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        Thread consumer = new Thread(() -> {
+            try {
+                for (int i = 0; i < 6; i++) {
+                    String item = buffer.take();
+                    System.out.println("Took: " + item);
+                    Thread.sleep(60);   // consumer is slower than producer
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        producer.start();
+        consumer.start();
+        producer.join();
+        consumer.join();
+        System.out.println("Done");
+    }
+}
+```
+
+**What to verify:**
+- All 6 items are put and taken without deadlock or data loss
+- The producer blocks once the buffer reaches capacity 3, resuming only as the consumer takes items
+- `"Done"` is printed last
+- Output order of put/take lines may vary
+
+<Note>Hint: use `while` (not `if`) to re-check the condition after `await()` — spurious wake-ups can occur and the condition may still not hold when the thread resumes.</Note>
+</Exercise>
 
 ## Try it
 

@@ -198,6 +198,68 @@ public class Pipeline {
 
 The bounded queues provide back-pressure: if a stage is slow, the queue upstream fills and pauses the previous stage — the whole pipeline throttles naturally.
 
+<Exercise>
+Implement a 3-stage pipeline using `BlockingQueue`. A producer puts integers 1–5 into `queue1`. Stage 1 reads from `queue1`, doubles each value, and puts into `queue2`. A consumer reads from `queue2` and prints each value. Use 3 threads (producer, stage1, consumer) and a poison pill to signal shutdown.
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    static final int POISON = -1;
+
+    public static void main(String[] args) throws InterruptedException {
+        BlockingQueue<Integer> queue1 = new ArrayBlockingQueue<>(5);
+        BlockingQueue<Integer> queue2 = new ArrayBlockingQueue<>(5);
+
+        // Producer: puts 1..5 then poison pill
+        Thread producer = new Thread(() -> {
+            try {
+                for (int i = 1; i <= 5; i++) {
+                    queue1.put(i);
+                    System.out.println("Produced: " + i);
+                }
+                queue1.put(POISON);
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        // Stage 1: doubles each value, forwards poison pill
+        Thread stage1 = new Thread(() -> {
+            try {
+                while (true) {
+                    int val = queue1.take();
+                    if (val == POISON) { queue2.put(POISON); break; }
+                    // TODO: double val and put into queue2
+                    queue2.put(val * 2);
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        // Consumer: prints each value until poison pill
+        Thread consumer = new Thread(() -> {
+            try {
+                while (true) {
+                    int val = queue2.take();
+                    if (val == POISON) break;
+                    System.out.println("Consumed: " + val);
+                }
+                System.out.println("Consumer done");
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        producer.start(); stage1.start(); consumer.start();
+        producer.join();  stage1.join();  consumer.join();
+    }
+}
+```
+
+**What to verify:**
+- Consumed values are `2, 4, 6, 8, 10` (each original doubled)
+- `"Consumer done"` is printed last
+- Output order may vary between produced/consumed lines
+
+<Note>Hint: the poison pill (`POISON = -1`) propagates from producer → stage1 → consumer, signalling each stage to shut down in turn.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Pattern 4: Publish-subscribe with ConcurrentHashMap

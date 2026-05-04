@@ -152,6 +152,95 @@ class ProductServiceIntegrationTest {
 
 No Spring context, no database connection, no network. These tests run in milliseconds and give full confidence in the service layer's logic.
 
+<Exercise>
+Implement an in-memory `TaskRepository`, a `TaskService` layer on top, and write 3 integration checks: create a task, find it by id, and mark it complete — using only real objects, no mocks.
+
+```java
+import java.util.*;
+
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    enum Status { PENDING, DONE }
+
+    static class Task {
+        Long id;
+        String title;
+        Status status;
+        Task(String title) { this.title = title; this.status = Status.PENDING; }
+    }
+
+    interface TaskRepository {
+        Task save(Task task);
+        Optional<Task> findById(Long id);
+    }
+
+    static class InMemoryTaskRepository implements TaskRepository {
+        private final Map<Long, Task> store = new HashMap<>();
+        private long nextId = 1;
+
+        @Override
+        public Task save(Task task) {
+            if (task.id == null) task.id = nextId++;
+            store.put(task.id, task);
+            return task;
+        }
+
+        @Override
+        public Optional<Task> findById(Long id) {
+            return Optional.ofNullable(store.get(id));
+        }
+    }
+
+    static class TaskService {
+        private final TaskRepository repo;
+        TaskService(TaskRepository repo) { this.repo = repo; }
+
+        Task create(String title) {
+            if (title == null || title.isBlank())
+                throw new IllegalArgumentException("Title required");
+            return repo.save(new Task(title));
+        }
+
+        void complete(Long id) {
+            Task t = repo.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Task not found: " + id));
+            t.status = Status.DONE;
+            repo.save(t);
+        }
+    }
+
+    public static void main(String[] args) {
+        TaskRepository repo = new InMemoryTaskRepository();
+        TaskService service  = new TaskService(repo);
+
+        // Check 1: create task
+        Task created = service.create("Write tests");
+        check(created.id != null,               "created task has an id");
+        check("Write tests".equals(created.title), "created task has correct title");
+
+        // Check 2: find by id
+        Optional<Task> found = repo.findById(created.id);
+        check(found.isPresent(),                "task can be found by id");
+
+        // Check 3: mark complete
+        service.complete(created.id);
+        Task updated = repo.findById(created.id).orElseThrow();
+        check(updated.status == Status.DONE,    "completed task has DONE status");
+    }
+}
+```
+
+**What to verify:**
+- All 4 checks print `PASS:`
+- Removing `task.id = nextId++` from `save()` causes check 1 to fail
+
+<Note>Hint: give each check a distinct, readable description so a failure message immediately tells you which integration point broke.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Test containers — real databases in CI
@@ -189,6 +278,91 @@ class ProductRepositoryJpaTest {
 The container starts once for the test class (thanks to `static @Container`), is shared across all tests in the class, and is stopped automatically when the JVM exits.
 
 <Note>Testcontainers requires Docker to be available on the machine running the tests. Most CI platforms (GitHub Actions, GitLab CI, CircleCI) support Docker out of the box. Developers without Docker installed can fall back to an H2 profile with a separate Maven profile flag.</Note>
+
+<Exercise>
+Test the service's error-handling contract: when the repository throws because the title is blank, verify that the service surfaces the error correctly (does not swallow it).
+
+```java
+import java.util.*;
+
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    static class Task {
+        Long id; String title;
+        Task(String title) { this.title = title; }
+    }
+
+    interface TaskRepository {
+        Task save(Task task);
+        Optional<Task> findById(Long id);
+    }
+
+    // Strict repository: rejects blank titles at the persistence layer
+    static class StrictInMemoryRepo implements TaskRepository {
+        private final Map<Long, Task> store = new HashMap<>();
+        private long nextId = 1;
+
+        @Override
+        public Task save(Task task) {
+            if (task.title == null || task.title.isBlank())
+                throw new IllegalArgumentException("Repo: title must not be blank");
+            task.id = nextId++;
+            store.put(task.id, task);
+            return task;
+        }
+
+        @Override
+        public Optional<Task> findById(Long id) {
+            return Optional.ofNullable(store.get(id));
+        }
+    }
+
+    static class TaskService {
+        private final TaskRepository repo;
+        TaskService(TaskRepository repo) { this.repo = repo; }
+
+        Task create(String title) {
+            // Service validates first, then delegates to repo
+            // TODO: throw IllegalArgumentException("Title required") for blank title
+            if (title == null || title.isBlank())
+                throw new IllegalArgumentException("Title required");
+            return repo.save(new Task(title));
+        }
+    }
+
+    public static void main(String[] args) {
+        TaskRepository repo    = new StrictInMemoryRepo();
+        TaskService    service = new TaskService(repo);
+
+        // Check: blank title — service should throw IllegalArgumentException
+        IllegalArgumentException caught = null;
+        try {
+            service.create("   ");
+        } catch (IllegalArgumentException e) {
+            caught = e;
+        }
+        check(caught != null, "service throws IllegalArgumentException for blank title");
+        check(caught != null && caught.getMessage() != null
+              && caught.getMessage().contains("Title"),
+              "exception message mentions 'Title'");
+
+        // Check: normal title still works after a failed attempt
+        Task ok = service.create("Valid task");
+        check(ok.id != null, "valid task saved successfully after failed attempt");
+    }
+}
+```
+
+**What to verify:**
+- All 3 checks print `PASS:`
+- Removing the blank-title guard from `TaskService.create()` causes the first check to fail (exception propagates from the repo with a different message, causing the second check to fail too)
+
+<Note>Hint: the service layer should validate *before* calling the repo — this gives a consistent error message regardless of which persistence backend is used.</Note>
+</Exercise>
 
 ## @SpringBootTest overview
 

@@ -204,6 +204,68 @@ public class TaskNotificationService implements AutoCloseable {
 
 <Note>The thread is created as a **daemon thread** (`t.setDaemon(true)`). Daemon threads do not prevent the JVM from exiting when only daemon threads remain. Background workers and notification threads should almost always be daemons.</Note>
 
+<Exercise>
+Implement an `OverdueChecker` that uses `ScheduledExecutorService.scheduleAtFixedRate` to check a list of tasks for overdue ones every 2 seconds. Simulate 3 iterations using an `AtomicInteger` counter, then shut down. Print `OVERDUE: <title>` for each overdue task found in each check.
+
+```java
+import java.time.LocalDate;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Main {
+    record Task(String title, LocalDate dueDate, boolean done) {}
+
+    static class OverdueChecker {
+        private final List<Task> tasks;
+        private final ScheduledExecutorService scheduler =
+            Executors.newSingleThreadScheduledExecutor();
+        private final AtomicInteger iterations = new AtomicInteger(0);
+
+        OverdueChecker(List<Task> tasks) { this.tasks = tasks; }
+
+        void start() {
+            // TODO: schedule checkOverdue at fixedRate of 2 seconds
+            // Stop after 3 iterations by calling scheduler.shutdown()
+        }
+
+        private void checkOverdue() {
+            System.out.println("--- Check #" + iterations.incrementAndGet() + " ---");
+            LocalDate today = LocalDate.now();
+            // TODO: print "OVERDUE: title" for each task whose dueDate is before today and is not done
+            if (iterations.get() >= 3) {
+                scheduler.shutdown();
+            }
+        }
+
+        void awaitDone() throws InterruptedException {
+            scheduler.awaitTermination(10, TimeUnit.SECONDS);
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        List<Task> tasks = List.of(
+            new Task("Fix login bug",    LocalDate.now().minusDays(3), false),
+            new Task("Write unit tests", LocalDate.now().plusDays(2),  false),
+            new Task("Deploy v1.0",      LocalDate.now().minusDays(1), true),
+            new Task("Update README",    LocalDate.now().minusDays(5), false)
+        );
+        var checker = new OverdueChecker(tasks);
+        checker.start();
+        checker.awaitDone();
+        System.out.println("Done");
+    }
+}
+```
+
+**What to verify:**
+- Three `--- Check # ---` headers appear
+- `OVERDUE: Fix login bug` and `OVERDUE: Update README` appear in each check (the done task is excluded)
+- `Done` is printed after shutdown
+
+<Note>Hint: use `scheduler.scheduleAtFixedRate(this::checkOverdue, 0, 2, TimeUnit.SECONDS)`. Inside `checkOverdue`, filter tasks where `task.dueDate().isBefore(today) && !task.done()`.</Note>
+</Exercise>
+
 ## NotificationService — async with CompletableFuture
 
 ```java
@@ -254,6 +316,60 @@ public class NotificationService {
 ```
 
 `CompletableFuture.allOf(futures)` returns a future that completes when every notification finishes — useful when you need to wait for the batch before moving on.
+
+<Exercise>
+Implement a `NotificationService.notifyAsync(Task)` method that returns a `CompletableFuture<String>`. The method should simulate sending a notification by sleeping 50 ms, then returning the string `"Notified: " + task.title()`. Use `CompletableFuture.supplyAsync`. Then send 3 notifications in parallel using `CompletableFuture.allOf`, wait for all to complete, and print each result.
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    record Task(String title) {}
+
+    static class NotificationService {
+        private final Executor executor;
+
+        NotificationService(Executor executor) { this.executor = executor; }
+
+        CompletableFuture<String> notifyAsync(Task task) {
+            // TODO: use supplyAsync to sleep 50ms then return "Notified: " + task.title()
+            return CompletableFuture.completedFuture("");
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        var pool = Executors.newCachedThreadPool();
+        var svc  = new NotificationService(pool);
+
+        Task[] tasks = {
+            new Task("Deploy backend"),
+            new Task("Run migrations"),
+            new Task("Smoke test prod")
+        };
+
+        // TODO: fire all three notifyAsync calls, combine with allOf, then print results
+        @SuppressWarnings("unchecked")
+        CompletableFuture<String>[] futures = new CompletableFuture[tasks.length];
+        for (int i = 0; i < tasks.length; i++) {
+            futures[i] = svc.notifyAsync(tasks[i]);
+        }
+
+        CompletableFuture.allOf(futures).join();
+        for (CompletableFuture<String> f : futures) {
+            System.out.println(f.join());
+        }
+
+        pool.shutdown();
+    }
+}
+```
+
+**What to verify:**
+- Three lines are printed, each starting with `Notified:`
+- All three tasks complete (the `allOf` ensures we wait for every one)
+
+<Note>Hint: inside `supplyAsync`, use a lambda: `() -> { Thread.sleep(50); return "Notified: " + task.title(); }` — you'll need to handle `InterruptedException`.</Note>
+</Exercise>
 
 ## TaskProcessor — BlockingQueue worker pool
 

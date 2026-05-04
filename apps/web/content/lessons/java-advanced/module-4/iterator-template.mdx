@@ -191,6 +191,44 @@ StreamSupport.stream(r.spliterator(), false)
 
 <Note>Each call to `iterator()` creates a fresh `Iterator` starting at `start`. This means you can iterate the same `Range` multiple times — in multiple for-each loops or in nested loops — without them interfering.</Note>
 
+<Exercise>
+Implement a `Range` class with `start`, `end` (exclusive), and `step` parameters that implements `Iterable<Integer>`. Use it in a for-each loop to iterate `new Range(0, 10, 2)` and print each value on its own line.
+
+```java
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+
+public class Main {
+    // TODO: class Range implements Iterable<Integer>
+    //         fields: start, end (exclusive), step
+    //         iterator() returns an anonymous Iterator<Integer> that
+    //           - starts at `start`
+    //           - hasNext() is true while current < end
+    //           - next() returns current, then advances by step
+
+    public static void main(String[] args) {
+        Range range = new Range(0, 10, 2);
+        for (int n : range) {
+            System.out.println(n);
+        }
+
+        // Bonus: iterate again to prove iterator() creates a fresh cursor
+        System.out.print("Again: ");
+        for (int n : range) {
+            System.out.print(n + " ");
+        }
+        System.out.println();
+    }
+}
+```
+
+**What to verify:**
+- First loop prints `0`, `2`, `4`, `6`, `8` (one per line)
+- Second loop on the same `range` object prints `0 2 4 6 8` (fresh cursor)
+
+<Note>Hint: `next()` should throw `NoSuchElementException` if `!hasNext()`. Store only a single `int current` field in the anonymous iterator.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Template Method pattern
@@ -251,6 +289,48 @@ json.process();
 // Pushing to message queue
 // JSON pipeline done.
 ```
+
+<Exercise>
+Implement `DataProcessor` as an abstract class with a `final processAll()` template method that calls abstract steps `readData()`, `processItem()`, and `writeOutput()` in that order. Create two concrete subclasses — `CsvProcessor` and `JsonProcessor` — each printing different format-appropriate messages for each step.
+
+```java
+public class Main {
+    // TODO: abstract class DataProcessor
+    //         public final void processAll() calls readData(), processItem(), writeOutput()
+    //         protected abstract void readData()
+    //         protected abstract void processItem()
+    //         protected abstract void writeOutput()
+
+    // TODO: class CsvProcessor extends DataProcessor
+    //         readData()     -> "Reading CSV file"
+    //         processItem()  -> "Parsing CSV rows"
+    //         writeOutput()  -> "Writing CSV results to DB"
+
+    // TODO: class JsonProcessor extends DataProcessor
+    //         readData()     -> "Fetching JSON from API"
+    //         processItem()  -> "Deserialising JSON objects"
+    //         writeOutput()  -> "Pushing JSON results to queue"
+
+    public static void main(String[] args) {
+        DataProcessor csv  = new CsvProcessor();
+        DataProcessor json = new JsonProcessor();
+
+        System.out.println("--- CSV ---");
+        csv.processAll();
+
+        System.out.println("--- JSON ---");
+        json.processAll();
+    }
+}
+```
+
+**What to verify:**
+- CSV block prints three lines with CSV-specific messages in `readData → processItem → writeOutput` order
+- JSON block prints three lines with JSON-specific messages in the same order
+- `processAll()` is declared `final` — subclasses cannot override it
+
+<Note>Hint: Mark `processAll()` as `final` to prevent subclasses from changing the algorithm order.</Note>
+</Exercise>
 
 ## Template Method in the JDK
 

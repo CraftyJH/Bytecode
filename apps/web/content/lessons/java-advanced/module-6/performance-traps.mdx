@@ -101,6 +101,57 @@ long sum = IntStream.of(numbers).asLongStream().sum();
 
 <Note>Eclipse Collections, Trove, and Koloboke provide `IntList`, `LongMap`, and similar collections that hold primitives without boxing. They are worth adopting for performance-critical code that processes large numbers of numeric values.</Note>
 
+<Exercise>
+Write two versions of a sum loop — one using `List<Integer>` (autoboxing overhead), one using a plain `int[]` array. Time both with `System.nanoTime()` and print the speedup ratio.
+
+```java
+import java.util.*;
+
+public class Main {
+    static final int SIZE = 1_000_000;
+
+    static long sumBoxed(List<Integer> numbers) {
+        long sum = 0;
+        // TODO: iterate over numbers and accumulate sum
+        // Each element is an Integer — unboxing happens on every addition
+        return sum;
+    }
+
+    static long sumPrimitive(int[] numbers) {
+        long sum = 0;
+        // TODO: iterate over numbers and accumulate sum
+        // Each element is a plain int — no boxing/unboxing
+        return sum;
+    }
+
+    public static void main(String[] args) {
+        // TODO: Create a List<Integer> with SIZE elements (0..SIZE-1)
+        // Hint: new ArrayList<>() then a loop with .add(i)
+
+        // TODO: Create an int[] with SIZE elements (0..SIZE-1)
+
+        // Warm up both methods
+        for (int i = 0; i < 5; i++) {
+            sumBoxed(/* boxed list */null);
+            sumPrimitive(/* primitive array */null);
+        }
+
+        // TODO: Time sumBoxed() and print elapsed in milliseconds
+        // TODO: Time sumPrimitive() and print elapsed in milliseconds
+        // TODO: Print speedup ratio: boxedTime / primitiveTime
+        // Expected: primitive array is 3–10x faster due to no boxing/unboxing and better cache locality
+    }
+}
+```
+
+**What to verify:**
+- The `int[]` version is measurably faster than the `List<Integer>` version
+- The speedup ratio is typically 3–10× for large arrays
+- The boxed list uses ~4× more memory (16 bytes per `Integer` object vs 4 bytes per `int`)
+
+<Note>Hint: replace the `null` arguments in the warm-up and timing calls with your actual list and array variables. If the difference is small, increase `SIZE` to `5_000_000`.</Note>
+</Exercise>
+
 ## Trap 2: String concatenation in loops
 
 `javac` compiles `"hello" + name` to `new StringBuilder().append("hello").append(name).toString()` in simple cases. But inside a loop, it creates a **new StringBuilder on every iteration**:
@@ -181,6 +232,55 @@ for (String line : millionLines) {
     }
 }
 ```
+
+<Exercise>
+Write two versions of a method that validates a simplified email format — one that calls `Pattern.matches()` on every invocation (recompiles the regex each time), and one that stores the compiled `Pattern` in a static field. Measure the performance difference over 100,000 calls.
+
+```java
+import java.util.regex.*;
+
+public class Main {
+    // TODO: Declare a static final Pattern field called EMAIL_PATTERN
+    // Use the regex: [a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}
+
+    // SLOW: recompiles the regex on every call
+    static boolean isValidEmailSlow(String email) {
+        // TODO: use email.matches("...the regex...") directly
+        // This compiles a new Pattern object on every single call
+        return false;
+    }
+
+    // FAST: reuses the pre-compiled Pattern
+    static boolean isValidEmailFast(String email) {
+        // TODO: use EMAIL_PATTERN.matcher(email).matches()
+        return false;
+    }
+
+    public static void main(String[] args) {
+        String[] testEmails = {
+            "user@example.com", "bad-email", "another@test.org",
+            "invalid@", "good@domain.co.uk"
+        };
+        int calls = 100_000;
+
+        // TODO: Time calls calls to isValidEmailSlow, cycling through testEmails
+        // Hint: testEmails[i % testEmails.length]
+
+        // TODO: Time calls calls to isValidEmailFast, cycling through testEmails
+
+        // TODO: Print both times in milliseconds and the speedup ratio
+        // Expected: fast version is 5–20x faster
+    }
+}
+```
+
+**What to verify:**
+- `isValidEmailSlow` is noticeably slower because `Pattern.matches()` calls `Pattern.compile()` internally on every invocation
+- `isValidEmailFast` reuses the same `Pattern` object, paying compilation cost only once
+- The `Pattern` class is thread-safe, so the static field is safe for concurrent use
+
+<Note>Hint: `String.matches(regex)` is equivalent to `Pattern.compile(regex).matcher(str).matches()` — it compiles a brand-new `Pattern` every time. The compiled `Pattern` object is the expensive part.</Note>
+</Exercise>
 
 ## Trap 5: stream overhead on tiny collections
 

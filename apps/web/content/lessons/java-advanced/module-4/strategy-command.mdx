@@ -297,6 +297,66 @@ public class Main {
 }
 ```
 
+<Exercise>
+Implement `TextEditor` with `executeCommand(Command)` and `undo()`. Implement `InsertCommand` and `DeleteCommand` (deletes the last N characters). Run 3 commands (`insert "Hello"`, `insert " World"`, `delete 6`), print the text, then undo 2 commands and print again.
+
+```java
+import java.util.ArrayDeque;
+import java.util.Deque;
+
+public class Main {
+    interface Command {
+        void execute();
+        void undo();
+    }
+
+    static class TextBuffer {
+        private StringBuilder text = new StringBuilder();
+        public void append(String s)   { text.append(s); }
+        public void deleteLast(int n)  {
+            int start = Math.max(0, text.length() - n);
+            text.delete(start, text.length());
+        }
+        public String getText() { return text.toString(); }
+    }
+
+    // TODO: class InsertCommand implements Command
+    //         execute() appends text, undo() deletes same length
+
+    // TODO: class DeleteCommand implements Command
+    //         execute() deletes last n chars, undo() re-inserts the deleted text
+    //         (capture the deleted substring before deleting)
+
+    // TODO: class TextEditor
+    //         executeCommand(Command) — executes and pushes to history stack
+    //         undo() — pops and calls undo() on the last command
+    //         getText() — delegates to TextBuffer
+
+    public static void main(String[] args) {
+        TextEditor editor = new TextEditor();
+
+        editor.executeCommand(new InsertCommand(editor.getBuffer(), "Hello"));
+        editor.executeCommand(new InsertCommand(editor.getBuffer(), " World"));
+        editor.executeCommand(new DeleteCommand(editor.getBuffer(), 6)); // deletes " World"
+        System.out.println(editor.getText()); // Hello
+
+        editor.undo(); // undo delete
+        System.out.println(editor.getText()); // Hello World
+
+        editor.undo(); // undo insert " World"
+        System.out.println(editor.getText()); // Hello
+    }
+}
+```
+
+**What to verify:**
+- After 3 commands: `Hello`
+- After first undo: `Hello World`
+- After second undo: `Hello`
+
+<Note>Hint: `DeleteCommand` must capture `buffer.getText().substring(buffer.getText().length() - n)` before calling `deleteLast(n)` so `undo()` can re-insert it.</Note>
+</Exercise>
+
 ## Try it
 
 Build a `SortContext` with pluggable strategy and a `TextEditor` with full undo:

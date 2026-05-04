@@ -330,6 +330,61 @@ public class TaskService {
 
 <Note>Notice that `updateStatus` is a single fluent chain: `findById → filter (checks transition) → map (applies update + saves)`. Each step either continues the happy path or collapses to `Optional.empty()`. No if-else, no try-catch, no intermediate variables.</Note>
 
+<Exercise>
+Implement a simplified `TaskService.createTask(String title, int priority)` that validates the input (non-blank title, priority 1–5) and, if valid, saves a new task to an `InMemoryRepository` and returns `Optional<Task>`. Return `Optional.empty()` on any validation failure. Test with two valid and two invalid inputs, printing success or failure for each.
+
+```java
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+
+public class Main {
+    enum TaskStatus { TODO, IN_PROGRESS, DONE }
+
+    record Task(UUID id, String title, int priority, TaskStatus status) {}
+
+    static class InMemoryRepository<T, ID> {
+        private final Map<ID, T> store = new ConcurrentHashMap<>();
+        private final Function<T, ID> idExtractor;
+        InMemoryRepository(Function<T, ID> idExtractor) { this.idExtractor = idExtractor; }
+        void save(T e) { store.put(idExtractor.apply(e), e); }
+        long count() { return store.size(); }
+    }
+
+    static class TaskService {
+        private final InMemoryRepository<Task, UUID> repo =
+            new InMemoryRepository<>(Task::id);
+
+        Optional<Task> createTask(String title, int priority) {
+            // TODO: validate, create, save, and return Optional<Task>
+            return Optional.empty();
+        }
+    }
+
+    public static void main(String[] args) {
+        var service = new TaskService();
+
+        printResult("Valid task",      service.createTask("Write docs", 3));
+        printResult("Valid high prio", service.createTask("Deploy now",  5));
+        printResult("Blank title",     service.createTask("",            2));
+        printResult("Bad priority",    service.createTask("Some task",   6));
+    }
+
+    static void printResult(String label, Optional<Task> result) {
+        System.out.println(label + ": " + (result.isPresent() ? "created " + result.get().title() : "failed"));
+    }
+}
+```
+
+**What to verify:**
+- `Valid task: created Write docs` is printed
+- `Valid high prio: created Deploy now` is printed
+- `Blank title: failed` is printed
+- `Bad priority: failed` is printed
+
+<Note>Hint: validate first, then create `new Task(UUID.randomUUID(), title, priority, TaskStatus.TODO)`, call `repo.save(task)`, and return `Optional.of(task)`.</Note>
+</Exercise>
+
 ## Using the Result type for richer feedback
 
 When `createTask` fails, `Optional.empty()` doesn't tell the caller *why*. Switching to `Result<Task, String>` fixes that:
@@ -380,6 +435,80 @@ public List<Task> criticalOverdueFor(String assigneeId) {
         .collect(Collectors.toList());
 }
 ```
+
+<Exercise>
+Implement `TaskService.updateStatus(UUID id, TaskStatus newStatus)` using a single Optional chain: `findById → filter (canTransitionTo) → map (create updated task + save)`. Return `Optional<Task>` — empty if the task is not found or the transition is invalid. Test three cases: a valid transition, an invalid transition, and a non-existent id.
+
+```java
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+
+public class Main {
+    enum TaskStatus {
+        TODO, IN_PROGRESS, DONE;
+        boolean canTransitionTo(TaskStatus next) {
+            return switch (this) {
+                case TODO        -> next == IN_PROGRESS;
+                case IN_PROGRESS -> next == DONE;
+                case DONE        -> false;
+            };
+        }
+    }
+
+    record Task(UUID id, String title, TaskStatus status) {
+        Task withStatus(TaskStatus s) { return new Task(id, title, s); }
+    }
+
+    static class InMemoryRepository<T, ID> {
+        private final Map<ID, T> store = new ConcurrentHashMap<>();
+        private final Function<T, ID> idEx;
+        InMemoryRepository(Function<T, ID> idEx) { this.idEx = idEx; }
+        void save(T e) { store.put(idEx.apply(e), e); }
+        Optional<T> findById(ID id) { return Optional.ofNullable(store.get(id)); }
+    }
+
+    static class TaskService {
+        private final InMemoryRepository<Task, UUID> repo = new InMemoryRepository<>(Task::id);
+
+        Task seed(String title) {
+            Task t = new Task(UUID.randomUUID(), title, TaskStatus.TODO);
+            repo.save(t);
+            return t;
+        }
+
+        Optional<Task> updateStatus(UUID id, TaskStatus newStatus) {
+            // TODO: implement as a single Optional chain
+            return Optional.empty();
+        }
+    }
+
+    public static void main(String[] args) {
+        var svc = new TaskService();
+        Task t = svc.seed("Write report");
+
+        // Valid transition
+        Optional<Task> r1 = svc.updateStatus(t.id(), TaskStatus.IN_PROGRESS);
+        System.out.println("Valid:   " + (r1.isPresent() ? "Updated to " + r1.get().status() : "Failed"));
+
+        // Invalid transition (IN_PROGRESS -> TODO is not allowed)
+        Optional<Task> r2 = svc.updateStatus(t.id(), TaskStatus.TODO);
+        System.out.println("Invalid: " + (r2.isPresent() ? "Updated" : "Failed"));
+
+        // Non-existent id
+        Optional<Task> r3 = svc.updateStatus(UUID.randomUUID(), TaskStatus.DONE);
+        System.out.println("Missing: " + (r3.isPresent() ? "Updated" : "Failed"));
+    }
+}
+```
+
+**What to verify:**
+- `Valid:   Updated to IN_PROGRESS` is printed
+- `Invalid: Failed` is printed
+- `Missing: Failed` is printed
+
+<Note>Hint: chain `.filter(t -> t.status().canTransitionTo(newStatus))` then `.map(t -> { Task u = t.withStatus(newStatus); repo.save(u); return u; })`.</Note>
+</Exercise>
 
 ## Try it
 

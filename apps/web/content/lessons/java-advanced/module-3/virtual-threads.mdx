@@ -110,6 +110,47 @@ This starts 10 000 virtual threads concurrently. With platform threads this woul
 
 <Note>Virtual threads are pinned to their carrier platform thread while executing `synchronized` blocks or native methods. If your virtual thread blocks inside a `synchronized` block, it holds the carrier thread — effectively behaving like a platform thread for that duration. Replace `synchronized` with `ReentrantLock` in code that must not pin.</Note>
 
+<Exercise>
+Create 1000 virtual threads, each sleeping 10 ms. Use a `CountDownLatch` to wait for all of them to finish. Print the total elapsed time to confirm that 1000 concurrent sleeps finish in roughly 10–50 ms rather than the sequential 10 000 ms.
+
+```java
+import java.util.concurrent.CountDownLatch;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        int count = 1000;
+        CountDownLatch latch = new CountDownLatch(count);
+        long start = System.currentTimeMillis();
+
+        for (int i = 0; i < count; i++) {
+            Thread.ofVirtual().start(() -> {
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    // TODO: count down the latch
+                    latch.countDown();
+                }
+            });
+        }
+
+        // TODO: await the latch so main waits for all virtual threads
+        latch.await();
+
+        long elapsed = System.currentTimeMillis() - start;
+        System.out.printf("1000 virtual threads finished in %d ms%n", elapsed);
+    }
+}
+```
+
+**What to verify:**
+- All 1000 virtual threads complete
+- Elapsed time is roughly 10–50 ms — far less than 10 000 ms sequential time
+
+<Note>Hint: `CountDownLatch(n)` starts at n; each `countDown()` decrements it; `await()` blocks until it reaches zero. Use `Thread.ofVirtual().start(runnable)` to create a virtual thread.</Note>
+</Exercise>
+
 ## When virtual threads shine
 
 Virtual threads are transformative for **I/O-bound, thread-per-task** patterns:
@@ -179,6 +220,47 @@ public class Main {
 ```
 
 For comparison, replace `newVirtualThreadPerTaskExecutor()` with `Executors.newFixedThreadPool(200)` and observe the time increase to ~500 ms (10 000 tasks / 200 threads × 10 ms each).
+
+<Exercise>
+Run 10 000 tasks (each sleeping 10 ms) with two different executors and compare elapsed time: first with `newFixedThreadPool(100)`, then with `newVirtualThreadPerTaskExecutor()`. Print the elapsed time for each to see the throughput difference.
+
+```java
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class Main {
+    static long runTasks(ExecutorService exec) throws Exception {
+        long start = System.currentTimeMillis();
+        try (exec) {
+            for (int i = 0; i < 10_000; i++) {
+                exec.submit(() -> {
+                    Thread.sleep(10);
+                    return null;
+                });
+            }
+        }  // auto-closes — waits for all tasks to complete
+        return System.currentTimeMillis() - start;
+    }
+
+    public static void main(String[] args) throws Exception {
+        // TODO: measure time with a fixed platform thread pool (100 threads)
+        long fixedTime = runTasks(Executors.newFixedThreadPool(100));
+        System.out.printf("Fixed pool (100 threads): %d ms%n", fixedTime);
+
+        // TODO: measure time with virtual thread executor
+        long virtualTime = runTasks(Executors.newVirtualThreadPerTaskExecutor());
+        System.out.printf("Virtual thread executor:  %d ms%n", virtualTime);
+    }
+}
+```
+
+**What to verify:**
+- Fixed pool time is roughly 1000 ms (10 000 tasks / 100 threads × 10 ms) or more
+- Virtual thread time is roughly 10–50 ms — all 10 000 virtual threads sleep concurrently
+- The virtual executor is significantly faster for this I/O-bound workload
+
+<Note>Hint: the `try-with-resources` on `ExecutorService` works because Java 19+ added `AutoCloseable` to `ExecutorService`. It calls `shutdown()` and `awaitTermination` automatically on exit.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

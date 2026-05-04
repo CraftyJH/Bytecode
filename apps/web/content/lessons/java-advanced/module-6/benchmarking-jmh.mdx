@@ -92,6 +92,54 @@ Problems:
 
 JMH fixes all of these by design.
 
+<Exercise>
+Write two "benchmarks" of string concatenation: one that is intentionally broken (the JIT can eliminate the work as dead code), and one that forces the computation by using a result variable. Observe how the broken version measures near-zero time while the correct version measures real work.
+
+```java
+public class Main {
+    static final int ITERATIONS = 1_000;
+
+    // BROKEN benchmark — JIT may eliminate the entire loop
+    static long naiveBenchmark() {
+        long start = System.nanoTime();
+        // TODO: loop ITERATIONS times doing: String s = "x" + i
+        // Do NOT use 's' after the loop — it will be dead code
+        // The JIT can and will optimize this away entirely
+        return System.nanoTime() - start;
+    }
+
+    // CORRECT benchmark — result is observable, JIT cannot eliminate it
+    static long correctBenchmark() {
+        long start = System.nanoTime();
+        String blackHole = "";
+        // TODO: loop ITERATIONS times doing: blackHole = "x" + i
+        // Using blackHole after the loop forces the JIT to keep the computation
+        if (blackHole.isEmpty()) throw new RuntimeException("should not happen");
+        return System.nanoTime() - start;
+    }
+
+    public static void main(String[] args) {
+        // Warm up both methods
+        for (int i = 0; i < 5000; i++) {
+            naiveBenchmark();
+            correctBenchmark();
+        }
+
+        // TODO: Run naiveBenchmark() 100 times, print average elapsed in nanoseconds
+        // TODO: Run correctBenchmark() 100 times, print average elapsed in nanoseconds
+        // TODO: Print a note explaining why the naive result is misleading
+    }
+}
+```
+
+**What to verify:**
+- The naive benchmark may report 0 ns or near-zero after JIT optimization
+- The correct benchmark reports measurable time because the result is observed
+- This is exactly why JMH uses `Blackhole` and requires returning values from `@Benchmark` methods
+
+<Note>Hint: in a real JMH benchmark you would pass a `Blackhole bh` parameter and call `bh.consume(s)` inside the loop. Here we simulate that with the `blackHole` string that is checked after the loop.</Note>
+</Exercise>
+
 ## JMH setup
 
 Add JMH to your `pom.xml`:
@@ -184,6 +232,54 @@ StringBenchmark.stringBuilderLoop  avgt   20    423.891 ±   8.3  ns/op
 - **Cnt** — total measurement samples (forks × iterations).
 
 The `StringBuilder` version is ~90× faster. A small error interval means the result is reliable.
+
+<Exercise>
+Annotate the method below with JMH-style annotations to turn it into a proper benchmark. Add a comment after each annotation explaining what it controls and why it is necessary.
+
+```java
+// TODO: Add @BenchmarkMode — choose AverageTime and explain why
+// TODO: Add @OutputTimeUnit — choose MICROSECONDS and explain why
+// TODO: Add @Warmup — use 5 iterations of 1 second each; explain what warm-up prevents
+// TODO: Add @Measurement — use 10 iterations of 1 second each; explain what this controls
+// TODO: Add @Fork — use 2 forks; explain why running in a separate JVM matters
+// TODO: Add @State(Scope.Benchmark) — explain what Scope.Benchmark means vs Scope.Thread
+public class StringReverseBenchmark {
+
+    private String input;
+
+    // TODO: Add @Setup(Level.Trial) to this method and explain when it runs
+    public void setUp() {
+        input = "The quick brown fox jumps over the lazy dog";
+    }
+
+    // TODO: Add @Benchmark to this method
+    // TODO: Explain why we return the result instead of discarding it
+    public String reverseWithBuilder() {
+        return new StringBuilder(input).reverse().toString();
+    }
+
+    // TODO: Add @Benchmark to this method
+    // TODO: Add a Blackhole parameter as an alternative to returning the result
+    public void reverseWithCharArray(/* TODO: add Blackhole bh parameter */) {
+        char[] chars = input.toCharArray();
+        int left = 0, right = chars.length - 1;
+        while (left < right) {
+            char tmp = chars[left];
+            chars[left++] = chars[right];
+            chars[right--] = tmp;
+        }
+        // TODO: consume the result with bh.consume(new String(chars))
+    }
+}
+```
+
+**What to verify:**
+- Each annotation is present and correctly placed on the class or method
+- Each annotation has a comment explaining its role in producing trustworthy results
+- The `@Benchmark` methods either return a value or consume it via `Blackhole`
+
+<Note>Hint: `@BenchmarkMode`, `@OutputTimeUnit`, `@Warmup`, `@Measurement`, and `@Fork` are class-level annotations. `@Benchmark` and `@Setup` are method-level. `@State` is on the class that holds benchmark state.</Note>
+</Exercise>
 
 <Note>Always use `@Fork(2)` or higher to run benchmarks in multiple JVM processes. A single JVM may have JIT compilation artifacts that skew results. Multiple forks average out JIT non-determinism.</Note>
 
