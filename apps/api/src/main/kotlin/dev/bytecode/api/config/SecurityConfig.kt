@@ -27,6 +27,7 @@ class SecurityConfig {
             .authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers("/api/health", "/actuator/health").permitAll()
+                    .requestMatchers("/api/internal/**").permitAll()
                     .anyRequest().authenticated()
             }
             .oauth2ResourceServer { oauth2 ->

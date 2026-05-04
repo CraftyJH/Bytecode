@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/Pill";
 import { fetchBackendUserState, resolvePlanState } from "@/lib/user-state";
+import { BillingActions } from "@/components/billing/BillingActions";
 
 async function changePassword(formData: FormData) {
   "use server";
@@ -196,23 +197,18 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       {/* Billing tab */}
       {tab === "billing" && (
         <Card padding="lg">
-          <p
-            className="text-prose-faint text-xs mb-2"
-            style={{ fontFamily: "var(--font-mono)" }}
-          >
-            // coming in sprint 5
-          </p>
           <h2 className="text-sm font-semibold text-prose mb-2 tracking-tight">Billing &amp; subscription</h2>
           <p className="text-sm text-prose-muted mb-5">
             {plan.isPremium
               ? "You are on Premium access. You can use all tracks, capstones, and certificates."
               : "You are on the Free plan. Upgrade to Premium for full Java + Kotlin tracks, capstones, and certificates."}
           </p>
-          {!plan.isPremium && (
-            <Button as="a" href="/pricing" variant="primary" size="sm">
-              View pricing
+          <div className="space-y-4">
+            <BillingActions isPremium={plan.isPremium} />
+            <Button as="a" href="/me/billing" variant="ghost" size="sm">
+              Open full billing page
             </Button>
-          )}
+          </div>
         </Card>
       )}
     </div>

@@ -4,6 +4,7 @@ import { Pricing } from "@/components/home/Pricing";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Pricing — Bytecode" };
 
@@ -25,7 +26,13 @@ const faqItems = [
   },
 ];
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const premiumHref = user ? "/me/billing" : "/signup?plan=premium";
+
   return (
     <>
       <Navbar />
@@ -75,7 +82,7 @@ export default function PricingPage() {
               Upgrade when you are ready for advanced tracks, capstone submissions, and portfolio-grade projects.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button as="a" href="/signup?plan=premium" variant="primary" size="md">
+              <Button as="a" href={premiumHref} variant="primary" size="md">
                 Go Premium
               </Button>
               <Button as="a" href="/curriculum" variant="secondary" size="md">

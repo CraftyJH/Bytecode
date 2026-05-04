@@ -50,7 +50,7 @@ export function UserMenu({ user }: UserMenuProps) {
     { label: "Dashboard", href: "/dashboard" },
     { label: "Profile", href: "/me/profile" },
     { label: "Settings", href: "/me/settings" },
-    { label: "Billing", href: "/me/billing" },
+    { label: "Billing", href: "/me/settings?tab=billing" },
   ];
 
   return (

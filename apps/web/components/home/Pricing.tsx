@@ -1,6 +1,7 @@
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { createClient } from "@/lib/supabase/server";
 
 const freeFeatures = [
   "Full Java Beginner + full Java Intermediate tracks",
@@ -32,7 +33,13 @@ function FeatureItem({ text, dim }: { text: string; dim?: boolean }) {
   );
 }
 
-export function Pricing() {
+export async function Pricing() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const premiumHref = user ? "/me/billing" : "/signup?plan=premium";
+
   return (
     <section
       className="border-y py-20 lg:py-28"
@@ -126,7 +133,7 @@ export function Pricing() {
                 <FeatureItem key={f} text={f} dim={f === "Everything in Free, plus:"} />
               ))}
             </ul>
-            <Button as="a" href="/signup?plan=premium" variant="primary" size="md" className="w-full justify-center">
+            <Button as="a" href={premiumHref} variant="primary" size="md" className="w-full justify-center">
               Go Premium
             </Button>
           </Card>

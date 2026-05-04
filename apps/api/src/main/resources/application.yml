@@ -38,6 +38,10 @@ server:
     include-message: on_param
     include-binding-errors: on_param
 
+internal:
+  billing:
+    sync-token: ${BYTECODE_INTERNAL_BILLING_SYNC_TOKEN:}
+
 management:
   endpoints:
     web:

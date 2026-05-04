@@ -8,6 +8,26 @@ export interface BackendUserState {
   streakCount: number;
 }
 
+export interface BillingSubscriptionState {
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripePriceId: string | null;
+  status: string | null;
+  currentPeriodEnd: string | null;
+  graceExpiresAt: string | null;
+  lastPaymentFailedAt: string | null;
+  canceledAt: string | null;
+  plan: string | null;
+}
+
+export interface BillingState {
+  userId: string;
+  plan: string;
+  role: string;
+  premiumUntil: string | null;
+  subscription: BillingSubscriptionState | null;
+}
+
 export interface PlanState {
   isPremium: boolean;
   isAdmin: boolean;
@@ -34,6 +54,27 @@ export async function fetchBackendUserState(accessToken?: string): Promise<Backe
       premiumUntil: data.premiumUntil ?? null,
       streakCount: data.streakCount ?? 0,
     };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchBillingStatus(accessToken?: string): Promise<BillingState | null> {
+  if (!accessToken) return null;
+
+  try {
+    const res = await fetch(`${BYTECODE_API_URL}/api/users/me/billing`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as BillingState;
+    return data;
   } catch {
     return null;
   }
