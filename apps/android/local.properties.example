@@ -5,3 +5,8 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 BYTECODE_API_URL=https://your-api-domain
 WEB_BASE_URL=https://bytecode-web.craftyjhs-projects.vercel.app
+# Optional release signing config:
+# ANDROID_SIGNING_STORE_FILE=app/keystore/release.jks
+# ANDROID_SIGNING_STORE_PASSWORD=your-store-password
+# ANDROID_SIGNING_KEY_ALIAS=your-key-alias
+# ANDROID_SIGNING_KEY_PASSWORD=your-key-password

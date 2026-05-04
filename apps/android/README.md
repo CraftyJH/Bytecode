@@ -35,10 +35,53 @@ BYTECODE_API_URL=https://bytecode-web.craftyjhs-projects.vercel.app
 WEB_BASE_URL=https://bytecode-web.craftyjhs-projects.vercel.app
 ```
 
-3. Open `apps/android` in Android Studio and run the `app` configuration.
+3. Generate a Gradle wrapper (required for CI builds and CLI builds if not already present):
+
+```bash
+cd apps/android
+gradle wrapper
+```
+
+4. Open `apps/android` in Android Studio and run the `app` configuration.
 
 ## Notes
 
 - The app uses direct Supabase Auth REST endpoints for login.
 - Backend API calls use the Supabase access token as bearer auth.
 - Billing checkout/portal remains web-driven and is opened via browser.
+
+## Release signing
+
+Release builds use env/local-properties based signing configuration:
+
+```properties
+ANDROID_SIGNING_STORE_FILE=app/keystore/release.jks
+ANDROID_SIGNING_STORE_PASSWORD=your-store-password
+ANDROID_SIGNING_KEY_ALIAS=your-key-alias
+ANDROID_SIGNING_KEY_PASSWORD=your-key-password
+```
+
+- If all values are provided and the keystore file exists, release builds are signed with that key.
+- If values are missing, release builds fall back to the debug signing key (useful for CI verification builds, not for Play Store release uploads).
+
+## CI (GitHub Actions)
+
+Workflow: `.github/workflows/android-build.yml`
+
+- Triggers on pushes/PRs that touch `apps/android/**` (and manually via workflow dispatch)
+- Requires Gradle wrapper files committed in `apps/android/`:
+  - `gradlew`
+  - `gradlew.bat`
+  - `gradle/wrapper/gradle-wrapper.jar`
+  - `gradle/wrapper/gradle-wrapper.properties`
+- Builds:
+  - `assembleDebug`
+  - `assembleRelease`
+- Uploads APK artifacts for both debug and release builds.
+
+Optional repository secrets for runtime/build config:
+
+- `ANDROID_SUPABASE_URL`
+- `ANDROID_SUPABASE_PUBLISHABLE_KEY`
+- `ANDROID_BYTECODE_API_URL`
+- `ANDROID_WEB_BASE_URL`
