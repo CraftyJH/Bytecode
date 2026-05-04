@@ -46,10 +46,10 @@ export async function POST() {
     return NextResponse.json({ error: "No billing customer found" }, { status: 404 });
   }
 
-  const session = await stripe.billingPortal.sessions.create({
+  const portalSession = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: buildAbsoluteUrl("/me/billing"),
   });
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: portalSession.url });
 }
