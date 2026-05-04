@@ -1,0 +1,335 @@
+export const meta = {
+  title: "Capstone: Integration Testing Strategies",
+  duration: 16,
+  order: 8,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "int-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which statement best describes the appropriate scope of an integration test?",
+    options: [
+      { text: "It tests a single class in complete isolation with all dependencies mocked.", correct: false, feedback: "That is the definition of a unit test. Integration tests purposefully involve multiple real components working together." },
+      { text: "It tests that two or more components work correctly when connected with real collaborators, stopping short of the full deployed system.", correct: true, feedback: "Correct — integration tests verify the seams between components: service + repository, HTTP client + real endpoint stub, or service + real in-memory database. They are more realistic than unit tests but more focused than full system tests." },
+      { text: "It simulates a real user navigating the production UI end-to-end.", correct: false, feedback: "That is an end-to-end (E2E) or system test. Integration tests are narrower — they test component boundaries, not full user journeys through a UI." },
+      { text: "It must use a production database to be a valid integration test.", correct: false, feedback: "Integration tests commonly use in-memory databases, Docker containers (Testcontainers), or embedded servers to be fast and isolated. Using production infrastructure would make tests dependent, slow, and destructive." },
+    ],
+    explanation: "Integration tests occupy the middle of the test pyramid. They verify that components collaborate correctly without mocking every dependency, but they do not spin up the entire system. Common scopes: service + repository (real in-memory DB), HTTP client + WireMock stub, or Spring slice test (@DataJpaTest, @WebMvcTest).",
+  },
+  endQ1: {
+    id: "int-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What problem does the Testcontainers library solve?",
+    options: [
+      { text: "It generates test data automatically based on database schema.", correct: false, feedback: "Testcontainers is about environment provisioning, not data generation." },
+      { text: "It starts real Docker containers (database, message broker, etc.) during the test run and stops them when done, giving tests a real but isolated environment.", correct: true, feedback: "Correct — Testcontainers pulls a Docker image, starts a container, provides connection details to the test, and shuts everything down automatically. Tests get a real PostgreSQL or Redis without any manual setup." },
+      { text: "It speeds up integration tests by caching container state between runs.", correct: false, feedback: "Testcontainers does support container reuse across runs as an opt-in feature, but its primary purpose is programmatic Docker lifecycle management, not caching per se." },
+      { text: "It replaces Spring Boot's @SpringBootTest annotation for web layer tests.", correct: false, feedback: "Testcontainers handles infrastructure (databases, brokers). @SpringBootTest handles Spring context loading. They are complementary and often used together." },
+    ],
+    explanation: "Testcontainers makes 'test against a real database' practical. Before it, teams either used H2 (in-memory, but behaviourally different from PostgreSQL) or required a pre-configured local database. Testcontainers starts a fresh container per test run, ensuring full isolation and exact production database semantics.",
+  },
+  endQ2: {
+    id: "int-end-2",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "What does contract testing verify that a regular integration test does not?",
+    options: [
+      { text: "That the service's database schema matches its entity model.", correct: false, feedback: "That is schema validation, typically handled by migration tools (Flyway, Liquibase) and ORM schema validation — not contract testing." },
+      { text: "That a consumer and provider agree on the API shape, verified independently for each side without requiring both to be running simultaneously.", correct: true, feedback: "Correct — contract testing (Pact is the most common Java tool) records the consumer's expectations as a 'contract' file. The provider then verifies it can satisfy those expectations independently. This catches API breaking changes without full E2E test setup." },
+      { text: "That all REST endpoints return HTTP 200 under load.", correct: false, feedback: "That is performance or load testing. Contract testing focuses on API shape correctness, not response codes under concurrent load." },
+      { text: "That two services can be deployed to the same JVM without ClassLoader conflicts.", correct: false, feedback: "Classloader conflicts are a build/packaging concern, not a contract testing concern." },
+    ],
+    explanation: "Contract testing addresses the microservices coordination problem: Service A consumes Service B's API, but they are deployed independently. Consumer-driven contract testing (Pact) lets Service A publish its expectations; Service B verifies them in its own CI pipeline. Breaking changes are caught before deployment, without any integration environment.",
+  },
+  endQ3: {
+    id: "int-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `@SpringBootTest
+@Transactional
+class UserIntegrationTest {
+
+    @Autowired UserService userService;
+    @Autowired UserRepository userRepository;
+
+    @Test
+    void savedUserCanBeFoundById() {
+        User saved = userService.create("alice@example.com");
+        Optional<User> found = userRepository.findById(saved.getId());
+        assertTrue(found.isPresent());
+    }
+
+    @Test
+    void userCountStartsAtZero() {
+        assertEquals(0, userRepository.count());  // line 14
+    }
+}`,
+    buggyLine: 14,
+    issue: "With @Transactional on the class, each test runs inside a transaction that is rolled back after the test. However, if the tests run in an order where 'savedUserCanBeFoundById' runs before 'userCountStartsAtZero' but the rollback does not complete before the second test begins, or if @Transactional is not set up correctly with the test runner, the count may not be zero. More critically: relying on rollback for isolation is fragile — Spring's @Transactional on integration tests is not always respected by all persistence providers or repository operations that use their own transaction boundaries.",
+    explanation: "The deeper issue is relying on transaction rollback for test isolation. A more robust pattern is to clean up data explicitly in @BeforeEach (delete all records) or use a fresh database per test (Testcontainers with a new container, or an in-memory H2 that is reset). This makes isolation explicit and independent of transaction boundary semantics.",
+  },
+};
+
+Unit tests verify individual classes in isolation. Integration tests verify that those classes collaborate correctly when connected to real implementations — real repositories, real serialisers, real HTTP handlers. This capstone lesson covers the strategies teams use to test across component boundaries without sacrificing speed, reproducibility, or confidence.
+
+## Unit vs integration vs system testing
+
+The three layers of the test pyramid serve different purposes and make different trade-offs:
+
+| Type | Tests | Uses real | Speed | Typical count |
+|---|---|---|---|---|
+| Unit | One class | Nothing | ~1ms | Hundreds |
+| Integration | 2+ components | DB, serialiser, HTTP stub | ~100ms | Tens |
+| System / E2E | Full stack | Everything | Seconds–minutes | Few |
+
+A common misconception is that integration tests must be slow. An integration test that hits a real in-memory H2 database or an in-process HTTP server can run in under 100ms. Speed depends on the infrastructure, not the classification.
+
+## Testing with a real in-memory repository
+
+The simplest form of integration test replaces a mock with a lightweight real implementation. An in-memory repository backed by a `HashMap` or `ArrayList` is a *fake* — real logic, production-unsuitable infrastructure:
+
+```java
+class InMemoryProductRepository implements ProductRepository {
+    private final Map<Long, Product> store = new HashMap<>();
+    private long nextId = 1;
+
+    @Override
+    public Product save(Product product) {
+        product.setId(nextId++);
+        store.put(product.getId(), product);
+        return product;
+    }
+
+    @Override
+    public Optional<Product> findById(Long id) {
+        return Optional.ofNullable(store.get(id));
+    }
+
+    @Override
+    public List<Product> findAll() {
+        return new ArrayList<>(store.values());
+    }
+}
+```
+
+An integration test wires the real service to this fake — no mocks, no framework, just business logic exercised against a realistic data layer:
+
+```java
+class ProductServiceIntegrationTest {
+    ProductRepository repository;
+    ProductService service;
+
+    @BeforeEach
+    void setUp() {
+        repository = new InMemoryProductRepository();  // fresh per test
+        service = new ProductService(repository);
+    }
+
+    @Test
+    void savedProductCanBeRetrievedById() {
+        Product saved = service.createProduct("Widget", 9.99);
+
+        Optional<Product> found = service.findById(saved.getId());
+
+        assertTrue(found.isPresent());
+        assertEquals("Widget", found.get().getName());
+        assertEquals(9.99, found.get().getPrice());
+    }
+
+    @Test
+    void duplicateProductNameThrowsDuplicateProductException() {
+        service.createProduct("Gadget", 19.99);
+
+        assertThrows(DuplicateProductException.class,
+            () -> service.createProduct("Gadget", 5.00));
+    }
+}
+```
+
+No Spring context, no database connection, no network. These tests run in milliseconds and give full confidence in the service layer's logic.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Test containers — real databases in CI
+
+When you need exact production database behaviour (specific SQL dialect, constraint enforcement, stored procedures), Testcontainers spins up a real Docker container during the test run:
+
+```java
+@Testcontainers
+class ProductRepositoryJpaTest {
+
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
+        .withDatabaseName("testdb")
+        .withUsername("test")
+        .withPassword("test");
+
+    @DynamicPropertySource
+    static void overrideProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    @Autowired ProductRepository repository;
+
+    @Test
+    void uniqueConstraintIsEnforcedByDatabase() {
+        repository.save(new Product("UniqueItem", 10.0));
+        assertThrows(DataIntegrityViolationException.class,
+            () -> repository.save(new Product("UniqueItem", 20.0)));
+    }
+}
+```
+
+The container starts once for the test class (thanks to `static @Container`), is shared across all tests in the class, and is stopped automatically when the JVM exits.
+
+<Note>Testcontainers requires Docker to be available on the machine running the tests. Most CI platforms (GitHub Actions, GitLab CI, CircleCI) support Docker out of the box. Developers without Docker installed can fall back to an H2 profile with a separate Maven profile flag.</Note>
+
+## @SpringBootTest overview
+
+For testing the full Spring application context — controllers, services, repositories, and all their wiring — JUnit 5 + Spring Boot provides `@SpringBootTest`:
+
+```java
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class ProductApiIntegrationTest {
+
+    @Autowired TestRestTemplate restTemplate;
+
+    @Test
+    void createProductReturns201() {
+        ResponseEntity<Product> response = restTemplate.postForEntity(
+            "/api/products",
+            new CreateProductRequest("Thingamajig", 14.99),
+            Product.class
+        );
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody().getId());
+    }
+}
+```
+
+`@SpringBootTest` starts the full context and can boot an embedded HTTP server on a random port. It is the slowest option but the most realistic. Spring Boot's slice annotations — `@DataJpaTest`, `@WebMvcTest`, `@JsonTest` — load only the relevant part of the context and are significantly faster.
+
+## WireMock — stubbing HTTP dependencies
+
+When the system under test calls an external HTTP service, WireMock starts an in-process stub server that returns pre-programmed responses:
+
+```java
+@SpringBootTest
+@AutoConfigureWireMock(port = 0)  // random port, configured automatically
+class PaymentClientIntegrationTest {
+
+    @Autowired PaymentClient paymentClient;
+
+    @Test
+    void successfulChargeReturnsTransactionId() {
+        stubFor(post(urlEqualTo("/charge"))
+            .willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"transactionId\": \"txn-123\"}")));
+
+        String txnId = paymentClient.charge(50.0);
+
+        assertEquals("txn-123", txnId);
+    }
+}
+```
+
+The real `PaymentClient` makes an actual HTTP call — WireMock intercepts it without any network egress, making the test fast and deterministic.
+
+## Contract testing concept
+
+In a microservices architecture, Service A (consumer) depends on Service B's (provider) API. Both evolve independently. Contract testing (using tools like Pact) lets the consumer record its expectations as a *contract file*, and the provider verifies it can satisfy the contract in its own CI pipeline — without either service running simultaneously.
+
+This catches breaking API changes at the earliest possible point — in CI before deployment — rather than in an integration environment at 2am.
+
+## Try it
+
+Write a complete integration test for a `TaskService` backed by an in-memory `TaskRepository` — no mocks, no Spring context:
+
+```java
+public interface TaskRepository {
+    Task save(Task task);
+    Optional<Task> findById(Long id);
+    List<Task> findAllByStatus(TaskStatus status);
+    void delete(Long id);
+}
+
+public class TaskService {
+    private final TaskRepository repository;
+    public TaskService(TaskRepository repository) { this.repository = repository; }
+
+    public Task create(String title) {
+        if (title == null || title.isBlank()) throw new IllegalArgumentException("Title required");
+        return repository.save(new Task(title, TaskStatus.PENDING));
+    }
+
+    public void complete(Long id) {
+        Task task = repository.findById(id)
+            .orElseThrow(() -> new TaskNotFoundException(id));
+        task.setStatus(TaskStatus.DONE);
+        repository.save(task);
+    }
+
+    public List<Task> getPending() {
+        return repository.findAllByStatus(TaskStatus.PENDING);
+    }
+}
+```
+
+Implement `InMemoryTaskRepository` and write integration tests for:
+1. Creating a task and retrieving it by ID
+2. Completing a task — verify status changes to DONE
+3. `getPending()` returns only PENDING tasks after one is completed
+4. Creating a task with a blank title throws `IllegalArgumentException`
+5. Completing a non-existent task throws `TaskNotFoundException`
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Writing integration tests for everything** — integration tests are slower and more complex than unit tests. Start with unit tests; add integration tests at the boundaries that matter (database queries, HTTP clients, event serialisation).
+- **Using @SpringBootTest when a slice annotation would suffice** — loading the full application context to test one JPA repository adds seconds of startup time per test class. Use `@DataJpaTest` for repository tests; it loads only the persistence layer.
+- **Not cleaning up between tests** — in-memory fakes are naturally reset by `@BeforeEach`. Real databases persist state. Always truncate or delete data in `@BeforeEach` (or rely on transaction rollback knowingly), or use Testcontainers with a fresh container per class.
+- **Mocking the class under test in integration tests** — an integration test that mocks the service being tested is neither a unit test nor an integration test. It tests nothing meaningful. Integration tests exist precisely to test the wiring; do not undermine that with mocks of the SUT.
+
+## Recap
+
+- **Integration tests** verify component collaboration with real (or realistic) collaborators, stopping short of the full deployed system
+- **In-memory fakes** (repositories backed by HashMap/ArrayList) enable fast, dependency-free integration tests for service logic
+- **Testcontainers** provisions real Docker containers (PostgreSQL, Redis, Kafka) for tests that need exact production database semantics
+- **@SpringBootTest** loads the full Spring context — use slice annotations (@DataJpaTest, @WebMvcTest) for faster, more focused tests
+- **WireMock** stubs HTTP dependencies so HTTP clients can be tested against realistic responses without network access
+- **Contract testing** (Pact) verifies consumer–provider API compatibility in CI without running both services simultaneously
+
+---
+
+## Module recap
+
+Congratulations — you have completed Module 5: Testing & Code Quality. Here is what the module covered:
+
+- **Lesson 1 — TDD Philosophy:** Red → Green → Refactor, the test pyramid, Arrange-Act-Assert, Given-When-Then naming
+- **Lesson 2 — JUnit 5 Foundations:** @Test, @BeforeEach/@AfterEach, @BeforeAll/@AfterAll, @DisplayName, assertThrows, assertAll, @Nested, @Disabled
+- **Lesson 3 — Parameterized Tests:** @ValueSource, @CsvSource, @MethodSource, @EnumSource, @DynamicTest — eliminating repetition in test data
+- **Lesson 4 — Mockito:** mock() vs spy(), when/thenReturn, verify(), ArgumentCaptor, @Mock/@InjectMocks, strict stubs, when not to mock
+- **Lesson 5 — Testing Exceptions:** assertThrows with message verification, assertThrowsExactly, null inputs, boundary value analysis, equivalence partitioning
+- **Lesson 6 — Test Structure:** naming conventions, single-scenario focus, test isolation, test doubles taxonomy (Dummy/Stub/Spy/Mock/Fake)
+- **Lesson 7 — Coverage & Quality:** line vs branch coverage, JaCoCo, why 100% coverage is not the goal, mutation testing with PIT
+- **Lesson 8 — Integration Testing:** unit vs integration vs system scope, in-memory fakes, Testcontainers, @SpringBootTest, WireMock, contract testing
+
+The consistent thread: tests are **executable specifications**. Written well, they document what code must do, catch regressions automatically, and make refactoring safe. Written poorly, they slow teams down and create false confidence. The techniques in this module give you the tools to write the former.
