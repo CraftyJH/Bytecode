@@ -106,6 +106,32 @@ This single method works for `Integer`, `String`, `LocalDate`, `BigDecimal`, and
 
 <Note>The bound `T extends Comparable<T>` is a **recursive bound** — T must be comparable to itself, not to some arbitrary other type. This pattern is used throughout the JDK (`Enum<E extends Enum<E>>` is a famous example).</Note>
 
+<Exercise>
+Implement a generic `min(List<T>)` method that returns the smallest element of a non-empty list using the natural ordering.
+
+```java
+import java.util.List;
+
+public class Main {
+    // TODO: implement min using T extends Comparable<T>
+    static <T extends Comparable<T>> T min(List<T> list) {
+        return null;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(min(List.of(3, 1, 4, 1, 5, 9))); // 1
+        System.out.println(min(List.of("pear", "apple", "mango"))); // apple
+    }
+}
+```
+
+**What to verify:**
+- `min` of integers prints `1`
+- `min` of strings prints `apple`
+
+<Note>Hint: Start with `result = list.get(0)` and iterate, replacing `result` whenever `item.compareTo(result) < 0`.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Multiple bounds
@@ -169,31 +195,32 @@ System.out.println(Algorithms.clamp(-5, 0, 10));     // 0
 System.out.println(Algorithms.clamp(5,  0, 10));     // 5
 ```
 
-## Try it
-
-Add a `min(List<T>)` method to the `Algorithms` class that finds the minimum element in a list:
+<Exercise>
+Implement a generic `clamp(T value, T lo, T hi)` method that returns `lo` if `value` is below the range, `hi` if above, and `value` otherwise. Test it with integers and strings.
 
 ```java
-import java.util.List;
-
 public class Main {
-    static <T extends Comparable<T>> T min(List<T> list) {
-        if (list.isEmpty()) throw new IllegalArgumentException("empty list");
-        T result = list.get(0);
-        for (T item : list) {
-            if (item.compareTo(result) < 0) result = item;
-        }
-        return result;
+    // TODO: implement clamp using T extends Comparable<T>
+    static <T extends Comparable<T>> T clamp(T value, T lo, T hi) {
+        return null;
     }
 
     public static void main(String[] args) {
-        System.out.println(min(List.of(3, 1, 4, 1, 5, 9)));  // 1
-        System.out.println(min(List.of("pear", "apple", "mango"))); // apple
+        System.out.println(clamp(15, 0, 10));   // 10
+        System.out.println(clamp(-5, 0, 10));   // 0
+        System.out.println(clamp(5,  0, 10));   // 5
+        System.out.println(clamp("cat", "ant", "dog")); // cat
+        System.out.println(clamp("zoo", "ant", "dog")); // dog
     }
 }
 ```
 
-Experiment: remove `extends Comparable<T>` from the type parameter and observe the compiler error that appears on the `compareTo` call.
+**What to verify:**
+- Integer clamp: `15→10`, `-5→0`, `5→5`
+- String clamp: `"cat"→cat`, `"zoo"→dog`
+
+<Note>Hint: call `value.compareTo(lo)` and `value.compareTo(hi)` to decide which boundary (if any) to return.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

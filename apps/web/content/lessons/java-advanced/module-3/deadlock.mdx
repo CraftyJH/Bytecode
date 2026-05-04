@@ -105,6 +105,65 @@ A deadlock can only occur when all four of these conditions hold simultaneously:
 
 Breaking *any one* of these conditions prevents deadlock.
 
+<Exercise>
+Write a program that demonstrates the classic two-lock deadlock setup: two threads each hold one lock and try to acquire the other. Use `tryLock()` (without a timeout) on the second lock so the program does not hang forever — if `tryLock` fails, print a message instead of blocking.
+
+```java
+import java.util.concurrent.locks.ReentrantLock;
+
+public class Main {
+    static final ReentrantLock lockA = new ReentrantLock();
+    static final ReentrantLock lockB = new ReentrantLock();
+
+    public static void main(String[] args) throws InterruptedException {
+        // Thread 1: acquires lockA first, then tries lockB
+        Thread t1 = new Thread(() -> {
+            lockA.lock();
+            try {
+                System.out.println("T1 holds lockA, trying lockB...");
+                // TODO: use tryLock() on lockB — print result
+                boolean gotB = lockB.tryLock();
+                if (gotB) {
+                    try { System.out.println("T1 got both locks"); }
+                    finally { lockB.unlock(); }
+                } else {
+                    System.out.println("T1 could not get lockB — would have deadlocked");
+                }
+            } finally { lockA.unlock(); }
+        });
+
+        // Thread 2: acquires lockB first, then tries lockA
+        Thread t2 = new Thread(() -> {
+            lockB.lock();
+            try {
+                System.out.println("T2 holds lockB, trying lockA...");
+                // TODO: use tryLock() on lockA — print result
+                boolean gotA = lockA.tryLock();
+                if (gotA) {
+                    try { System.out.println("T2 got both locks"); }
+                    finally { lockA.unlock(); }
+                } else {
+                    System.out.println("T2 could not get lockA — would have deadlocked");
+                }
+            } finally { lockB.unlock(); }
+        });
+
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
+        System.out.println("Both threads finished");
+    }
+}
+```
+
+**What to verify:**
+- Both threads start and finish without hanging
+- At least one thread prints a "could not get" message on some runs, demonstrating the deadlock scenario is avoided only by `tryLock` — output order may vary
+
+<Note>Hint: if both threads happen to acquire their first lock simultaneously, `tryLock` will return `false` for whichever arrives second. The non-deterministic scheduling means the result varies per run.</Note>
+</Exercise>
+
 ## Classic two-lock deadlock
 
 The canonical example involves two threads and two locks, each wanting them in opposite order:
@@ -170,6 +229,61 @@ public class BankAccount {
 ```
 
 No matter which direction money flows, both threads acquire the same account's lock first — circular wait is impossible.
+
+<Exercise>
+Implement a `BankAccount.transfer(from, to, amount)` method that uses consistent lock ordering based on account `id` to prevent deadlock. Test it by launching two threads that transfer in opposite directions between the same two accounts in a tight loop.
+
+```java
+public class Main {
+    static class BankAccount {
+        final int id;
+        int balance;
+
+        BankAccount(int id, int balance) {
+            this.id = id;
+            this.balance = balance;
+        }
+
+        static void transfer(BankAccount from, BankAccount to, int amount) {
+            // TODO: determine which account to lock first using from.id vs to.id
+            BankAccount first  = /* lower id account */ null;
+            BankAccount second = /* higher id account */ null;
+
+            synchronized (first) {
+                synchronized (second) {
+                    from.balance -= amount;
+                    to.balance   += amount;
+                }
+            }
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        BankAccount alice = new BankAccount(1, 1000);
+        BankAccount bob   = new BankAccount(2, 1000);
+
+        Thread t1 = new Thread(() -> {
+            for (int i = 0; i < 500; i++) BankAccount.transfer(alice, bob, 1);
+        });
+        Thread t2 = new Thread(() -> {
+            for (int i = 0; i < 500; i++) BankAccount.transfer(bob, alice, 1);
+        });
+
+        t1.start(); t2.start();
+        t1.join();  t2.join();
+
+        System.out.println("Alice: " + alice.balance);  // should be 1000
+        System.out.println("Bob:   " + bob.balance);    // should be 1000
+    }
+}
+```
+
+**What to verify:**
+- Both threads finish without deadlocking
+- `Alice: 1000` and `Bob: 1000` are printed — the total money is conserved
+
+<Note>Hint: always lock the account with the smaller `id` first: `BankAccount first = from.id < to.id ? from : to;`. This breaks the circular-wait condition.</Note>
+</Exercise>
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 

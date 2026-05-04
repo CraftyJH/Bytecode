@@ -105,6 +105,34 @@ You can also specify T explicitly with a *witness* when inference would be ambig
 String s = Utils.<String>identity("hello");
 ```
 
+<Exercise>
+Implement `firstOrDefault(List<T> list, T defaultVal)` that returns the first element of the list, or `defaultVal` if the list is empty.
+
+```java
+import java.util.List;
+
+public class Main {
+    // TODO: implement firstOrDefault as a generic method
+    static <T> T firstOrDefault(List<T> list, T defaultVal) {
+        return null;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(firstOrDefault(List.of("a", "b"), "none")); // a
+        System.out.println(firstOrDefault(List.of(),          "none")); // none
+        System.out.println(firstOrDefault(List.of(10, 20),   -1));     // 10
+        System.out.println(firstOrDefault(List.of(),          -1));     // -1
+    }
+}
+```
+
+**What to verify:**
+- Non-empty list returns first element
+- Empty list returns the default value
+
+<Note>Hint: check `list.isEmpty()` before calling `list.get(0)`.</Note>
+</Exercise>
+
 ## Type inference in practice
 
 The compiler infers type arguments by looking at argument types, target types, and return contexts — a process called **target typing** (introduced in Java 8):
@@ -197,38 +225,37 @@ public class Pair<A, B> {
 }
 ```
 
-## Try it
-
-Implement both `filter` and `map`, then chain them to process a list of integers:
+<Exercise>
+Implement `map(List<T>, Function<T, R>)` from scratch — a generic method that applies a function to every element and returns the results in a new list.
 
 ```java
 import java.util.*;
-import java.util.function.*;
+import java.util.function.Function;
 
 public class Main {
-    static <T> List<T> filter(List<T> list, Predicate<T> pred) {
-        List<T> out = new ArrayList<>();
-        for (T item : list) if (pred.test(item)) out.add(item);
-        return out;
-    }
-
-    static <T, R> List<R> map(List<T> list, Function<T, R> fn) {
-        List<R> out = new ArrayList<>();
-        for (T item : list) out.add(fn.apply(item));
-        return out;
+    // TODO: implement map with two type parameters T and R
+    static <T, R> List<R> map(List<T> list, Function<T, R> f) {
+        return null;
     }
 
     public static void main(String[] args) {
-        List<Integer> nums = List.of(1, 2, 3, 4, 5, 6, 7, 8);
+        List<String> names = List.of("alice", "bob", "carol");
 
-        List<Integer> evens   = filter(nums, n -> n % 2 == 0);
-        List<String>  doubled = map(evens, n -> "val=" + (n * 2));
+        List<Integer> lengths = map(names, String::length);
+        System.out.println(lengths); // [5, 3, 5]
 
-        System.out.println(evens);    // [2, 4, 6, 8]
-        System.out.println(doubled);  // [val=4, val=8, val=12, val=16]
+        List<String> upper = map(names, String::toUpperCase);
+        System.out.println(upper);   // [ALICE, BOB, CAROL]
     }
 }
 ```
+
+**What to verify:**
+- `lengths` prints `[5, 3, 5]`
+- `upper` prints `[ALICE, BOB, CAROL]`
+
+<Note>Hint: create a new `ArrayList<R>`, iterate `list`, call `f.apply(item)` for each element, and add the result.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

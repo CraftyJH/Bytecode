@@ -150,6 +150,36 @@ public class Outer {
 
 Lambdas do not introduce a new scope for `this`. They are *closures over the enclosing object*, not objects in their own right. This makes them lighter than anonymous classes (no new class file, no extra object allocation in many JVM implementations).
 
+<Exercise>
+Declare three lambda variables and call each. Use: a `Predicate<String>` that tests whether a string's length is greater than 4; a `Function<Integer, String>` that converts an integer `n` to the string `"num:N"`; and a `Consumer<String>` that prints its argument wrapped in square brackets.
+
+```java
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // TODO: declare Predicate<String> longerThanFour
+        // TODO: declare Function<Integer, String> toLabel
+        // TODO: declare Consumer<String> printBracketed
+
+        // Call each:
+        // System.out.println(longerThanFour.test("hi"));      // false
+        // System.out.println(longerThanFour.test("hello"));   // true
+        // System.out.println(toLabel.apply(42));              // num:42
+        // printBracketed.accept("java");                      // [java]
+    }
+}
+```
+
+**What to verify:**
+- `longerThanFour.test("hi")` prints `false`
+- `longerThanFour.test("hello")` prints `true`
+- `toLabel.apply(42)` prints `num:42`
+- `printBracketed.accept("java")` prints `[java]`
+
+<Note>Hint: use `s -> s.length() > 4`, `n -> "num:" + n`, and `s -> System.out.println("[" + s + "]")`.</Note>
+</Exercise>
+
 ## Try it
 
 Open the editor and experiment with these three lambdas:
@@ -175,6 +205,33 @@ public class Main {
 ```
 
 Modify `length` to return the string reversed instead. Then change `multiply` to a block-body lambda that also prints the operands before returning.
+
+<Exercise>
+Demonstrate effectively-final capture: write a lambda that closes over a local `int` variable and prints it. Add a comment explaining why placing `i++` before the lambda declaration would prevent compilation.
+
+```java
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        int factor = 5;
+        // i++ here would make factor NOT effectively final — compile error
+
+        Function<Integer, Integer> scale = n -> n * factor;
+
+        // TODO: call scale with 3 and print the result  // 15
+        // TODO: call scale with 7 and print the result  // 35
+    }
+}
+```
+
+**What to verify:**
+- `scale.apply(3)` prints `15`
+- `scale.apply(7)` prints `35`
+- A comment in the code explains why mutating `factor` before the lambda would fail
+
+<Note>Hint: the lambda captures `factor` by reference to the enclosing stack frame. Any reassignment (even `factor = factor`) makes it no longer effectively final.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

@@ -138,6 +138,39 @@ Map<Character, List<String>> upper = words.stream()
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 
+<Exercise>
+Group a list of words by their first character, then print each group in sorted key order.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> words = List.of(
+            "apple", "avocado", "banana", "blueberry", "cherry", "apricot"
+        );
+
+        // TODO: group by first character into Map<Character, List<String>>
+        // Map<Character, List<String>> grouped = ...
+
+        // TODO: iterate via TreeMap for sorted key order and print each entry
+        // Expected output:
+        // a=[apple, avocado, apricot]
+        // b=[banana, blueberry]
+        // c=[cherry]
+    }
+}
+```
+
+**What to verify:**
+- Key `a` maps to `[apple, avocado, apricot]`
+- Key `b` maps to `[banana, blueberry]`
+- Key `c` maps to `[cherry]`
+
+<Note>Hint: `Collectors.groupingBy(s -> s.charAt(0))`, then `new TreeMap<>(grouped).forEach(...)`.</Note>
+</Exercise>
+
 ## counting and other downstream collectors
 
 `Collectors.counting()` is a downstream collector that counts elements in each group. There are several more useful ones:
@@ -173,6 +206,39 @@ System.out.println(partition.get(false)); // [1, 3, 5, 7]
 ```
 
 Both keys always exist in the result map (even if one group is empty), so `partition.get(true)` is always safe — no null check needed.
+
+<Exercise>
+Join a list of names with `", "` delimiter and a `"Names: "` prefix. Then use `partitioningBy` to split a list of integers into even and odd groups and print both.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> names = List.of("Alice", "Bob", "Carol", "Dave");
+
+        // TODO: join with ", " delimiter and "Names: " prefix (no suffix)
+        // String joined = ...
+        System.out.println(joined); // Names: Alice, Bob, Carol, Dave
+
+        List<Integer> nums = List.of(1, 2, 3, 4, 5, 6, 7, 8);
+
+        // TODO: partition into even (true) and odd (false)
+        // Map<Boolean, List<Integer>> parts = ...
+        System.out.println("even: " + parts.get(true));  // even: [2, 4, 6, 8]
+        System.out.println("odd:  " + parts.get(false)); // odd:  [1, 3, 5, 7]
+    }
+}
+```
+
+**What to verify:**
+- `joined` prints `Names: Alice, Bob, Carol, Dave`
+- `parts.get(true)` prints `[2, 4, 6, 8]`
+- `parts.get(false)` prints `[1, 3, 5, 7]`
+
+<Note>Hint: `Collectors.joining(", ", "Names: ", "")` and `Collectors.partitioningBy(n -> n % 2 == 0)`.</Note>
+</Exercise>
 
 ## toMap
 

@@ -116,6 +116,41 @@ opt.ifPresent(System.out::println);             // prints "hello"
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 
+<Exercise>
+Write a method `findUser(String name)` that returns `Optional.empty()` when the name is blank and `Optional.of(name)` otherwise. Then call it and chain `map`/`orElse` operations.
+
+```java
+import java.util.*;
+
+public class Main {
+    static Optional<String> findUser(String name) {
+        // TODO: return empty if name is blank, otherwise return Optional.of(name)
+        return null; // replace this
+    }
+
+    public static void main(String[] args) {
+        // Call with a valid name, map to uppercase, orElse "UNKNOWN"
+        String result1 = findUser("alice")
+            .map(String::toUpperCase)
+            .orElse("UNKNOWN");
+        System.out.println(result1); // ALICE
+
+        // Call with blank name
+        String result2 = findUser("  ")
+            .map(String::toUpperCase)
+            .orElse("UNKNOWN");
+        System.out.println(result2); // UNKNOWN
+    }
+}
+```
+
+**What to verify:**
+- `findUser("alice")` chain prints `ALICE`
+- `findUser("  ")` chain prints `UNKNOWN`
+
+<Note>Hint: `name.isBlank()` to detect blank; `Optional.empty()` vs `Optional.of(name)`.</Note>
+</Exercise>
+
 ## Transforming with map and flatMap
 
 Optional is a functor and a monad — it has `map` and `flatMap` that mirror the stream versions:
@@ -174,6 +209,46 @@ opt.get(); // NoSuchElementException if empty
 // GOOD — use expressive extraction
 opt.orElseThrow(() -> new EntityNotFoundException("not found"));
 ```
+
+<Exercise>
+Rewrite the null-checking if-else chain below using `Optional.ofNullable().filter().map().orElse()` — no explicit null checks or if statements.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        String raw = "  Java Developer  ";
+
+        // Old style — replace this block with a single Optional chain:
+        String role;
+        if (raw != null) {
+            String trimmed = raw.trim();
+            if (!trimmed.isEmpty()) {
+                role = trimmed.toUpperCase();
+            } else {
+                role = "UNKNOWN";
+            }
+        } else {
+            role = "UNKNOWN";
+        }
+
+        // TODO: replace above with:
+        // String role = Optional.ofNullable(raw)
+        //     .filter(...)
+        //     .map(...)
+        //     .orElse("UNKNOWN");
+
+        System.out.println(role); // JAVA DEVELOPER
+    }
+}
+```
+
+**What to verify:**
+- With `raw = "  Java Developer  "`, prints `JAVA DEVELOPER`
+- With `raw = null`, prints `UNKNOWN`
+- With `raw = "   "`, prints `UNKNOWN`
+
+<Note>Hint: `.filter(s -> !s.trim().isEmpty())` then `.map(s -> s.trim().toUpperCase())`.</Note>
+</Exercise>
 
 ## Try it
 

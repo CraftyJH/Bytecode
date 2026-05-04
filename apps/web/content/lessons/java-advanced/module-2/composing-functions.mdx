@@ -141,6 +141,35 @@ List<String> accepted = inputs.stream()
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 
+<Exercise>
+Build a string-processing pipeline by composing 4 `Function`s in sequence: trim whitespace, convert to lowercase, replace spaces with hyphens, and prepend `"slug:"`.
+
+```java
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Function<String, String> trim       = String::trim;
+        Function<String, String> lower      = String::toLowerCase;
+        Function<String, String> hyphenate  = s -> s.replace(" ", "-");
+        Function<String, String> addPrefix  = s -> "slug:" + s;
+
+        // TODO: compose all four with andThen into a single `toSlug` function
+        // Function<String, String> toSlug = ...
+
+        System.out.println(toSlug.apply("  Hello World  ")); // slug:hello-world
+        System.out.println(toSlug.apply("  Functional Java  ")); // slug:functional-java
+    }
+}
+```
+
+**What to verify:**
+- `toSlug.apply("  Hello World  ")` prints `slug:hello-world`
+- `toSlug.apply("  Functional Java  ")` prints `slug:functional-java`
+
+<Note>Hint: `trim.andThen(lower).andThen(hyphenate).andThen(addPrefix)`.</Note>
+</Exercise>
+
 ## Building pipelines from small pieces
 
 Composition becomes powerful when you name your building blocks and assemble them for different contexts:
@@ -180,6 +209,36 @@ List<Integer> result = Stream.of(-3, 0, 1, 2, 4, 5, 6)
     .collect(Collectors.toList());
 System.out.println(result); // [4, 8, 12]
 ```
+
+<Exercise>
+Build a password validator by composing 3 `Predicate`s with `.and()`: length is at least 8, contains at least one digit, and contains at least one uppercase letter.
+
+```java
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Predicate<String> longEnough    = s -> s.length() >= 8;
+        Predicate<String> hasDigit      = s -> s.chars().anyMatch(Character::isDigit);
+        Predicate<String> hasUppercase  = s -> s.chars().anyMatch(Character::isUpperCase);
+
+        // TODO: compose all three into a single `strongPassword` predicate
+        // Predicate<String> strongPassword = ...
+
+        System.out.println(strongPassword.test("Hello1World")); // true
+        System.out.println(strongPassword.test("hello1world")); // false (no uppercase)
+        System.out.println(strongPassword.test("Hello"));       // false (too short, no digit)
+    }
+}
+```
+
+**What to verify:**
+- `"Hello1World"` prints `true`
+- `"hello1world"` prints `false`
+- `"Hello"` prints `false`
+
+<Note>Hint: `longEnough.and(hasDigit).and(hasUppercase)` — all three must be true.</Note>
+</Exercise>
 
 ## Try it
 

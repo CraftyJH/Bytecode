@@ -117,6 +117,46 @@ The diamond operator `<>` on the right-hand side lets the compiler infer the typ
 
 <Note>Type parameters are **reference types only**. `Box<int>` is illegal; use `Box<Integer>` instead. Java's autoboxing quietly converts primitives when you call `new Box<>(42)`, so in practice this restriction rarely slows you down.</Note>
 
+<Exercise>
+Add a `map(Function<T, R>)` method to `Box<T>` that applies a function to the value and returns a new `Box<R>`.
+
+```java
+import java.util.function.Function;
+
+public class Main {
+    static class Box<T> {
+        private final T value;
+
+        public Box(T value) { this.value = value; }
+        public T get() { return value; }
+
+        public <R> Box<R> map(Function<T, R> f) {
+            // TODO: apply f to value and wrap result in a new Box
+            return null;
+        }
+
+        @Override
+        public String toString() { return "Box[" + value + "]"; }
+    }
+
+    public static void main(String[] args) {
+        Box<String> strBox = new Box<>("hello");
+        Box<Integer> lenBox = strBox.map(String::length);
+        Box<String> upperBox = strBox.map(String::toUpperCase);
+
+        System.out.println(lenBox);   // Box[5]
+        System.out.println(upperBox); // Box[HELLO]
+    }
+}
+```
+
+**What to verify:**
+- `lenBox` prints `Box[5]`
+- `upperBox` prints `Box[HELLO]`
+
+<Note>Hint: `map` is a generic method — it needs its own `<R>` type parameter before the return type.</Note>
+</Exercise>
+
 ## Multiple type parameters
 
 A class can declare as many type parameters as it needs. The classic example is a key-value `Pair`:
@@ -185,9 +225,8 @@ public class Triple<X, Y, Z> {
 
 `mapFirst` is a *generic method* inside a generic class — it introduces its own type parameter `R` independent of `X`, `Y`, `Z`. Lesson 4 covers generic methods in depth.
 
-## Try it
-
-Build a `Pair<A, B>` class and exercise all three methods:
+<Exercise>
+Implement `Pair<A, B>.swap()` and test it with two different type combinations to confirm the returned pair has its type parameters reversed.
 
 ```java
 public class Main {
@@ -203,8 +242,9 @@ public class Main {
         public A getFirst()  { return first; }
         public B getSecond() { return second; }
 
+        // TODO: implement swap() returning Pair<B, A>
         public Pair<B, A> swap() {
-            return new Pair<>(second, first);
+            return null;
         }
 
         @Override
@@ -214,15 +254,21 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        Pair<String, Integer> p = new Pair<>("Java", 21);
-        System.out.println(p);                  // (Java, 21)
-        System.out.println(p.swap());           // (21, Java)
-        System.out.println(p.getFirst().length()); // 4
+        Pair<String, Integer> p1 = new Pair<>("Java", 21);
+        System.out.println(p1.swap());           // (21, Java)
+
+        Pair<Double, Boolean> p2 = new Pair<>(3.14, true);
+        System.out.println(p2.swap());           // (true, 3.14)
     }
 }
 ```
 
-Try changing the type arguments to `<Double, Boolean>` and constructing a new pair. Notice the compiler catches any type mismatch immediately.
+**What to verify:**
+- `p1.swap()` prints `(21, Java)`
+- `p2.swap()` prints `(true, 3.14)`
+
+<Note>Hint: `swap()` returns `new Pair<>(second, first)` — the compiler infers `Pair<B, A>` from the types of those fields.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

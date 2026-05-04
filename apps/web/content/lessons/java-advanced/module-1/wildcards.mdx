@@ -115,6 +115,34 @@ sum(List.of(1, 2.0, 3L));      // List<Number>   ✓
 
 <Note>You **cannot add** to a `List<? extends T>`. The compiler doesn't know the exact type — it might be `List<Integer>`, so adding a `Double` would be illegal. The only thing you can read out is a `T` (or a supertype of T).</Note>
 
+<Exercise>
+Implement `sum(List<? extends Number>)` that sums any list of Number subtypes and returns the total as a `double`.
+
+```java
+import java.util.List;
+
+public class Main {
+    // TODO: implement sum accepting any list of Number subtypes
+    static double sum(List<? extends Number> list) {
+        return 0;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(sum(List.of(1, 2, 3)));         // 6.0
+        System.out.println(sum(List.of(1.5, 2.5, 3.0)));  // 7.0
+        System.out.println(sum(List.of(10L, 20L)));        // 30.0
+    }
+}
+```
+
+**What to verify:**
+- Integer list sums to `6.0`
+- Double list sums to `7.0`
+- Long list sums to `30.0`
+
+<Note>Hint: iterate the list, reading each element as `Number`, and accumulate via `n.doubleValue()`.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## `? super T` — the consumer wildcard
@@ -139,6 +167,39 @@ System.out.println(numbers); // [0, 1, 2]
 ```
 
 When you read from a `? super T` list, you only get `Object` back, because the compiler can't guarantee anything more specific.
+
+<Exercise>
+Implement `copyInto(List<? extends T> src, List<? super T> dest)` that appends every element from `src` into `dest`. Test by copying a `List<Integer>` into a `List<Number>`.
+
+```java
+import java.util.*;
+
+public class Main {
+    // TODO: implement copyInto using PECS wildcards
+    static <T> void copyInto(List<? extends T> src, List<? super T> dest) {
+        // ...
+    }
+
+    public static void main(String[] args) {
+        List<Integer> ints = List.of(1, 2, 3);
+        List<Number>  nums = new ArrayList<>();
+        copyInto(ints, nums);
+        System.out.println(nums); // [1, 2, 3]
+
+        List<String> words = List.of("a", "b");
+        List<Object> objs  = new ArrayList<>();
+        copyInto(words, objs);
+        System.out.println(objs); // [a, b]
+    }
+}
+```
+
+**What to verify:**
+- `nums` prints `[1, 2, 3]` after copying integers
+- `objs` prints `[a, b]` after copying strings
+
+<Note>Hint: iterate `src` and call `dest.add(item)` — the wildcards guarantee this is type-safe.</Note>
+</Exercise>
 
 ## Unbounded wildcard `<?>`
 

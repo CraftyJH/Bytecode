@@ -120,6 +120,36 @@ public class Logger {
 
 <Note>The `volatile` keyword on the DCL field is non-optional. Without it, the JVM's memory model allows another thread to observe a partially-constructed instance. This is a real concurrency bug that only surfaces under load. Prefer the enum form.</Note>
 
+<Exercise>
+Implement a `Config` singleton using an enum. The singleton must hold a `Map<String, String>` for properties and expose `get(String key)` and `set(String key, String value)` methods. Pre-populate two properties in the instance body and print them from `main`.
+
+```java
+import java.util.HashMap;
+import java.util.Map;
+
+public class Main {
+    // TODO: declare enum Config with INSTANCE, a Map<String, String> field,
+    //       get(String key) and set(String key, String value) methods.
+    //       Pre-set "host" -> "localhost" and "port" -> "8080" in the enum body.
+
+    public static void main(String[] args) {
+        // TODO: retrieve and print "host" and "port" via Config.INSTANCE
+        // TODO: change "port" to "9090", then print it again to show mutation is shared
+        System.out.println(Config.INSTANCE.get("host"));   // localhost
+        System.out.println(Config.INSTANCE.get("port"));   // 8080
+        Config.INSTANCE.set("port", "9090");
+        System.out.println(Config.INSTANCE.get("port"));   // 9090
+    }
+}
+```
+
+**What to verify:**
+- Output is `localhost`, `8080`, then `9090`
+- Only one `INSTANCE` exists — the second reference to `Config.INSTANCE` reflects the mutation
+
+<Note>Hint: Initialise the map inside the enum constructor or an instance initialiser block.</Note>
+</Exercise>
+
 ## When singletons hurt testability
 
 Singletons introduce hidden global state. Consider:
@@ -187,6 +217,47 @@ n.send("Your order has shipped.");
 ```
 
 Adding a new channel (`PushNotification`) requires only a new class and one new `case` in the factory — zero changes to client code.
+
+<Exercise>
+Implement `NotificationFactory.create(String type)` returning objects of three concrete `Notification` implementations: `SmsNotification`, `EmailNotification`, and `PushNotification`. Each must implement a `send(String message)` method that prints a type-prefixed line. Pass `"unknown"` to verify the factory throws `IllegalArgumentException`.
+
+```java
+public class Main {
+    interface Notification {
+        void send(String message);
+    }
+
+    // TODO: implement SmsNotification, EmailNotification, PushNotification
+    //       each printing e.g. "SMS: <message>", "Email: <message>", "Push: <message>"
+
+    // TODO: implement NotificationFactory.create(String type)
+    //       supported types: "sms", "email", "push"
+    //       throw IllegalArgumentException for unknown types
+
+    public static void main(String[] args) {
+        Notification sms   = NotificationFactory.create("sms");
+        Notification email = NotificationFactory.create("email");
+        Notification push  = NotificationFactory.create("push");
+
+        sms.send("Your code is 4821");
+        email.send("Welcome aboard!");
+        push.send("New message from Bob");
+
+        try {
+            NotificationFactory.create("fax");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught: " + e.getMessage());
+        }
+    }
+}
+```
+
+**What to verify:**
+- Output lines: `SMS: Your code is 4821`, `Email: Welcome aboard!`, `Push: New message from Bob`
+- Final line starts with `Caught:` and names the unknown type
+
+<Note>Hint: Use a `switch` expression on the type string so adding a fourth channel requires only a new class and one new case.</Note>
+</Exercise>
 
 ## Abstract Factory
 

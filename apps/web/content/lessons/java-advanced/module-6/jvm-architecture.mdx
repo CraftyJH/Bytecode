@@ -87,6 +87,36 @@ System.out.println(Main.class.getClassLoader()
 
 <Note>Returning `null` from `getClassLoader()` is not an error — it means Bootstrap ClassLoader, which has no Java-side object because it is written in C++.</Note>
 
+<Exercise>
+Print the full ClassLoader chain for three different classes: a class you define yourself, `String` (a JDK core class), and `java.sql.DriverManager` (a platform module class). Observe the hierarchy and note what `null` means.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // TODO: Print the ClassLoader for Main.class
+        // Hint: Main.class.getClassLoader()
+
+        // TODO: Print the ClassLoader for String.class
+        // Note: getClassLoader() may return null — what does that mean?
+
+        // TODO: Print the ClassLoader for java.sql.DriverManager.class
+        // Hint: use getClassLoader().getClass().getName() to get a readable name
+
+        // TODO: Walk the parent chain for Main's ClassLoader
+        // Hint: use a while loop calling getParent() until null
+    }
+}
+```
+
+**What to verify:**
+- `String.class.getClassLoader()` returns `null` (Bootstrap — native, no Java object)
+- `DriverManager.class.getClassLoader()` shows the Platform ClassLoader
+- `Main.class.getClassLoader()` shows the Application ClassLoader
+- Walking the parent chain from Application → Platform → null confirms the delegation hierarchy
+
+<Note>Hint: use `ClassLoader cl = Main.class.getClassLoader(); while (cl != null) { System.out.println(cl); cl = cl.getParent(); }` to walk the chain.</Note>
+</Exercise>
+
 ## From source to bytecode
 
 `javac` compiles `.java` source into `.class` files containing **bytecode** — a compact, stack-based instruction set. You can inspect it with `javap -c`:
@@ -130,6 +160,40 @@ java -XX:+PrintCompilation -jar myapp.jar
 ```
 
 The number in column 3 is the tier (4 = C2).
+
+<Exercise>
+Write a tight loop that sums 1 million integers. Measure execution time using `System.nanoTime()` for the first run (interpreter-dominated) versus a warmed-up run. Observe how JIT compilation improves steady-state performance.
+
+```java
+public class Main {
+    static long sumOneMillion() {
+        long sum = 0;
+        // TODO: loop from 0 to 999_999 and accumulate sum
+        return sum;
+    }
+
+    public static void main(String[] args) {
+        // TODO: Run sumOneMillion() once and record time with System.nanoTime()
+        // This measures cold/interpreter performance
+
+        // TODO: Run sumOneMillion() 20_000 more times to let JIT compile it
+        // (C2 kicks in after ~10_000 invocations)
+
+        // TODO: Run sumOneMillion() one final time and record the time again
+        // Compare first-run time vs warmed-up time
+
+        // TODO: Print both times in microseconds and compute the ratio
+    }
+}
+```
+
+**What to verify:**
+- The first call is noticeably slower (interpreter, possibly 10–100× slower) than the call after warm-up
+- After warm-up the time drops significantly and stabilizes as C2 native code takes over
+- Running with `-XX:+PrintCompilation` shows `sumOneMillion` reaching tier 4
+
+<Note>Hint: convert nanoseconds to microseconds with `/ 1_000`. The first-call time will be noisy — that is expected. Focus on the ratio between cold and steady-state, not an exact number.</Note>
+</Exercise>
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 

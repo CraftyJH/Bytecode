@@ -119,6 +119,42 @@ System.out.println(temps);   // [-10.0°C, 37.0°C, 100.0°C]
 
 <Note>Always use `Double.compare(a, b)`, `Integer.compare(a, b)`, etc. instead of subtraction (`a - b`). Subtraction overflows for large integers and produces NaN for certain doubles, leading to incorrect sort orders.</Note>
 
+<Exercise>
+Make a `Student` record implement `Comparable<Student>` with a natural ordering of **GPA descending** (highest GPA first). Ties sort alphabetically by name.
+
+```java
+import java.util.*;
+
+public class Main {
+    record Student(String name, double gpa) implements Comparable<Student> {
+        // TODO: implement compareTo for GPA descending, then name ascending
+        @Override
+        public int compareTo(Student other) {
+            return 0;
+        }
+    }
+
+    public static void main(String[] args) {
+        List<Student> students = new ArrayList<>(List.of(
+            new Student("Zara",  3.9),
+            new Student("Alice", 3.7),
+            new Student("Bob",   3.9),
+            new Student("Carol", 3.5)
+        ));
+        Collections.sort(students);
+        students.forEach(s -> System.out.println(s.name() + " " + s.gpa()));
+    }
+}
+```
+
+**What to verify:**
+- `Bob 3.9` and `Zara 3.9` appear first (Bob before Zara alphabetically)
+- `Alice 3.7` comes next
+- `Carol 3.5` last
+
+<Note>Hint: compare GPA with `Double.compare(other.gpa(), this.gpa())` for descending order, then fall back to `this.name().compareTo(other.name())` on ties.</Note>
+</Exercise>
+
 ## `Comparator<T>` — external, composable ordering
 
 `Comparator` is a functional interface — you can create one with a lambda or method reference. The `Comparator.comparing` factory is the modern entry point:
@@ -158,6 +194,41 @@ System.out.println(people);
 ```
 
 You can chain as many `thenComparing` calls as needed.
+
+<Exercise>
+Sort a list of employees by **department ascending**, then **salary descending**, then **name ascending** using a single chained `Comparator`.
+
+```java
+import java.util.*;
+
+public class Main {
+    record Employee(String name, String dept, int salary) {}
+
+    public static void main(String[] args) {
+        List<Employee> employees = new ArrayList<>(List.of(
+            new Employee("Zara",  "Engineering", 90_000),
+            new Employee("Alice", "Engineering", 75_000),
+            new Employee("Bob",   "Marketing",   80_000),
+            new Employee("Dave",  "Marketing",   80_000),
+            new Employee("Eve",   "Engineering", 90_000)
+        ));
+
+        // TODO: build a Comparator chain: dept asc, salary desc, name asc
+        employees.sort(null);
+
+        employees.forEach(e -> System.out.println(e.name()));
+    }
+}
+```
+
+**What to verify:**
+- Engineering employees appear before Marketing
+- Within Engineering: Eve and Zara (90k) before Alice (75k)
+- Eve before Zara (alphabetical tie-break at same salary)
+- Within Marketing: Bob and Dave both at 80k, Bob before Dave
+
+<Note>Hint: use `Comparator.comparing(Employee::dept).thenComparing(Comparator.comparingInt(Employee::salary).reversed()).thenComparing(Employee::name)`.</Note>
+</Exercise>
 
 ## `reversed()` and `reverseOrder()`
 

@@ -139,6 +139,46 @@ Patterns hurt when:
 
 > **Rule of thumb:** if you cannot name the concrete problem the pattern solves in your specific code, do not introduce it.
 
+<Exercise>
+Refactor the "god method" below into at least two named helper methods that each have a single, clear responsibility. Your `main` must call the helpers and produce the same output.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // TODO: Replace the body below with calls to focused helper methods.
+        // Each helper should do ONE thing (e.g., greet, calculate, display).
+
+        String name = "Alice";
+        int[] scores = {88, 72, 95, 60, 84};
+
+        // Greeting
+        System.out.println("Welcome, " + name + "!");
+
+        // Calculate average
+        int sum = 0;
+        for (int s : scores) sum += s;
+        double avg = (double) sum / scores.length;
+
+        // Find max
+        int max = scores[0];
+        for (int s : scores) if (s > max) max = s;
+
+        // Display results
+        System.out.printf("Average score: %.1f%n", avg);
+        System.out.println("Highest score: " + max);
+        System.out.println("Status: " + (avg >= 75 ? "Pass" : "Fail"));
+    }
+}
+```
+
+**What to verify:**
+- Output remains identical: welcome message, average, highest score, and pass/fail status
+- `main` delegates to at least 2 named methods, each with a single responsibility
+- No single method exceeds ~10 lines
+
+<Note>Hint: Consider methods like `greet(String name)`, `average(int[] scores)`, `max(int[] scores)`, and `printResults(...)`.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Try it — pattern category identification
@@ -178,6 +218,36 @@ _Answer: Structural (Adapter pattern wraps the legacy interface inside the expec
 ```
 
 _Answer: Behavioral (Observer pattern manages the notification relationship.)_
+
+<Exercise>
+Given three code scenarios described in comments, print which GoF category (Creational, Structural, or Behavioral) applies and a one-sentence reason for each.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // Scenario A: Your app needs a single shared configuration object.
+        //             Many classes must access it, but only one instance
+        //             should ever be created.
+        // TODO: print the category and reason for Scenario A
+
+        // Scenario B: A third-party CSV library exposes CsvParser.parse(String).
+        //             Your codebase depends on DataReader.read(InputStream).
+        //             You cannot modify either class.
+        // TODO: print the category and reason for Scenario B
+
+        // Scenario C: A Button should notify an unlimited number of listeners
+        //             when clicked, without knowing who is listening.
+        // TODO: print the category and reason for Scenario C
+    }
+}
+```
+
+**What to verify:**
+- Each printed line names the correct category: Creational, Structural, or Behavioral
+- Each line includes a brief justification matching the scenario's key concern
+
+<Note>Hint: Focus on the primary intent — creation, composition, or communication.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

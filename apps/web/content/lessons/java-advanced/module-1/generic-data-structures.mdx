@@ -160,6 +160,50 @@ The `@SuppressWarnings("unchecked")` annotation tells the compiler "I know about
 
 Setting the popped slot to `null` is important: leaving the old reference alive is a **memory leak** — the array holds a strong reference even after the element is logically removed. The JDK's `ArrayDeque` does the same null-clearing.
 
+<Exercise>
+Implement `push()` and `pop()` for a `Stack<T>` backed by a fixed-capacity `Object[]`. `pop()` must null out the slot after removal.
+
+```java
+public class Main {
+    @SuppressWarnings("unchecked")
+    static class Stack<T> {
+        private final Object[] data;
+        private int top = -1;
+
+        Stack(int capacity) { data = new Object[capacity]; }
+
+        // TODO: implement push(T item)
+        public void push(T item) { }
+
+        // TODO: implement pop() — throw EmptyStackException if empty, null the slot
+        public T pop() { return null; }
+
+        public boolean isEmpty() { return top == -1; }
+        public int     size()    { return top + 1; }
+    }
+
+    public static void main(String[] args) {
+        Stack<String> s = new Stack<>(8);
+        s.push("x");
+        s.push("y");
+        s.push("z");
+        System.out.println(s.pop());      // z
+        System.out.println(s.pop());      // y
+        System.out.println(s.size());     // 1
+        System.out.println(s.isEmpty());  // false
+    }
+}
+```
+
+**What to verify:**
+- First `pop()` returns `z`
+- Second `pop()` returns `y`
+- `size()` is `1`
+- `isEmpty()` is `false`
+
+<Note>Hint: `push` does `data[++top] = item`; `pop` saves `(T) data[top]`, sets `data[top--] = null`, then returns the saved value.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Adding an iterator
@@ -227,28 +271,62 @@ public class Stack<T> implements Iterable<T> {
 }
 ```
 
-## Try it
-
-Use the Stack to evaluate a simple expression (reverse a string by pushing characters, then popping them):
+<Exercise>
+Implement a `Queue<T>` backed by **two stacks** — an inbox stack for enqueue and an outbox stack for dequeue. When `outbox` is empty on a dequeue, transfer all elements from `inbox` to `outbox`.
 
 ```java
+import java.util.EmptyStackException;
+
 public class Main {
+    @SuppressWarnings("unchecked")
+    static class Stack<T> {
+        private Object[] data = new Object[16];
+        private int top = -1;
+        public void push(T item) { data[++top] = item; }
+        public T    pop()  { T v = (T) data[top]; data[top--] = null; return v; }
+        public T    peek() { return (T) data[top]; }
+        public boolean isEmpty() { return top == -1; }
+    }
+
+    static class Queue<T> {
+        private final Stack<T> inbox  = new Stack<>();
+        private final Stack<T> outbox = new Stack<>();
+
+        // TODO: implement enqueue(T item)
+        public void enqueue(T item) { }
+
+        // TODO: implement dequeue() — transfer inbox→outbox when outbox is empty
+        public T dequeue() { return null; }
+
+        // TODO: implement peek() — same transfer logic, but don't remove
+        public T peek() { return null; }
+
+        public boolean isEmpty() { return inbox.isEmpty() && outbox.isEmpty(); }
+    }
+
     public static void main(String[] args) {
-        Stack<Character> stack = new Stack<>();
-
-        String input = "hello";
-        for (char c : input.toCharArray()) stack.push(c);
-
-        StringBuilder sb = new StringBuilder();
-        while (!stack.isEmpty()) sb.append(stack.pop());
-
-        System.out.println(sb);  // olleh
-        System.out.println(stack.size()); // 0
+        Queue<Integer> q = new Queue<>();
+        q.enqueue(1);
+        q.enqueue(2);
+        q.enqueue(3);
+        System.out.println(q.dequeue()); // 1
+        q.enqueue(4);
+        System.out.println(q.dequeue()); // 2
+        System.out.println(q.peek());    // 3
+        System.out.println(q.dequeue()); // 3
+        System.out.println(q.dequeue()); // 4
+        System.out.println(q.isEmpty()); // true
     }
 }
 ```
 
-Extend the Try It: add a `toList()` method that returns the elements bottom-to-top as a `java.util.List<T>`.
+**What to verify:**
+- Elements dequeue in FIFO order: `1`, `2`, `3`, `4`
+- `peek()` returns `3` without removing it
+- `isEmpty()` is `true` after all elements are consumed
+
+<Note>Hint: when `dequeue` or `peek` is called and `outbox` is empty, pop every element from `inbox` and push it onto `outbox` — this reverses the order into FIFO.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

@@ -137,6 +137,46 @@ Pizza p = new Pizza("large", true, false, true, "tomato", false, true);
 
 A class with 6 optional boolean parameters needs up to 64 constructor overloads to cover every combination. The Builder pattern eliminates all of them.
 
+<Exercise>
+Implement `Pizza.Builder` with a required `size` field (set in the Builder constructor) and optional `crust` (default `"regular"`), `sauce` (default `"tomato"`), and `toppings` (varargs, stored as a `List<String>`). Build two pizzas — a minimal one and a fully loaded one — and print them.
+
+```java
+import java.util.Arrays;
+import java.util.List;
+
+public class Main {
+    // TODO: implement Pizza with a private constructor accepting a Builder
+    //       and a Builder static inner class with:
+    //         - required: size (String)
+    //         - optional: crust (String, default "regular"),
+    //                     sauce (String, default "tomato"),
+    //                     toppings (varargs String..., stored as List)
+    //       Pizza.toString() should print all fields
+
+    public static void main(String[] args) {
+        Pizza plain = new Pizza.Builder("small")
+                .build();
+
+        Pizza loaded = new Pizza.Builder("large")
+                .crust("thin")
+                .sauce("pesto")
+                .toppings("mozzarella", "basil", "olives")
+                .build();
+
+        System.out.println(plain);
+        System.out.println(loaded);
+    }
+}
+```
+
+**What to verify:**
+- `plain` shows `size=small`, default `crust=regular`, default `sauce=tomato`, empty toppings list
+- `loaded` shows `size=large`, `crust=thin`, `sauce=pesto`, `toppings=[mozzarella, basil, olives]`
+- `Pizza` has only `final` fields and no setters (immutable)
+
+<Note>Hint: Accept the varargs with `public Builder toppings(String... tops)` and store as `Arrays.asList(tops)`.</Note>
+</Exercise>
+
 ## Builder with inner static class
 
 ```java
@@ -219,6 +259,50 @@ Pizza p = new Pizza.Builder("medium").cheese(true).build();
 cache.put("standard", p);           // safe to share
 list.add(p);                        // safe to put in collections
 ```
+
+<Exercise>
+Implement an immutable `HttpRequest` class using a Builder. The builder must support `url(String)`, `method(String)` (default `"GET"`), and `header(String name, String value)` (accumulates into a `Map<String, String>`). `build()` must throw `IllegalStateException` if `url` is blank. Print a GET and a POST request.
+
+```java
+import java.util.HashMap;
+import java.util.Map;
+
+public class Main {
+    // TODO: implement HttpRequest with private constructor(Builder)
+    //       All fields final. toString() prints method, url, and headers.
+    //
+    // TODO: implement HttpRequest.Builder with:
+    //         url(String)              — required
+    //         method(String)           — optional, default "GET"
+    //         header(String, String)   — adds to a map, can be called multiple times
+    //         build()                  — validates url, returns new HttpRequest
+
+    public static void main(String[] args) {
+        HttpRequest get = new HttpRequest.Builder()
+                .url("https://api.example.com/users")
+                .header("Accept", "application/json")
+                .build();
+
+        HttpRequest post = new HttpRequest.Builder()
+                .url("https://api.example.com/users")
+                .method("POST")
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer token123")
+                .build();
+
+        System.out.println(get);
+        System.out.println(post);
+    }
+}
+```
+
+**What to verify:**
+- GET request shows `method=GET`, the correct URL, and one header
+- POST request shows `method=POST`, the correct URL, and two headers
+- Attempting `new HttpRequest.Builder().build()` (no url) throws `IllegalStateException`
+
+<Note>Hint: Initialise `headers` as a `new HashMap<>()` in the Builder. Each `header()` call puts into it and returns `this`.</Note>
+</Exercise>
 
 ## Lombok @Builder
 

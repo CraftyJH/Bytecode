@@ -138,6 +138,37 @@ max.ifPresent(System.out::println); // 5
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 
+<Exercise>
+Use `reduce` twice on the same list: once to compute the product of all integers, and once to find the longest string in a list of words.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(1, 2, 3, 4, 5);
+
+        // TODO: use reduce to compute the product (identity = 1)
+        // int product = ...
+        System.out.println(product); // 120
+
+        List<String> words = List.of("fig", "banana", "kiwi", "elderberry", "plum");
+
+        // TODO: use one-argument reduce to find the longest string
+        // Optional<String> longest = ...
+        System.out.println(longest.orElse("none")); // elderberry
+    }
+}
+```
+
+**What to verify:**
+- `product` prints `120`
+- `longest.orElse("none")` prints `elderberry`
+
+<Note>Hint: `reduce(1, (a, b) -> a * b)` for product; `reduce((a, b) -> a.length() >= b.length() ? a : b)` for longest.</Note>
+</Exercise>
+
 ## findFirst and findAny
 
 Both return an `Optional<T>`. `findFirst` respects encounter order; `findAny` may return any element (faster in parallel streams):
@@ -167,6 +198,34 @@ boolean noneNaN = nums.stream().noneMatch(Double::isNaN); // true
 ```
 
 `anyMatch` is `true` if at least one element satisfies the predicate — equivalent to `filter(pred).findFirst().isPresent()` but potentially faster.
+
+<Exercise>
+Given a list of integers, use `anyMatch`, `allMatch`, and `noneMatch` to test three different conditions and print each result.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(2, 4, 6, 8, 11);
+
+        // TODO: anyMatch — is there any number greater than 10?
+        // TODO: allMatch — are all numbers even?
+        // TODO: noneMatch — are there no negative numbers?
+
+        // Print each boolean result on its own line
+    }
+}
+```
+
+**What to verify:**
+- `anyMatch(n -> n > 10)` prints `true`
+- `allMatch(n -> n % 2 == 0)` prints `false` (11 is odd)
+- `noneMatch(n -> n < 0)` prints `true`
+
+<Note>Hint: each match operation short-circuits — it stops scanning as soon as the result is determined.</Note>
+</Exercise>
 
 ## Try it
 

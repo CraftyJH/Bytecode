@@ -133,6 +133,34 @@ The output stream has the same number of elements as the input; each is just a d
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 
+<Exercise>
+Build a pipeline on the provided list: filter words longer than 5 characters, map to uppercase, sort alphabetically, collect to a list, and print it.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> fruits = List.of("apple", "banana", "cherry", "date", "elderberry");
+
+        List<String> result = fruits.stream()
+            // TODO: filter length > 5
+            // TODO: map to uppercase
+            // TODO: sort
+            .collect(Collectors.toList());
+
+        System.out.println(result);
+    }
+}
+```
+
+**What to verify:**
+- Output is `[BANANA, CHERRY, ELDERBERRY]`
+
+<Note>Hint: `filter(s -> s.length() > 5)`, `map(String::toUpperCase)`, `sorted()`.</Note>
+</Exercise>
+
 ## flatMap
 
 `flatMap(Function<T, Stream<R>>)` maps each element to a stream, then *flattens* all those streams into one:
@@ -160,6 +188,36 @@ List<String> flat = groups.stream()
     .collect(Collectors.toList());
 // [a, b, c, d, e, f]
 ```
+
+<Exercise>
+Given a nested list of integers, use `flatMap` to produce a single stream, filter even numbers, map each to its square, and print the results.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<List<Integer>> nested = List.of(
+            List.of(1, 2, 3),
+            List.of(4, 5, 6),
+            List.of(7, 8, 9)
+        );
+
+        nested.stream()
+            // TODO: flatMap to a single stream of integers
+            // TODO: filter even numbers
+            // TODO: map each to its square
+            .forEach(System.out::println);
+    }
+}
+```
+
+**What to verify:**
+- Output lines (in order): `4`, `16`, `36`, `64`
+
+<Note>Hint: `flatMap(Collection::stream)`, `filter(n -> n % 2 == 0)`, `map(n -> n * n)`.</Note>
+</Exercise>
 
 ## Other useful intermediate operations
 

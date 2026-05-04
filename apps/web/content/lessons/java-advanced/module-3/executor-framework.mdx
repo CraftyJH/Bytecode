@@ -115,6 +115,42 @@ Useful for serialising access to a non-thread-safe resource without writing `syn
 
 <Note>Avoid `Executors.newFixedThreadPool` with an unbounded queue for work that can grow without limit — if tasks arrive faster than they are processed the queue fills heap memory indefinitely. In production, construct a `ThreadPoolExecutor` directly with a bounded queue and an explicit rejection policy.</Note>
 
+<Exercise>
+Submit 10 tasks (numbered 1–10) to a fixed thread pool of size 3. Each task should print its task number and the name of the thread currently executing it, then sleep 50 ms to simulate work.
+
+```java
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        // TODO: create a fixed thread pool with 3 threads
+        ExecutorService pool = null;
+
+        for (int i = 1; i <= 10; i++) {
+            final int taskId = i;
+            pool.submit(() -> {
+                // TODO: print taskId and Thread.currentThread().getName()
+                try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            });
+        }
+
+        pool.shutdown();
+        pool.awaitTermination(5, TimeUnit.SECONDS);
+        System.out.println("All tasks complete");
+    }
+}
+```
+
+**What to verify:**
+- Exactly 3 distinct thread names appear across all 10 task lines (the pool reuses its 3 threads)
+- `"All tasks complete"` is the last line printed
+- Output order may vary
+
+<Note>Hint: `Executors.newFixedThreadPool(3)` creates a pool with exactly 3 worker threads. Tasks 4–10 queue up until one of the 3 threads becomes free.</Note>
+</Exercise>
+
 ## submit() vs execute()
 
 ```java
@@ -148,6 +184,49 @@ try {
 
 - `shutdown()` — orderly: no new tasks accepted, existing queued tasks complete.
 - `shutdownNow()` — aggressive: attempts to interrupt running tasks, returns the list of queued-but-not-started tasks.
+
+<Exercise>
+Submit 3 tasks to a single-thread executor, call `shutdown()`, then try to submit one more task after shutdown. Catch the `RejectedExecutionException` that is thrown.
+
+```java
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        ExecutorService exec = Executors.newSingleThreadExecutor();
+
+        for (int i = 1; i <= 3; i++) {
+            final int id = i;
+            exec.submit(() -> System.out.println("Task " + id + " running"));
+        }
+
+        // TODO: call exec.shutdown()
+        exec.shutdown();
+
+        try {
+            // TODO: submit one more task after shutdown — this should throw
+            exec.submit(() -> System.out.println("This should not run"));
+            System.out.println("No exception — unexpected!");
+        } catch (RejectedExecutionException e) {
+            System.out.println("Caught RejectedExecutionException as expected");
+        }
+
+        exec.awaitTermination(5, TimeUnit.SECONDS);
+        System.out.println("Done");
+    }
+}
+```
+
+**What to verify:**
+- `"Task 1 running"`, `"Task 2 running"`, `"Task 3 running"` are printed (the pre-shutdown tasks complete)
+- `"Caught RejectedExecutionException as expected"` is printed
+- `"This should not run"` is never printed
+
+<Note>Hint: `shutdown()` stops accepting new submissions but lets queued tasks finish. Any submission after `shutdown()` immediately throws `RejectedExecutionException`.</Note>
+</Exercise>
 
 ## Try it
 

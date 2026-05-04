@@ -118,6 +118,34 @@ The annotation documents intent and protects the interface's contract. Any inter
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 
+<Exercise>
+Declare one variable of each of the four core types — `Supplier`, `Function`, `Predicate`, and `Consumer` — then chain them: the Supplier produces a string, the Function transforms it, the Predicate tests it, and the Consumer prints the result.
+
+```java
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Supplier<String> produce = () -> "  Hello, Java!  ";
+        Function<String, String> transform = s -> s.trim().toLowerCase();
+        Predicate<String> test = s -> s.contains("java");
+        Consumer<String> display = s -> System.out.println("Result: " + s);
+
+        String value = produce.get();
+        String transformed = transform.apply(value);
+        // TODO: print whether the predicate holds      // true
+        // TODO: pass transformed to the consumer       // Result: hello, java!
+    }
+}
+```
+
+**What to verify:**
+- Boolean result of `test.test(transformed)` prints `true`
+- `display.accept(transformed)` prints `Result: hello, java!`
+
+<Note>Hint: `System.out.println(test.test(transformed))` then `display.accept(transformed)`.</Note>
+</Exercise>
+
 ## Composing with andThen, compose, and negate
 
 The standard functional interfaces include composition helpers — methods that combine two functions into one.
@@ -153,6 +181,44 @@ System.out.println(valid.test("hello world")); // false (has space)
 Predicate<String> either = longEnough.or(noSpaces);
 Predicate<String> notLong = longEnough.negate();
 ```
+
+<Exercise>
+Compose two `Predicate`s with `.and()` and two `Function`s with `.andThen()`, then print all results.
+
+```java
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Predicates
+        Predicate<String> longerThan3 = s -> s.length() > 3;
+        Predicate<String> startsWithJ = s -> s.startsWith("J");
+        Predicate<String> both = longerThan3.and(startsWithJ);
+
+        // TODO: test "Java" — should be true
+        // TODO: test "Go"   — should be false (too short)
+        // TODO: test "Ruby" — should be false (doesn't start with J)
+
+        // Functions
+        Function<String, String> trim  = String::trim;
+        Function<String, String> upper = String::toUpperCase;
+        Function<String, String> shout = trim.andThen(upper);
+
+        // TODO: apply shout to "  hello  " and print   // HELLO
+        // TODO: apply shout to "  world  " and print   // WORLD
+    }
+}
+```
+
+**What to verify:**
+- `both.test("Java")` prints `true`
+- `both.test("Go")` prints `false`
+- `both.test("Ruby")` prints `false`
+- `shout.apply("  hello  ")` prints `HELLO`
+- `shout.apply("  world  ")` prints `WORLD`
+
+<Note>Hint: `longerThan3.and(startsWithJ)` requires both; `trim.andThen(upper)` applies trim first, then upper.</Note>
+</Exercise>
 
 ## Try it
 

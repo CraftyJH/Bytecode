@@ -92,6 +92,41 @@ public class Stack<T> {
 
 Now the test is green. The refactor step might extract a constant, rename a variable, or do nothing at all if the code is already clean.
 
+<Exercise>
+Follow the TDD cycle to implement `StringUtils.reverse(String)`. First write failing checks, then implement the method to make them pass.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    // Step 1 (Red): write checks for behaviour that doesn't exist yet
+    // Step 2 (Green): implement reverse() so all checks pass
+    // Step 3 (Refactor): clean up if needed
+
+    static String reverse(String s) {
+        // TODO: implement — return the characters of s in reverse order
+        throw new UnsupportedOperationException("not implemented");
+    }
+
+    public static void main(String[] args) {
+        check(reverse("hello").equals("olleh"), "reverse(\"hello\") == \"olleh\"");
+        check(reverse("a").equals("a"),         "reverse single char");
+        check(reverse("").equals(""),           "reverse empty string");
+        check(reverse("abcd").equals("dcba"),   "reverse(\"abcd\") == \"dcba\"");
+    }
+}
+```
+
+**What to verify:**
+- All four `check()` calls print `PASS:`
+- Removing or miswriting the implementation causes an `AssertionError` (the "Red" state)
+
+<Note>Hint: `new StringBuilder(s).reverse().toString()` is the idiomatic one-liner, but you can also loop from the end to the start to see the logic explicitly.</Note>
+</Exercise>
+
 ## Why tests drive design
 
 Writing the test first makes you the first *consumer* of your own API. Before typing a single line of implementation you must decide:
@@ -138,6 +173,57 @@ void givenStackWithOneItem_whenPop_thenReturnsItem() {
 ```
 
 This separation makes the test self-documenting. A reader instantly sees the precondition, the action under test, and the expected outcome.
+
+<Exercise>
+Write 3 separate `check()` calls for a `Calculator.add(int, int)` method, each strictly following the Arrange-Act-Assert layout. Mark each section with a comment.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    static int add(int a, int b) {
+        // TODO: implement
+        return 0;
+    }
+
+    public static void main(String[] args) {
+        // Check 1 — positive + positive
+        // Arrange
+        int x = 3, y = 4;
+        // Act
+        int result1 = add(x, y);
+        // Assert
+        check(result1 == 7, "add(3, 4) == 7");
+
+        // Check 2 — negative + positive
+        // Arrange
+        int a = -5, b = 10;
+        // Act
+        int result2 = add(a, b);
+        // Assert
+        check(result2 == 5, "add(-5, 10) == 5");
+
+        // Check 3 — identity: adding zero
+        // Arrange
+        int n = 42;
+        // Act
+        int result3 = add(n, 0);
+        // Assert
+        check(result3 == 42, "add(42, 0) == 42");
+    }
+}
+```
+
+**What to verify:**
+- Each `check()` block has clearly labelled Arrange, Act, and Assert comments
+- Implementing `add` as `return a + b` makes all three print `PASS:`
+- A wrong implementation (e.g. `return a - b`) causes an `AssertionError` on the first failing check
+
+<Note>Hint: the Arrange section sets up inputs, Act calls the method and captures the result, Assert evaluates the result — keep them visually separated.</Note>
+</Exercise>
 
 ## Given-When-Then naming
 

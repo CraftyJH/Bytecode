@@ -187,6 +187,73 @@ public class Main {
 
 Run it several times. Notice that the print order of `alpha`, `beta`, and `gamma` varies — the OS scheduler decides which thread runs when.
 
+<Exercise>
+Create 3 threads, naming them `"worker-1"`, `"worker-2"`, and `"worker-3"`. Each thread should print its own name and a counter from 1 to 3 (one line per count). Start all three threads, then join them so main waits for all to finish.
+
+```java
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        Thread[] threads = new Thread[3];
+
+        for (int i = 1; i <= 3; i++) {
+            final int id = i;
+            threads[i - 1] = new Thread(() -> {
+                String name = Thread.currentThread().getName();
+                for (int c = 1; c <= 3; c++) {
+                    // TODO: print name + " count=" + c
+                }
+            }, "worker-" + id);
+        }
+
+        // TODO: start all threads
+        // TODO: join all threads
+        System.out.println("all done");
+    }
+}
+```
+
+**What to verify:**
+- Each of `worker-1`, `worker-2`, `worker-3` prints three lines containing its name and the numbers 1, 2, 3
+- `"all done"` appears last
+- The interleaving order of the three workers varies between runs — output order may vary
+
+<Note>Hint: collect threads in an array, use two separate loops — one to start all, one to join all.</Note>
+</Exercise>
+
+<Exercise>
+Create a daemon thread that prints `"tick"` every 100 ms in an infinite loop. Set its daemon flag before starting it, then let main sleep for 300 ms. After main returns the JVM should exit even though the daemon thread is still "running".
+
+```java
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        Thread ticker = new Thread(() -> {
+            try {
+                while (true) {
+                    // TODO: print "tick"
+                    Thread.sleep(100);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        // TODO: mark ticker as daemon
+        ticker.start();
+
+        Thread.sleep(300);
+        System.out.println("main exiting");
+        // JVM exits here — daemon thread is stopped automatically
+    }
+}
+```
+
+**What to verify:**
+- `"tick"` prints roughly 2–3 times before `"main exiting"` appears
+- The program exits on its own without hanging
+
+<Note>Hint: call `setDaemon(true)` **before** `start()` — calling it afterwards throws `IllegalThreadStateException`.</Note>
+</Exercise>
+
 ## End-of-lesson quiz
 
 <Quiz data={quizzes.endQ1} label="question 1 of 3" />

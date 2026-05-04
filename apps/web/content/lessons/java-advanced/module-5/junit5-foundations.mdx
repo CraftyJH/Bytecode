@@ -138,6 +138,69 @@ void negativeDepositThrows() {
 
 <Note>Some teams skip @DisplayName and instead follow a strict naming convention such as `given_when_then` or `should_when_given`. Both approaches are valid — pick one and apply it consistently across the codebase.</Note>
 
+<Exercise>
+Implement a `BankAccount` class with `deposit`, `withdraw`, and `getBalance`, then write 4 `check()` calls covering initial state, deposit, withdraw, and overdraft behaviour.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    static class BankAccount {
+        private double balance = 0;
+
+        void deposit(double amount) {
+            // TODO: add amount to balance; throw IllegalArgumentException if amount <= 0
+        }
+
+        void withdraw(double amount) {
+            // TODO: subtract amount; throw IllegalStateException if amount > balance
+        }
+
+        double getBalance() {
+            return balance;
+        }
+    }
+
+    public static void main(String[] args) {
+        // Check 1: initial balance is 0
+        BankAccount acc1 = new BankAccount();
+        check(acc1.getBalance() == 0, "initial balance is 0");
+
+        // Check 2: deposit increases balance
+        BankAccount acc2 = new BankAccount();
+        acc2.deposit(100);
+        check(acc2.getBalance() == 100, "deposit(100) sets balance to 100");
+
+        // Check 3: withdraw decreases balance
+        BankAccount acc3 = new BankAccount();
+        acc3.deposit(200);
+        acc3.withdraw(50);
+        check(acc3.getBalance() == 150, "withdraw(50) from 200 leaves 150");
+
+        // Check 4: overdraft throws IllegalStateException
+        BankAccount acc4 = new BankAccount();
+        acc4.deposit(30);
+        boolean threw = false;
+        try {
+            acc4.withdraw(100);
+        } catch (IllegalStateException e) {
+            threw = true;
+        }
+        check(threw, "withdraw more than balance throws IllegalStateException");
+    }
+}
+```
+
+**What to verify:**
+- All 4 checks print `PASS:` when the implementation is correct
+- Removing the overdraft guard causes check 4 to throw `AssertionError`
+
+<Note>Hint: in `withdraw`, compare `amount > balance` before subtracting — if true, throw `new IllegalStateException("Insufficient funds")`.</Note>
+</Exercise>
+
 ## Assertions
 
 JUnit 5's `Assertions` class (statically imported in most test files) covers the full set:
@@ -171,6 +234,42 @@ assertAll("account state",
 ```
 
 `assertAll` is particularly valuable when checking multiple properties of a result: without it, a failure on the first assertion hides whether the remaining ones pass.
+
+<Exercise>
+Define a `User` record (name, email, age) and write grouped assertions that verify all three fields at once, plus a separate check that the email contains `@`.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    record User(String name, String email, int age) {}
+
+    public static void main(String[] args) {
+        User user = new User("Alice", "alice@example.com", 30);
+
+        // Grouped check — all three fields (mirrors assertAll behaviour:
+        // collect every failure rather than stopping at the first)
+        StringBuilder failures = new StringBuilder();
+        if (!user.name().equals("Alice"))               failures.append("name mismatch; ");
+        if (!user.email().equals("alice@example.com"))  failures.append("email mismatch; ");
+        if (user.age() != 30)                           failures.append("age mismatch; ");
+        check(failures.isEmpty(), "all User fields correct — failures: " + failures);
+
+        // Separate check: email format contains '@'
+        check(user.email().contains("@"), "email contains '@'");
+    }
+}
+```
+
+**What to verify:**
+- Both checks print `PASS:` for the correct `User` record
+- Changing any field value (e.g. `age = 31`) causes the grouped check to fail and report which field is wrong
+
+<Note>Hint: the `failures` `StringBuilder` pattern mirrors `assertAll` — it accumulates every mismatch instead of stopping on the first one, so you see the full picture in one run.</Note>
+</Exercise>
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 

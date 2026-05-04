@@ -95,6 +95,46 @@ public class UnsafeCounter {
 
 `count++` looks like one operation but compiles to three bytecode instructions: load the value, add 1, store the result. Two threads can interleave these steps and both write back the same incremented value, effectively losing one increment. Run 5 threads incrementing 1 000 times each and the final count will almost certainly be less than 5 000.
 
+<Exercise>
+Implement an `UnsafeCounter` class with a plain `int` field and a non-synchronized `increment()` method. Run 5 threads each calling `increment()` 1000 times, then print the final count to observe the race condition.
+
+```java
+public class Main {
+    static class UnsafeCounter {
+        private int count = 0;
+
+        public void increment() {
+            // TODO: count++ (intentionally NOT synchronized)
+        }
+
+        public int getCount() { return count; }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        UnsafeCounter counter = new UnsafeCounter();
+        Thread[] threads = new Thread[5];
+
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < 1000; j++) counter.increment();
+            });
+        }
+
+        for (Thread t : threads) t.start();
+        for (Thread t : threads) t.join();
+
+        System.out.println("Final count: " + counter.getCount());
+    }
+}
+```
+
+**What to verify:**
+- The printed value is almost always **less than 5000** — demonstrating the lost-update race condition
+- The exact value varies between runs
+
+<Note>Hint: the result is non-deterministic by design. Run it several times — you should rarely (if ever) see exactly 5000.</Note>
+</Exercise>
+
 ## synchronized methods
 
 Marking a method `synchronized` makes the JVM acquire the object's **intrinsic lock** (also called a monitor lock) before the method body executes, and release it when the method returns:
@@ -197,6 +237,47 @@ public class Main {
 ```
 
 Now remove `synchronized` from `increment()` and run it again — observe the inconsistent totals. Re-add `synchronized` and confirm it is always 5 000.
+
+<Exercise>
+Fix the race condition from the previous exercise by adding `synchronized` to both `increment()` and `getCount()`. Run the same 5-thread × 1000-increment test and confirm the result is always exactly 5000.
+
+```java
+public class Main {
+    static class SafeCounter {
+        private int count = 0;
+
+        public synchronized void increment() {
+            // TODO: count++
+        }
+
+        public synchronized int getCount() {
+            // TODO: return count
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        SafeCounter counter = new SafeCounter();
+        Thread[] threads = new Thread[5];
+
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < 1000; j++) counter.increment();
+            });
+        }
+
+        for (Thread t : threads) t.start();
+        for (Thread t : threads) t.join();
+
+        System.out.println("Final count: " + counter.getCount());
+    }
+}
+```
+
+**What to verify:**
+- The printed value is **always exactly 5000**, no matter how many times you run it
+
+<Note>Hint: both `increment()` and `getCount()` must be synchronized on the same lock — if only the writer is synchronized, readers may still see stale values.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

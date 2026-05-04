@@ -115,6 +115,34 @@ String s = (String) b.get();  // inserted by compiler
 
 The JVM sees no generics — all safety is a compile-time guarantee.
 
+<Exercise>
+Use `Class<T>` as a type token to implement `isInstanceOf(Object obj, Class<T> type)` that returns `true` when `obj` is an instance of `type`, without using the `instanceof` operator.
+
+```java
+public class Main {
+    // TODO: implement isInstanceOf using Class<T>.isInstance()
+    static <T> boolean isInstanceOf(Object obj, Class<T> type) {
+        return false;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(isInstanceOf("hello", String.class));  // true
+        System.out.println(isInstanceOf(42,       String.class));  // false
+        System.out.println(isInstanceOf(42,       Integer.class)); // true
+        System.out.println(isInstanceOf(null,     String.class));  // false
+    }
+}
+```
+
+**What to verify:**
+- `"hello"` is an instance of `String` → `true`
+- `42` is not an instance of `String` → `false`
+- `42` is an instance of `Integer` → `true`
+- `null` returns `false`
+
+<Note>Hint: `Class` has an `isInstance(Object obj)` method that does exactly what you need.</Note>
+</Exercise>
+
 ## What you cannot do because of erasure
 
 ```java
@@ -144,6 +172,37 @@ String s = strings.get(1);   // ClassCastException at runtime!
 ```
 
 This is **heap pollution**: a `List<String>` reference points to a list that actually contains an Integer. The cast fails far from where the bad element was inserted, making the bug hard to find.
+
+<Exercise>
+The snippet below uses raw types in two places. Rewrite `printNames` with proper generic types so the compiler can verify correctness without any casts or unchecked warnings.
+
+```java
+import java.util.*;
+
+public class Main {
+    // TODO: fix raw-type usage — add proper type parameters
+    static void printNames(List names) {
+        for (Object name : names) {
+            // raw cast is unsafe:
+            System.out.println(((String) name).toUpperCase());
+        }
+    }
+
+    public static void main(String[] args) {
+        List names = new ArrayList();
+        names.add("alice");
+        names.add("bob");
+        printNames(names);
+    }
+}
+```
+
+**What to verify:**
+- Output is `ALICE` then `BOB`
+- No raw-type or unchecked-cast warnings remain
+
+<Note>Hint: change `List` to `List<String>` in both the method parameter and the local variable, then remove the `(String)` cast.</Note>
+</Exercise>
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 

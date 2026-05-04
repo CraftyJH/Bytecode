@@ -167,6 +167,45 @@ Constructor references are most useful with `Collectors.toCollection()` and fact
 List<String> mutable = stream.collect(Collectors.toCollection(ArrayList::new));
 ```
 
+<Exercise>
+Rewrite each of the four lambdas below as a method reference — one of each form: static, bound instance, unbound instance, and constructor.
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // 1. Static method reference — replace lambda with Integer::parseInt
+        Function<String, Integer> parse = s -> Integer.parseInt(s);
+
+        // 2. Bound instance method reference — replace lambda with System.out::println
+        Consumer<String> print = s -> System.out.println(s);
+
+        // 3. Unbound instance method reference — replace lambda with String::toUpperCase
+        Function<String, String> upper = s -> s.toUpperCase();
+
+        // 4. Constructor reference — replace lambda with ArrayList::new
+        Supplier<List<String>> listMaker = () -> new ArrayList<>();
+
+        // Verify
+        System.out.println(parse.apply("99"));          // 99
+        print.accept("bound ref");                       // bound ref
+        System.out.println(upper.apply("hello"));        // HELLO
+        System.out.println(listMaker.get().getClass().getSimpleName()); // ArrayList
+    }
+}
+```
+
+**What to verify:**
+- `parse.apply("99")` prints `99`
+- `print.accept("bound ref")` prints `bound ref`
+- `upper.apply("hello")` prints `HELLO`
+- `listMaker.get().getClass().getSimpleName()` prints `ArrayList`
+
+<Note>Hint: replace each lambda body with the shortest method reference of the correct form.</Note>
+</Exercise>
+
 ## When to prefer method references over lambdas
 
 A method reference is preferable when the lambda *only* calls a single method and passes the arguments through unchanged:
@@ -182,6 +221,37 @@ A method reference is preferable when the lambda *only* calls a single method an
 ```
 
 The rule of thumb: if reading the method reference name is *more* informative than reading the lambda body, use the reference.
+
+<Exercise>
+Take the lambda-based pipeline below and convert every lambda to a method reference.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    static boolean isLong(String s) { return s.length() > 4; }
+
+    public static void main(String[] args) {
+        List<String> words = List.of("hi", "hello", "java", "streams", "rock");
+
+        List<String> result = words.stream()
+            .filter(s -> isLong(s))            // TODO: static ref
+            .map(s -> s.toUpperCase())         // TODO: unbound ref
+            .sorted((a, b) -> a.compareTo(b)) // TODO: unbound ref
+            .collect(Collectors.toList());
+
+        result.forEach(s -> System.out.println(s)); // TODO: bound ref
+    }
+}
+```
+
+**What to verify:**
+- Output lines (one per matching word, in order): `HELLO`, `JAVA`, `ROCK`, `STREAMS`
+- The final version contains zero inline lambdas — every step uses a method reference
+
+<Note>Hint: `Main::isLong`, `String::toUpperCase`, `String::compareTo`, `System.out::println`.</Note>
+</Exercise>
 
 ## Try it
 

@@ -113,6 +113,40 @@ public class StopFlag {
 
 <Note>`volatile` does NOT make `counter++` atomic. That operation is three steps: read current value, add 1, write back. Two threads can interleave those steps and lose updates, even on a volatile field. Use `AtomicInteger` for counter patterns.</Note>
 
+<Exercise>
+Use a `volatile boolean` stop flag to coordinate a worker thread. The worker loops while the flag is `true`, printing a message each iteration. The main thread sleeps 100 ms then sets the flag to `false`, causing the worker to exit cleanly.
+
+```java
+public class Main {
+    static volatile boolean running = true;
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread worker = new Thread(() -> {
+            int iterations = 0;
+            while (running) {
+                // TODO: increment iterations
+                try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
+            }
+            System.out.println("Worker stopped after " + iterations + " iterations");
+        });
+
+        worker.start();
+        Thread.sleep(100);
+        // TODO: set running to false
+        worker.join();
+        System.out.println("Main done");
+    }
+}
+```
+
+**What to verify:**
+- `"Worker stopped after N iterations"` is printed (N is typically around 9–10)
+- `"Main done"` appears afterwards
+- The program exits on its own — no hanging loop
+
+<Note>Hint: without `volatile`, the JVM may cache `running` in a CPU register and the worker may never see the write from main. The `volatile` keyword ensures the write is immediately visible.</Note>
+</Exercise>
+
 ## AtomicInteger and AtomicLong
 
 The `java.util.concurrent.atomic` package provides classes that perform compound operations atomically using CPU-level compare-and-swap (CAS) instructions — no lock required:
@@ -211,6 +245,43 @@ public class Main {
 ```
 
 Then experiment with `getAndIncrement()` — print its return value inside the loop to see each thread capturing unique sequence numbers.
+
+<Exercise>
+Implement a thread-safe counter using `AtomicInteger`. Run 10 threads, each calling `increment()` 1000 times. After all threads finish, assert that the result is exactly 10000.
+
+```java
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Main {
+    static AtomicInteger counter = new AtomicInteger(0);
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread[] threads = new Thread[10];
+
+        for (int i = 0; i < 10; i++) {
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < 1000; j++) {
+                    // TODO: atomically increment counter
+                }
+            });
+        }
+
+        for (Thread t : threads) t.start();
+        for (Thread t : threads) t.join();
+
+        int result = counter.get();
+        System.out.println("Result: " + result);
+        System.out.println("Correct: " + (result == 10000));
+    }
+}
+```
+
+**What to verify:**
+- `"Result: 10000"` is printed every single run
+- `"Correct: true"` is printed
+
+<Note>Hint: use `incrementAndGet()` or `getAndIncrement()` — both are atomic. Contrast this with a plain `int` counter, which would produce inconsistent results.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 
