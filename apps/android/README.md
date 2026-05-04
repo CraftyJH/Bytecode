@@ -68,16 +68,14 @@ ANDROID_SIGNING_KEY_PASSWORD=your-key-password
 
 Workflow: `.github/workflows/android-build.yml`
 
-- Triggers on pushes/PRs that touch `apps/android/**` (and manually via workflow dispatch)
-- Requires Gradle wrapper files committed in `apps/android/`:
-  - `gradlew`
-  - `gradlew.bat`
-  - `gradle/wrapper/gradle-wrapper.jar`
-  - `gradle/wrapper/gradle-wrapper.properties`
-- Builds:
-  - `assembleDebug`
-  - `assembleRelease`
+- Triggers on pushes/PRs that touch `apps/android/**` (and manually via workflow dispatch).
+- Pipeline stages:
+  - `:app:lintDebug`
+  - `:app:testDebugUnitTest`
+  - `:app:assembleDebug`
+  - `:app:assembleRelease`
 - Uploads APK artifacts for both debug and release builds.
+- If Gradle wrapper files are missing from the repo, the workflow auto-generates them in CI before running tasks.
 
 Optional repository secrets for runtime/build config:
 
@@ -85,3 +83,10 @@ Optional repository secrets for runtime/build config:
 - `ANDROID_SUPABASE_PUBLISHABLE_KEY`
 - `ANDROID_BYTECODE_API_URL`
 - `ANDROID_WEB_BASE_URL`
+
+Optional repository secrets for signed release artifacts:
+
+- `ANDROID_SIGNING_STORE_BASE64` (base64-encoded JKS file contents)
+- `ANDROID_SIGNING_STORE_PASSWORD`
+- `ANDROID_SIGNING_KEY_ALIAS`
+- `ANDROID_SIGNING_KEY_PASSWORD`
