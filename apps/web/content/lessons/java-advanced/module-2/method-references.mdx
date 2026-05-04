@@ -1,0 +1,236 @@
+export const meta = {
+  title: "Method References — Four Forms",
+  duration: 13,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "mr-mid-1",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Convert the lambda to a method reference. The method `Integer.parseInt` is static and takes a `String`:",
+    code: `Function<String, Integer> parse = ___::___;`,
+    correctAnswers: ["Integer::parseInt"],
+    caseSensitive: true,
+    explanation: "`Integer.parseInt` is a static method, so the method reference form is `ClassName::staticMethodName`, giving `Integer::parseInt`. This is the static method reference form.",
+  },
+  endQ1: {
+    id: "mr-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which form of method reference is `String::toUpperCase` when used as a `Function<String, String>`?",
+    options: [
+      { text: "Static method reference", correct: false, feedback: "`toUpperCase` is an instance method, not static. Static method references look like `ClassName::staticMethod`." },
+      { text: "Bound instance method reference", correct: false, feedback: "A bound reference captures a specific instance: `myStr::toUpperCase`. `String::toUpperCase` does not capture an instance — it expects one to be supplied as the first argument." },
+      { text: "Unbound instance method reference", correct: true, feedback: "Correct — `String::toUpperCase` is *unbound*. When used as `Function<String, String>`, the lambda runtime supplies the `String` instance as the first (and only) argument." },
+      { text: "Constructor reference", correct: false, feedback: "Constructor references use `::new`. `String::toUpperCase` is a method, not a constructor." },
+    ],
+    explanation: "An unbound instance method reference `ClassName::instanceMethod` leaves the receiver unspecified. When the lambda is invoked, the first argument becomes the `this` for the method call. `String::toUpperCase` as `Function<String, String>` means `s -> s.toUpperCase()`.",
+  },
+  endQ2: {
+    id: "mr-end-2",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> words = Arrays.asList("banana", "apple", "cherry");
+        words.stream()
+            .sorted(String::compareTo)
+            .forEach(System.out::println);
+    }
+}`,
+    expectedOutput: "apple\nbanana\ncherry",
+    explanation: "`String::compareTo` is an unbound instance method reference used as a `Comparator<String>`. It sorts alphabetically. `System.out::println` is a bound instance method reference — `println` is called on the `System.out` `PrintStream` instance.",
+  },
+  endQ3: {
+    id: "mr-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Supplier<List<String>> listMaker = ArrayList::new;
+        List<String> words = List.of("hello", "world");
+        List<String> copy = words.stream()
+            .collect(Collectors.toCollection(List::new));
+        System.out.println(copy);
+    }
+}`,
+    buggyLine: 9,
+    issue: "`List` is an interface — it has no constructor. `List::new` does not compile. Use a concrete class such as `ArrayList::new`.",
+    explanation: "Constructor references require a *concrete* class with an accessible constructor. `List` is an interface with no constructor. Replace `List::new` with `ArrayList::new` (or another `List` implementation) to fix the error.",
+  },
+};
+
+Method references are method references are a shorthand notation for lambdas that do nothing but call a single existing method. Where a lambda would be `s -> s.toUpperCase()`, a method reference is `String::toUpperCase`. The JVM generates the same bytecode — the difference is purely in how much you type and how clearly the intent reads.
+
+The four forms cover every scenario you'll encounter. Learning to recognise them by shape turns unfamiliar library code from mysterious to immediately readable.
+
+## Form 1 — Static method reference
+
+`ClassName::staticMethodName`
+
+Used when the method is `static`. The lambda's arguments are passed directly to the static method.
+
+```java
+// Lambda                         Method reference
+s -> Integer.parseInt(s)          Integer::parseInt
+n -> Math.abs(n)                  Math::abs
+(a, b) -> Integer.max(a, b)       Integer::max
+```
+
+```java
+import java.util.function.*;
+
+Function<String, Integer> parse = Integer::parseInt;
+System.out.println(parse.apply("42")); // 42
+```
+
+## Form 2 — Bound instance method reference
+
+`instance::instanceMethodName`
+
+The receiver is fixed to a specific object that was captured when the reference was created. The lambda's arguments become the method's arguments.
+
+```java
+String prefix = "Hello, ";
+// Lambda:                              Bound reference:
+s -> prefix.concat(s)                  prefix::concat
+
+PrintStream out = System.out;
+s -> out.println(s)                    System.out::println
+```
+
+```java
+Consumer<String> log = System.out::println;
+log.accept("bound reference");  // bound reference
+```
+
+## Form 3 — Unbound instance method reference
+
+`ClassName::instanceMethodName`
+
+No receiver is captured. When the lambda is invoked, the *first* argument becomes `this` for the method call.
+
+```java
+// Lambda                              Unbound reference
+s -> s.toUpperCase()                   String::toUpperCase
+s -> s.length()                        String::length
+(s, regex) -> s.split(regex)           String::split
+```
+
+This form is especially common in stream pipelines:
+
+```java
+List.of("alice", "bob", "carol")
+    .stream()
+    .map(String::toUpperCase)   // unbound: each element becomes `this`
+    .sorted(String::compareTo)  // unbound Comparator: (a, b) -> a.compareTo(b)
+    .forEach(System.out::println); // bound: always prints to System.out
+```
+
+<Note>The difference between bound and unbound is whether the receiver is fixed at reference creation time. `"prefix"::concat` captures the specific string `"prefix"`. `String::concat` expects the receiver to be supplied as the first argument at call time.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Form 4 — Constructor reference
+
+`ClassName::new`
+
+Constructs a new instance. The lambda's arguments become constructor arguments.
+
+```java
+// Supplier — zero-argument constructor
+Supplier<ArrayList<String>> maker = ArrayList::new;
+ArrayList<String> list = maker.get();
+
+// Function — single-argument constructor
+Function<String, StringBuilder> builder = StringBuilder::new;
+StringBuilder sb = builder.apply("start");
+
+// BiFunction — two-argument constructor
+BiFunction<String, Integer, String> repeated = String::new; // not useful here, just illustrative
+```
+
+Constructor references are most useful with `Collectors.toCollection()` and factory methods:
+
+```java
+// Collect into a specific List implementation
+List<String> mutable = stream.collect(Collectors.toCollection(ArrayList::new));
+```
+
+## When to prefer method references over lambdas
+
+A method reference is preferable when the lambda *only* calls a single method and passes the arguments through unchanged:
+
+```java
+// Prefer method reference — the lambda adds nothing
+.map(s -> s.trim())          →  .map(String::trim)
+.forEach(x -> list.add(x))  →  .forEach(list::add)
+
+// Keep the lambda — the lambda adds real logic
+.map(s -> s.trim().toLowerCase())   // two chained calls, no single method
+.filter(n -> n > 0 && n < 100)      // compound expression
+```
+
+The rule of thumb: if reading the method reference name is *more* informative than reading the lambda body, use the reference.
+
+## Try it
+
+Start with this pipeline and replace every eligible lambda with a method reference:
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    static boolean isLong(String s) { return s.length() > 4; }
+
+    public static void main(String[] args) {
+        List<String> words = List.of("hi", "hello", "java", "streams", "rock");
+        List<String> result = words.stream()
+            .filter(s -> isLong(s))          // -> static ref
+            .map(s -> s.toUpperCase())       // -> unbound ref
+            .sorted((a, b) -> a.compareTo(b)) // -> unbound ref
+            .collect(Collectors.toList());
+        result.forEach(s -> System.out.println(s)); // -> bound ref
+    }
+}
+```
+
+After refactoring, the pipeline should use four method references and zero inline lambdas.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using `List::new` for a constructor reference** — `List` is an interface with no constructor. Use `ArrayList::new`, `LinkedList::new`, or another concrete class.
+- **Confusing bound and unbound** — `System.out::println` is bound to the specific `out` object. `PrintStream::println` would be unbound and require a `PrintStream` as the first argument. Pick bound for "always use this object", unbound for "apply to each element".
+- **Overusing method references** — when the lambda has more logic than a single forwarding call, a lambda is clearer. `s -> prefix + s.trim()` is better left as a lambda.
+- **Forgetting that an unbound reference adds a parameter** — `String::compareTo` as a `Comparator<String>` receives two strings: the receiver and the argument. If the arity doesn't match the target functional interface, the compiler will tell you.
+
+## Recap
+
+- **Static:** `ClassName::staticMethod` — arguments forwarded directly
+- **Bound:** `instance::method` — receiver is a captured object
+- **Unbound:** `ClassName::instanceMethod` — first argument becomes the receiver
+- **Constructor:** `ClassName::new` — constructs an instance
+- Prefer method references when they name the operation more clearly than the lambda body does
+
+**Up next:** Stream pipelines — filter, map, flatMap, and lazy evaluation.

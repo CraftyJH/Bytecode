@@ -1,0 +1,228 @@
+export const meta = {
+  title: "Terminal Operations — reduce, count, findFirst, anyMatch",
+  duration: 14,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "st-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the purpose of the *identity* value in `reduce(identity, accumulator)`?",
+    options: [
+      { text: "It is returned only when the stream has exactly one element.", correct: false, feedback: "The identity is the starting value for the accumulation, used regardless of stream size." },
+      { text: "It is the starting value for the accumulation and the result for an empty stream.", correct: true, feedback: "Correct — the identity acts as both the initial accumulator value and the result when the stream is empty. For sum, identity is 0; for product, it is 1." },
+      { text: "It is the maximum allowed value in the stream.", correct: false, feedback: "The identity has nothing to do with bounding values. It is purely the neutral element for the combining operation." },
+      { text: "It replaces elements that fail the accumulator's type check.", correct: false, feedback: "There is no type check inside reduce. The identity is simply the mathematical neutral element for the binary operation." },
+    ],
+    explanation: "The identity must be neutral with respect to the operation: `identity op x == x` for all `x`. For addition, identity is `0` (0 + x = x). For multiplication it is `1`. For string concatenation it is `\"\"`. Using a non-identity starting value will produce an incorrect result when the stream is empty.",
+  },
+  endQ1: {
+    id: "st-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(1, 2, 3, 4, 5);
+
+        int product = nums.stream()
+            .reduce(1, (a, b) -> a * b);
+
+        Optional<Integer> first = nums.stream()
+            .filter(n -> n > 3)
+            .findFirst();
+
+        System.out.println(product);
+        System.out.println(first.orElse(-1));
+    }
+}`,
+    expectedOutput: "120\n4",
+    explanation: "`reduce(1, (a, b) -> a * b)` starts at 1 and multiplies each element: 1*1=1, 1*2=2, 2*3=6, 6*4=24, 24*5=120. `filter(n -> n > 3)` passes 4 and 5; `findFirst()` returns an `Optional` containing 4. `orElse(-1)` unwraps it to `4`.",
+  },
+  endQ2: {
+    id: "st-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the terminal operation that returns `true` if every element of the stream satisfies the predicate:",
+    code: `boolean allPositive = nums.stream().___( n -> n > 0);`,
+    correctAnswers: ["allMatch"],
+    caseSensitive: true,
+    explanation: "`allMatch(predicate)` returns `true` only if every element matches. It short-circuits on the first non-matching element. `anyMatch` returns true if at least one matches; `noneMatch` returns true if none match.",
+  },
+  endQ3: {
+    id: "st-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(3, 1, 4, 1, 5, 9);
+        int max = nums.stream()
+            .reduce(0, Integer::max);
+        System.out.println("max: " + max);
+    }
+}`,
+    buggyLine: 7,
+    issue: "The identity value `0` is wrong for a max operation on a list that could contain only negative numbers. When the stream is empty, it would incorrectly return 0. For a general max, use the no-identity `reduce(Integer::max)` which returns `Optional<Integer>`.",
+    explanation: "Using `0` as the identity for `max` will fail silently when all elements are negative (e.g., `[-3, -1, -5]` would return `0`, not `-1`). The correct approach for general max is `reduce(Integer::max)` which returns `Optional<Integer>`, forcing you to handle the empty case, or use `IntStream.of(...).max()`.",
+  },
+};
+
+Terminal operations are where stream pipelines actually *do* something. Until a terminal operation runs, no element has been processed — the pipeline is just a recipe. Terminal operations trigger execution, consume the stream, and produce a result (a value, a side effect, or a collection). This lesson covers the full set: counting, matching, finding, reducing, and primitive stream arithmetic.
+
+## forEach and count
+
+The simplest terminals:
+
+```java
+List<String> names = List.of("Alice", "Bob", "Carol");
+
+// forEach — side effect, returns void
+names.stream().forEach(System.out::println);
+
+// count — number of elements that reach the terminal
+long n = names.stream().filter(s -> s.length() > 3).count(); // 2
+```
+
+`forEach` processes every element for its side effect. `count` is equivalent to `reduce(0L, (acc, e) -> acc + 1)` but may be optimised by the JVM.
+
+## Primitive stream arithmetic: sum, average, min, max
+
+Generic `Stream<T>` has no arithmetic — boxing `Integer` objects just to add them is wasteful. Use primitive streams:
+
+```java
+import java.util.stream.*;
+
+int sum  = IntStream.of(1, 2, 3, 4, 5).sum();         // 15
+double avg = IntStream.of(1, 2, 3, 4, 5).average()
+               .orElse(0.0);                           // 3.0
+int min  = IntStream.of(4, 1, 9, 2).min().orElseThrow(); // 1
+int max  = IntStream.of(4, 1, 9, 2).max().orElseThrow(); // 9
+```
+
+`min()` and `max()` return `OptionalInt` because the stream may be empty. Always handle the optional.
+
+When starting from a `Stream<T>`, bridge with `mapToInt`:
+
+```java
+List<String> words = List.of("hi", "hello", "world");
+int totalChars = words.stream().mapToInt(String::length).sum(); // 12
+```
+
+## reduce
+
+`reduce` folds the stream to a single value using a binary operation.
+
+**Two-argument form** (always returns the type, uses identity):
+
+```java
+int sum     = IntStream.rangeClosed(1, 5).reduce(0, Integer::sum); // 15
+int product = IntStream.rangeClosed(1, 5).reduce(1, (a, b) -> a * b); // 120
+```
+
+**One-argument form** (returns Optional — handles empty stream gracefully):
+
+```java
+Optional<Integer> max = Stream.of(3, 1, 4, 1, 5).reduce(Integer::max);
+max.ifPresent(System.out::println); // 5
+```
+
+<Note>The identity value must be neutral for the operation: `identity op x == x` for all x. Zero for addition, one for multiplication, empty string for concatenation. Using a wrong identity silently corrupts results on empty streams.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## findFirst and findAny
+
+Both return an `Optional<T>`. `findFirst` respects encounter order; `findAny` may return any element (faster in parallel streams):
+
+```java
+List<Integer> nums = List.of(1, 2, 3, 4, 5);
+
+Optional<Integer> firstEven = nums.stream()
+    .filter(n -> n % 2 == 0)
+    .findFirst();                          // Optional[2]
+
+System.out.println(firstEven.orElse(-1)); // 2
+```
+
+If no element matches the filter, `findFirst()` returns `Optional.empty()`.
+
+## anyMatch, allMatch, noneMatch
+
+These short-circuit terminals stop as soon as the result is determined:
+
+```java
+List<Integer> nums = List.of(-2, 0, 3, 5, -1);
+
+boolean anyNeg  = nums.stream().anyMatch(n -> n < 0);  // true  (stops at -2)
+boolean allPos  = nums.stream().allMatch(n -> n > 0);  // false (stops at -2)
+boolean noneNaN = nums.stream().noneMatch(Double::isNaN); // true
+```
+
+`anyMatch` is `true` if at least one element satisfies the predicate — equivalent to `filter(pred).findFirst().isPresent()` but potentially faster.
+
+## Try it
+
+Try these three terminals on the same list:
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(4, 7, 2, 9, 1, 6, 3, 8, 5);
+
+        // Sum with reduce
+        int total = nums.stream().reduce(0, Integer::sum);
+        System.out.println("sum: " + total); // 45
+
+        // Find first even number
+        Optional<Integer> firstEven = nums.stream()
+            .filter(n -> n % 2 == 0)
+            .findFirst();
+        System.out.println("first even: " + firstEven.orElse(-1)); // 4
+
+        // Check all positive
+        boolean allPositive = nums.stream().allMatch(n -> n > 0);
+        System.out.println("all positive: " + allPositive); // true
+    }
+}
+```
+
+After running, change `reduce(0, Integer::sum)` to `mapToInt(Integer::intValue).sum()` — both produce the same result but the second avoids boxing.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using the two-argument `reduce` without a valid identity** — `reduce(0, Integer::max)` is wrong for lists with negative numbers; 0 is not neutral for `max`. Use the one-argument form which returns an `Optional`.
+- **Calling `findFirst()` without handling the Optional** — `findFirst().get()` throws `NoSuchElementException` on empty results. Always use `orElse`, `orElseGet`, or `orElseThrow`.
+- **Using `forEach` when you need a return value** — `forEach` is for side effects and returns `void`. If you need to aggregate, use `reduce`, `collect`, or a specific terminal.
+- **Expecting `anyMatch` to always scan the whole stream** — it short-circuits. If you're relying on a side effect inside the predicate for every element, use `forEach` instead.
+
+## Recap
+
+- `forEach(action)` runs a side effect on every element; returns `void`
+- `count()` returns the number of elements reaching the terminal
+- `sum()`, `average()`, `min()`, `max()` live on primitive streams (`IntStream`, etc.)
+- `reduce(identity, op)` folds elements to a single value; use the one-arg form to get `Optional`
+- `findFirst()` / `findAny()` return `Optional<T>` — handle the empty case
+- `anyMatch` / `allMatch` / `noneMatch` short-circuit for efficiency
+
+**Up next:** Collectors — grouping, partitioning, joining, and downstream aggregation.

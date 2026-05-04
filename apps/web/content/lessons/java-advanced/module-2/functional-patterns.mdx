@@ -1,0 +1,318 @@
+export const meta = {
+  title: "Capstone: Functional Design Patterns",
+  duration: 18,
+  order: 10,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "fp-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the key benefit of memoizing a function with `Map.computeIfAbsent`?",
+    options: [
+      { text: "It automatically parallelises the computation across threads.", correct: false, feedback: "`computeIfAbsent` has no parallel semantics. It only avoids recomputing values already in the cache." },
+      { text: "It ensures each distinct input is computed at most once, caching the result for future calls.", correct: true, feedback: "Correct — the map acts as a cache. On the first call with a given key, the supplier is invoked and the result stored. Subsequent calls with the same key return the cached value without re-running the supplier." },
+      { text: "It makes the function return a default value when the input is null.", correct: false, feedback: "`computeIfAbsent` is about caching, not null handling. It still runs the mapping function for every new key, regardless of nullity." },
+      { text: "It converts the function into a pure function by removing all side effects.", correct: false, feedback: "Memoization assumes the function is already pure (same input → same output). It cannot convert a side-effectful function into a pure one." },
+    ],
+    explanation: "`Map.computeIfAbsent(key, fn)` calls `fn(key)` only if `key` is absent, stores the result, and returns it. For expensive pure functions (e.g., recursive Fibonacci, database lookups), this avoids redundant computation. The function must be deterministic — same input must always produce the same output.",
+  },
+  endQ1: {
+    id: "fp-end-1",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `import java.util.*;
+import java.util.function.*;
+
+public class Main {
+    static Map<Integer, Long> cache = new HashMap<>();
+
+    static long fib(int n) {
+        if (n <= 1) return n;
+        return cache.computeIfAbsent(n, k -> fib(k - 1) + fib(k - 2));
+    }
+
+    public static void main(String[] args) {
+        System.out.println(fib(10));
+        System.out.println(cache.size());
+    }
+}`,
+    expectedOutput: "55\n9",
+    explanation: "`fib(10)` = 55. The cache stores results for inputs 2 through 10 (fib(0) and fib(1) return immediately without caching, fib(2) through fib(10) are cached). That is 9 entries: keys 2, 3, 4, 5, 6, 7, 8, 9, 10.",
+  },
+  endQ2: {
+    id: "fp-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Fill in the method name to add a filter step to a `Pipeline<T>` fluent builder that stores a `Predicate<T>` as a step:",
+    code: `Pipeline<String> p = Pipeline.<String>of()
+    .___(s -> s.length() > 3)
+    .map(String::toUpperCase);`,
+    correctAnswers: ["filter"],
+    caseSensitive: true,
+    explanation: "A fluent pipeline API models transformations as a chain of method calls. `filter(predicate)` records a step that will discard elements not matching the predicate when the pipeline is executed. The method returns `this` (or a new pipeline) to enable chaining.",
+  },
+  endQ3: {
+    id: "fp-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `import java.util.*;
+import java.util.function.*;
+
+public class Validator<T> {
+    private final List<Predicate<T>> rules = new ArrayList<>();
+
+    public Validator<T> addRule(Predicate<T> rule) {
+        rules.add(rule);
+        return this;
+    }
+
+    public boolean validate(T value) {
+        return rules.stream().allMatch(r -> r.test(value));
+    }
+
+    public static void main(String[] args) {
+        Validator<String> v = new Validator<String>()
+            .addRule(s -> !s.isBlank())
+            .addRule(s -> s.length() >= 4);
+        Predicate<String> combined = v.validate;
+        System.out.println(combined.test("hello"));
+    }
+}`,
+    buggyLine: 18,
+    issue: "`validate` is a method, not a field. `v.validate` is not valid Java syntax. Use `v::validate` to obtain a method reference, or call `v.validate(\"hello\")` directly.",
+    explanation: "In Java, methods are not first-class values you can reference without `::`. To get a `Predicate<String>` from `v.validate`, use the method reference `v::validate`. Then `combined.test(\"hello\")` works correctly, or simply call `v.validate(\"hello\")` without the intermediate variable.",
+  },
+};
+
+The previous lessons introduced lambdas, functional interfaces, streams, Optional, and composition as individual tools. This capstone lesson shows how those tools combine into recognisable *design patterns*: approaches to recurring problems that functional style solves more elegantly than traditional object-oriented solutions. By the end you'll have a mini stream-like fluent API you wrote yourself, giving you insight into how the real Java streams library works internally.
+
+## Pattern 1: Strategy with lambdas
+
+The classic Strategy pattern replaces a family of interchangeable algorithms with a common interface. Before lambdas, this required a class per strategy. With lambdas, a strategy is just a functional interface value:
+
+```java
+import java.util.function.*;
+import java.util.*;
+
+// Sorting strategies as lambdas — no extra classes needed
+Comparator<String> byLength = Comparator.comparingInt(String::length);
+Comparator<String> alphabetical = Comparator.naturalOrder();
+Comparator<String> byLengthThenAlpha = byLength.thenComparing(alphabetical);
+
+List<String> words = new ArrayList<>(List.of("fig", "apple", "kiwi", "cherry", "banana"));
+words.sort(byLengthThenAlpha);
+System.out.println(words); // [fig, kiwi, apple, cherry, banana]
+```
+
+A pricing engine using a discount strategy:
+
+```java
+@FunctionalInterface
+interface DiscountStrategy {
+    double apply(double price);
+}
+
+DiscountStrategy noDiscount   = price -> price;
+DiscountStrategy tenPercent   = price -> price * 0.9;
+DiscountStrategy halfPrice    = price -> price * 0.5;
+
+double checkout(double price, DiscountStrategy strategy) {
+    return strategy.apply(price);
+}
+
+System.out.println(checkout(100.0, tenPercent)); // 90.0
+```
+
+## Pattern 2: Pipeline
+
+A pipeline is a sequence of transformations applied to data. This is exactly what streams do, but you can build a lightweight version for specialised use cases:
+
+```java
+import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public class Pipeline<T> {
+    private final List<Function<List<T>, List<T>>> steps = new ArrayList<>();
+
+    public static <T> Pipeline<T> of() { return new Pipeline<>(); }
+
+    public Pipeline<T> filter(Predicate<T> pred) {
+        steps.add(list -> list.stream().filter(pred).collect(Collectors.toList()));
+        return this;
+    }
+
+    public Pipeline<T> map(UnaryOperator<T> fn) {
+        steps.add(list -> list.stream().map(fn).collect(Collectors.toList()));
+        return this;
+    }
+
+    public List<T> execute(List<T> input) {
+        List<T> result = new ArrayList<>(input);
+        for (Function<List<T>, List<T>> step : steps) {
+            result = step.apply(result);
+        }
+        return result;
+    }
+}
+```
+
+Usage:
+
+```java
+Pipeline<String> pipeline = Pipeline.<String>of()
+    .filter(s -> s.length() > 3)
+    .map(String::toUpperCase);
+
+List<String> output = pipeline.execute(
+    List.of("hi", "hello", "java", "streams")
+);
+System.out.println(output); // [HELLO, JAVA, STREAMS]
+```
+
+## Pattern 3: Memoization
+
+Pure functions always return the same output for the same input. When computation is expensive, cache results with `Map.computeIfAbsent`:
+
+```java
+import java.util.*;
+import java.util.function.*;
+
+public class Memoize {
+    public static <A, R> Function<A, R> of(Function<A, R> fn) {
+        Map<A, R> cache = new HashMap<>();
+        return arg -> cache.computeIfAbsent(arg, fn);
+    }
+}
+
+// Memoize an expensive computation
+Function<Integer, Long> fib = Memoize.of(n -> {
+    // naive recursive Fibonacci — slow without memoisation
+    if (n <= 1) return (long) n;
+    return fib.apply(n - 1) + fib.apply(n - 2); // fib captured below
+});
+// NOTE: for recursive memoisation, use a static Map (see Try it section)
+
+Function<String, Integer> countVowels = Memoize.of(s ->
+    (int) s.chars().filter("aeiou"::indexOf).count()
+);
+
+System.out.println(countVowels.apply("functional")); // 4
+System.out.println(countVowels.apply("functional")); // 4 (cached)
+```
+
+<Note>`Map.computeIfAbsent` is not thread-safe for recursive lambdas in Java 8 (it can deadlock). Use `ConcurrentHashMap` only for non-recursive memoization in concurrent contexts. For recursive memoization, a plain `HashMap` is simplest and correct when accessed single-threaded.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Pattern 4: Lazy evaluation with Supplier
+
+`Supplier<T>` defers computation until the value is actually needed:
+
+```java
+import java.util.function.*;
+
+// Without lazy: always computed, even if unused
+String eagerLog = "Result: " + expensiveComputation();
+
+// With lazy: only computed when logged
+Supplier<String> lazyLog = () -> "Result: " + expensiveComputation();
+if (debugEnabled) System.out.println(lazyLog.get()); // only calls expensiveComputation here
+```
+
+Optional uses the same idea with `orElseGet(() -> fallback())`. Libraries like SLF4J use suppliers for lazy log message formatting to avoid string concatenation when the log level is off.
+
+## Try it
+
+Build the complete `Pipeline<T>` class with `filter`, `map`, and `toList`, then exercise it:
+
+```java
+import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public class Main {
+    static class Pipeline<T> {
+        private final List<UnaryOperator<List<T>>> steps = new ArrayList<>();
+
+        public static <T> Pipeline<T> start() { return new Pipeline<>(); }
+
+        public Pipeline<T> filter(Predicate<T> pred) {
+            steps.add(list -> list.stream()
+                .filter(pred).collect(Collectors.toList()));
+            return this;
+        }
+
+        @SuppressWarnings("unchecked")
+        public <R> Pipeline<R> map(Function<T, R> fn) {
+            Pipeline<R> next = new Pipeline<>();
+            next.steps.addAll((List) steps);
+            next.steps.add(list -> ((List<T>) list).stream()
+                .map(fn).collect(Collectors.toList()));
+            return next;
+        }
+
+        public List<T> toList(List<T> source) {
+            List<T> result = new ArrayList<>(source);
+            for (UnaryOperator<List<T>> step : steps) result = step.apply(result);
+            return result;
+        }
+    }
+
+    public static void main(String[] args) {
+        List<String> words = List.of("hi", "hello", "world", "java", "fun", "streams");
+
+        List<String> result = Pipeline.<String>start()
+            .filter(s -> s.length() > 3)
+            .map(String::toUpperCase)
+            .toList(words);
+
+        System.out.println(result); // [HELLO, WORLD, JAVA, STREAMS]
+
+        // Memoised vowel counter
+        Map<String, Long> vowelCache = new HashMap<>();
+        Function<String, Long> countVowels = w ->
+            vowelCache.computeIfAbsent(w,
+                s -> s.chars().filter(c -> "aeiou".indexOf(c) >= 0).count());
+
+        words.forEach(w -> System.out.println(w + " -> " + countVowels.apply(w)));
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Memoizing impure functions** — if the function has side effects or depends on external state, caching silently returns stale results. Memoize only pure, deterministic functions.
+- **Building overly clever pipelines** — functional pipelines are great for transforming data, but deeply nested `andThen` / `compose` chains without named intermediate steps become unreadable. Extract named variables.
+- **Using `HashMap` for concurrent memoization** — `computeIfAbsent` on `HashMap` is not thread-safe. Use `ConcurrentHashMap` for shared caches, being aware that the supplier may be called more than once for the same key under race conditions.
+- **Forgetting that `Pipeline.execute` eagerly materialises each step** — unlike Java streams, this simple implementation builds an intermediate `List` at each step. Real streams avoid this with lazy spliterators. For high-throughput production work, prefer `Stream` over a hand-rolled pipeline.
+
+## Module recap
+
+You have completed **Module 2: Functional Java**. Here is what you now know:
+
+- **Lambda expressions** (`lesson 1`) — syntax, capture, effectively-final rules, `this` semantics
+- **Functional interfaces** (`lesson 2`) — the full `java.util.function` zoo, `@FunctionalInterface`, `andThen`/`negate`
+- **Method references** (`lesson 3`) — four forms (static, bound, unbound, constructor) and when each applies
+- **Stream pipelines — filter/map/flatMap** (`lesson 4`) — lazy evaluation, intermediate operations, `flatMap` for nested structures
+- **Terminal operations** (`lesson 5`) — `reduce`, `findFirst`, `anyMatch`/`allMatch`, primitive stream arithmetic
+- **Collectors** (`lesson 6`) — `groupingBy`, `joining`, `partitioningBy`, `toMap`, downstream collectors
+- **Optional** (`lesson 7`) — `ofNullable`, `orElse` vs `orElseGet`, `map`/`flatMap`, anti-patterns
+- **Composing functions** (`lesson 8`) — `andThen`/`compose`, `Predicate.and/or/negate`, point-free style
+- **Parallel streams** (`lesson 9`) — fork-join pool, stateless safety, encounter order, when to use
+- **Functional patterns** (`lesson 10`) — strategy, pipeline, memoization, lazy evaluation, fluent API
+
+The functional style is not a replacement for every Java idiom — loops, classes, and inheritance still have their place. But you now have the vocabulary to choose: when the data flows in a clear transformation chain, reach for streams and lambdas; when the logic is stateful and complex, reach for imperative control flow. Knowing both — and the trade-offs between them — is what makes you a well-rounded Java developer.

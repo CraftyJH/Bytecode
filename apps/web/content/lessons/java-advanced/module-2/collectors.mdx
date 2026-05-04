@@ -1,0 +1,266 @@
+export const meta = {
+  title: "Collectors — toList, groupingBy, joining, partitioningBy",
+  duration: 15,
+  order: 6,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "col-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> words = List.of("apple", "ant", "banana", "avocado", "blueberry");
+        Map<Character, Long> result = words.stream()
+            .collect(Collectors.groupingBy(
+                s -> s.charAt(0),
+                Collectors.counting()
+            ));
+        // Print in sorted key order for determinism
+        new TreeMap<>(result).forEach((k, v) -> System.out.println(k + "=" + v));
+    }
+}`,
+    expectedOutput: "a=3\nb=2",
+    explanation: "Words starting with 'a': apple, ant, avocado (count=3). Words starting with 'b': banana, blueberry (count=2). `groupingBy` groups by first character; the downstream `counting()` collector counts elements in each group. Iterating via a `TreeMap` ensures alphabetical key order.",
+  },
+  endQ1: {
+    id: "col-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the return type of `Collectors.partitioningBy(predicate)`?",
+    options: [
+      { text: "`Map<Boolean, List<T>>`", correct: true, feedback: "Correct — `partitioningBy` always produces exactly two entries: key `true` for elements satisfying the predicate and key `false` for the rest." },
+      { text: "`List<List<T>>`", correct: false, feedback: "The result is a `Map`, not a nested `List`. The keys are `Boolean` values." },
+      { text: "`Map<String, List<T>>`", correct: false, feedback: "The keys are `Boolean` (true/false), not `String`." },
+      { text: "`Optional<Map<Boolean, List<T>>>`", correct: false, feedback: "`partitioningBy` always produces a map; it never returns an `Optional`." },
+    ],
+    explanation: "`partitioningBy` is a special case of `groupingBy` that always partitions into exactly two groups: elements where the predicate is `true` and elements where it is `false`. The map always contains both keys, even if one group is empty.",
+  },
+  endQ2: {
+    id: "col-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Fill in the collector that joins strings with a comma separator and wraps them in brackets, producing output like `[a, b, c]`:",
+    code: `String result = Stream.of("a", "b", "c")
+    .collect(Collectors.___(", ", "[", "]"));`,
+    correctAnswers: ["joining"],
+    caseSensitive: true,
+    explanation: "`Collectors.joining(delimiter, prefix, suffix)` concatenates stream elements as strings, placing `delimiter` between elements and wrapping with `prefix` and `suffix`. For `Stream.of(\"a\",\"b\",\"c\")` this produces `[a, b, c]`.",
+  },
+  endQ3: {
+    id: "col-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> words = List.of("apple", "banana", "cherry");
+        Map<Integer, String> byLength = words.stream()
+            .collect(Collectors.toMap(
+                String::length,
+                s -> s
+            ));
+        System.out.println(byLength);
+    }
+}`,
+    buggyLine: 7,
+    issue: "If two strings have the same length (e.g., both 6 characters), `toMap` throws `IllegalStateException: Duplicate key`. A merge function is required to handle collisions.",
+    explanation: "`Collectors.toMap(keyMapper, valueMapper)` throws on duplicate keys. Here `\"banana\"` and `\"cherry\"` both have length 6. Fix by providing a merge function: `Collectors.toMap(String::length, s -> s, (a, b) -> a + \",\" + b)` to combine duplicates.",
+  },
+};
+
+The `collect` terminal operation is how you pour a stream into a container — a list, a set, a map, or even a custom data structure. The `Collectors` utility class provides factory methods for the most common aggregation patterns. Knowing this API well transforms you from someone who can only `collect(Collectors.toList())` to someone who can express complex grouping and aggregation in a single readable expression.
+
+## toList and toUnmodifiableList
+
+```java
+import java.util.stream.*;
+
+List<String> mutable    = stream.collect(Collectors.toList());
+List<String> immutable  = stream.collect(Collectors.toUnmodifiableList());
+
+// Java 16+ shorthand (always unmodifiable):
+List<String> immutable2 = stream.toList();
+```
+
+Prefer `toUnmodifiableList()` / `toList()` when the caller should not modify the result. Pass `Collectors.toList()` when you need a mutable list (e.g., to pass to a method that calls `add`).
+
+## joining
+
+`joining()` concatenates `Stream<String>` elements:
+
+```java
+String csv = Stream.of("Alice", "Bob", "Carol")
+    .collect(Collectors.joining(", "));           // "Alice, Bob, Carol"
+
+String html = Stream.of("Alice", "Bob", "Carol")
+    .collect(Collectors.joining(", ", "<ul>", "</ul>"));
+// "<ul>Alice, Bob, Carol</ul>"
+```
+
+The three-argument form adds a prefix and suffix around the entire result — not around each element.
+
+## groupingBy
+
+`groupingBy(classifier)` partitions elements into groups by the value returned by the classifier function. The result is a `Map<K, List<T>>`:
+
+```java
+List<String> words = List.of("apple", "banana", "avocado", "blueberry", "apricot");
+
+Map<Character, List<String>> byLetter = words.stream()
+    .collect(Collectors.groupingBy(s -> s.charAt(0)));
+// {a=[apple, avocado, apricot], b=[banana, blueberry]}
+```
+
+A *downstream collector* processes the values within each group before they're placed in the map:
+
+```java
+// Count per group
+Map<Character, Long> counts = words.stream()
+    .collect(Collectors.groupingBy(s -> s.charAt(0), Collectors.counting()));
+
+// Uppercase values in each group
+Map<Character, List<String>> upper = words.stream()
+    .collect(Collectors.groupingBy(
+        s -> s.charAt(0),
+        Collectors.mapping(String::toUpperCase, Collectors.toList())
+    ));
+```
+
+<Note>The key iteration order of the map returned by `groupingBy` is unspecified (backed by a `HashMap`). Wrap it in `new TreeMap<>(result)` if you need sorted keys.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## counting and other downstream collectors
+
+`Collectors.counting()` is a downstream collector that counts elements in each group. There are several more useful ones:
+
+```java
+// Sum the lengths of strings in each group
+Map<Character, Integer> totalLength = words.stream()
+    .collect(Collectors.groupingBy(
+        s -> s.charAt(0),
+        Collectors.summingInt(String::length)
+    ));
+
+// Join strings in each group with a comma
+Map<Character, String> joined = words.stream()
+    .collect(Collectors.groupingBy(
+        s -> s.charAt(0),
+        Collectors.joining(", ")
+    ));
+```
+
+## partitioningBy
+
+`partitioningBy(predicate)` is like `groupingBy` with exactly two groups — `true` and `false`:
+
+```java
+List<Integer> nums = List.of(1, 2, 3, 4, 5, 6, 7, 8);
+
+Map<Boolean, List<Integer>> partition = nums.stream()
+    .collect(Collectors.partitioningBy(n -> n % 2 == 0));
+
+System.out.println(partition.get(true));  // [2, 4, 6, 8]
+System.out.println(partition.get(false)); // [1, 3, 5, 7]
+```
+
+Both keys always exist in the result map (even if one group is empty), so `partition.get(true)` is always safe — no null check needed.
+
+## toMap
+
+`toMap(keyMapper, valueMapper)` builds a `Map<K, V>` from a stream:
+
+```java
+Map<String, Integer> wordLengths = Stream.of("apple", "fig", "banana")
+    .collect(Collectors.toMap(
+        s -> s,           // key: the word itself
+        String::length    // value: its length
+    ));
+// {apple=5, fig=3, banana=6}
+```
+
+When duplicate keys are possible, supply a merge function as the third argument:
+
+```java
+Map<Integer, String> byLen = Stream.of("hi", "bye", "ok")
+    .collect(Collectors.toMap(
+        String::length,
+        s -> s,
+        (existing, incoming) -> existing + "," + incoming // merge duplicates
+    ));
+```
+
+## Try it
+
+Explore all three major patterns on a word list:
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> words = List.of(
+            "the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"
+        );
+
+        // Group by first letter
+        Map<Character, List<String>> grouped = words.stream()
+            .collect(Collectors.groupingBy(s -> s.charAt(0)));
+        new TreeMap<>(grouped).forEach((k, v) -> System.out.println(k + ": " + v));
+
+        System.out.println("---");
+
+        // Join with delimiter
+        String sentence = words.stream()
+            .distinct()
+            .sorted()
+            .collect(Collectors.joining(" | "));
+        System.out.println(sentence);
+
+        System.out.println("---");
+
+        // Partition by length >= 4
+        Map<Boolean, List<String>> parts = words.stream()
+            .collect(Collectors.partitioningBy(s -> s.length() >= 4));
+        System.out.println("long: "  + parts.get(true));
+        System.out.println("short: " + parts.get(false));
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Duplicate keys in `toMap`** — without a merge function, `toMap` throws `IllegalStateException` on any duplicate key. Always supply a merge function when duplicates are possible.
+- **Modifying a `toUnmodifiableList()` result** — it throws `UnsupportedOperationException`. Use `Collectors.toList()` if mutability is needed.
+- **Expecting `groupingBy` to return a sorted map** — the backing map is a `HashMap`. Wrap in `new TreeMap<>()` for sorted keys.
+- **Forgetting that `partitioningBy` always returns both keys** — unlike `groupingBy`, both `true` and `false` keys are always present. You never need to check for null.
+
+## Recap
+
+- `Collectors.toList()` — mutable; `toUnmodifiableList()` / `toList()` — immutable
+- `joining(delim, prefix, suffix)` — concatenates strings with optional wrapping
+- `groupingBy(fn)` — groups into `Map<K, List<T>>`; downstream collectors further process each group
+- `counting()`, `summingInt()`, `mapping()` are common downstream collectors
+- `partitioningBy(pred)` — two-key map (`true`/`false`), both keys always present
+- `toMap(key, value, merge)` — build arbitrary maps; always provide a merge function for safety
+
+**Up next:** Optional — eliminating null checks with a composable container type.

@@ -1,0 +1,240 @@
+export const meta = {
+  title: "Stream Pipelines — filter, map, flatMap",
+  duration: 15,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "sm-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> words = List.of("ant", "bear", "cat", "deer", "eel");
+        List<String> result = words.stream()
+            .filter(s -> s.length() > 3)
+            .map(String::toUpperCase)
+            .collect(Collectors.toList());
+        System.out.println(result);
+    }
+}`,
+    expectedOutput: "[BEAR, DEER]",
+    explanation: "`filter` keeps words longer than 3 characters: `\"bear\"` (4) and `\"deer\"` (4). `\"ant\"` (3), `\"cat\"` (3), and `\"eel\"` (3) are excluded. `map(String::toUpperCase)` converts the survivors to uppercase. The result is collected into a list.",
+  },
+  endQ1: {
+    id: "sm-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What does `flatMap` do that `map` does not?",
+    options: [
+      { text: "`flatMap` applies the function in parallel; `map` runs sequentially.", correct: false, feedback: "Neither `map` nor `flatMap` controls parallelism — that's determined by whether the stream itself is parallel." },
+      { text: "`flatMap` maps each element to a Stream and merges all those streams into one; `map` keeps each result as a separate element.", correct: true, feedback: "Correct — `flatMap(f)` is equivalent to `map(f)` followed by a flatten step that concatenates all the inner streams into a single stream." },
+      { text: "`flatMap` removes `null` elements; `map` does not.", correct: false, feedback: "`flatMap` does not remove nulls automatically. It merges inner streams — if those streams are empty, those elements simply disappear." },
+      { text: "`flatMap` is an optimised version of `map` for primitive types.", correct: false, feedback: "Primitive specialisations use `mapToInt`, `mapToLong`, `mapToDouble`. `flatMap` is about flattening nested structure, not primitive performance." },
+    ],
+    explanation: "`flatMap` is essential when each element maps to *multiple* elements — e.g., each sentence maps to a stream of words. Without it, you'd get a `Stream<Stream<String>>`; `flatMap` collapses that to a flat `Stream<String>`.",
+  },
+  endQ2: {
+    id: "sm-end-2",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<List<Integer>> nested = List.of(
+            List.of(1, 2, 3),
+            List.of(4, 5),
+            List.of(6)
+        );
+        long count = nested.stream()
+            .flatMap(Collection::stream)
+            .filter(n -> n % 2 == 0)
+            .count();
+        System.out.println(count);
+    }
+}`,
+    expectedOutput: "3",
+    explanation: "`flatMap(Collection::stream)` flattens the nested lists into a single stream: 1, 2, 3, 4, 5, 6. `filter(n -> n % 2 == 0)` keeps the even numbers: 2, 4, 6. `count()` returns 3.",
+  },
+  endQ3: {
+    id: "sm-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the intermediate operation that removes duplicate elements from a stream:",
+    code: `long uniqueCount = Stream.of(1, 2, 2, 3, 3, 3).___().count();`,
+    correctAnswers: ["distinct"],
+    caseSensitive: true,
+    explanation: "`distinct()` is an intermediate operation that filters out duplicate elements according to `equals()`. Applied to `1, 2, 2, 3, 3, 3` it produces `1, 2, 3`, so `count()` returns 3.",
+  },
+};
+
+Stream pipelines are how modern Java expresses data transformation. A pipeline is a sequence of operations applied to a source: each element flows through each stage and exits at the terminal operation. Understanding which operations are *intermediate* (lazy, return a new stream) versus *terminal* (eager, produce a result) is the key mental model for working with streams fluently.
+
+## Lazy evaluation — why it matters
+
+Intermediate operations do not execute immediately. They build a *description* of what to do. Execution only begins when a terminal operation runs — and it runs only enough to satisfy the terminal:
+
+```java
+List<Integer> nums = List.of(1, 2, 3, 4, 5);
+
+// This does nothing — no terminal operation
+nums.stream()
+    .filter(n -> { System.out.println("filter: " + n); return n > 2; })
+    .map(n -> { System.out.println("map: " + n); return n * 10; });
+
+// Add a terminal — now it runs, and the output interleaves:
+// filter: 1, filter: 2, filter: 3, map: 3, filter: 4, map: 4, ...
+nums.stream()
+    .filter(n -> n > 2)
+    .map(n -> n * 10)
+    .forEach(System.out::println); // triggers the whole pipeline
+```
+
+Laziness enables short-circuit operations like `findFirst()` and `limit()` to stop processing early, which would be impossible if every stage materialised a full intermediate list.
+
+## filter
+
+`filter(Predicate<T>)` keeps elements for which the predicate returns `true`.
+
+```java
+List<String> names = List.of("Alice", "Bob", "Anna", "Charlie");
+
+List<String> aNames = names.stream()
+    .filter(s -> s.startsWith("A"))
+    .collect(Collectors.toList());
+// [Alice, Anna]
+```
+
+The predicate is called for every element. Elements where it returns `false` are silently dropped from the downstream stages.
+
+## map
+
+`map(Function<T, R>)` transforms each element from type `T` to type `R`.
+
+```java
+List<String> words = List.of("hello", "world");
+
+List<Integer> lengths = words.stream()
+    .map(String::length)
+    .collect(Collectors.toList());
+// [5, 5]
+```
+
+The output stream has the same number of elements as the input; each is just a different type or value.
+
+<Note>When mapping to a primitive, prefer `mapToInt`, `mapToLong`, or `mapToDouble`. These return a primitive stream (`IntStream`, `LongStream`, `DoubleStream`) that avoids boxing and adds arithmetic terminals like `sum()` and `average()`.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## flatMap
+
+`flatMap(Function<T, Stream<R>>)` maps each element to a stream, then *flattens* all those streams into one:
+
+```java
+List<String> sentences = List.of("hello world", "java streams");
+
+List<String> words = sentences.stream()
+    .flatMap(sentence -> Arrays.stream(sentence.split(" ")))
+    .collect(Collectors.toList());
+// [hello, world, java, streams]
+```
+
+Without `flatMap`, using `map` would produce a `Stream<String[]>` or `Stream<Stream<String>>`, requiring an extra step to unwrap. `flatMap` is the idiomatic way to go from one-to-many.
+
+```java
+// Another common pattern: flatten nested lists
+List<List<String>> groups = List.of(
+    List.of("a", "b"),
+    List.of("c"),
+    List.of("d", "e", "f")
+);
+List<String> flat = groups.stream()
+    .flatMap(Collection::stream)
+    .collect(Collectors.toList());
+// [a, b, c, d, e, f]
+```
+
+## Other useful intermediate operations
+
+```java
+.distinct()           // remove duplicates (uses equals/hashCode)
+.sorted()             // natural order
+.sorted(comparator)   // custom order
+.limit(n)             // keep at most n elements
+.peek(action)         // run a side-effect, pass element through unchanged
+```
+
+`peek` is a debugging aid: insert it between stages to see what is flowing through without disturbing the pipeline.
+
+```java
+List.of(1, 2, 3, 4, 5).stream()
+    .filter(n -> n % 2 == 0)
+    .peek(n -> System.out.println("after filter: " + n))
+    .map(n -> n * n)
+    .peek(n -> System.out.println("after map: " + n))
+    .forEach(System.out::println);
+```
+
+<Note>Never rely on `peek` for production logic — its execution is not guaranteed when a terminal short-circuits. Use it only for debugging.</Note>
+
+## Try it
+
+Build a pipeline on a `List<String>` that keeps words longer than 3 characters, uppercases them, sorts alphabetically, and takes at most 3:
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<String> words = List.of(
+            "fig", "apple", "kiwi", "banana", "pear", "plum", "mango"
+        );
+
+        List<String> result = words.stream()
+            .filter(s -> s.length() > 3)
+            .map(String::toUpperCase)
+            .sorted()
+            .limit(3)
+            .collect(Collectors.toList());
+
+        System.out.println(result); // [APPLE, BANANA, KIWI]
+    }
+}
+```
+
+Experiment: change `limit(3)` to `limit(2)`, then add `.distinct()` after `.map()` and verify it has no effect here (all words are already distinct after uppercasing).
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting `flatMap` when mapping to collections** — `words.stream().map(s -> Arrays.stream(s.split("")))` gives a `Stream<IntStream>`, not the flat stream you wanted. Use `flatMap`.
+- **Using `peek` for production side effects** — `peek` is not guaranteed to run for every element when the terminal short-circuits (e.g., `findFirst`). Use `map` with a side effect inside if you truly need both, or separate the side effect and the transformation.
+- **Sorting before filtering** — sorting is O(n log n); filtering is O(n). Filter first to reduce the set, then sort the smaller result.
+- **Confusing `map` with `forEach`** — `map` transforms and returns a stream; `forEach` is a terminal that performs a side effect and returns `void`. You cannot chain after `forEach`.
+
+## Recap
+
+- Stream pipelines are **lazy**: intermediate operations run only when a terminal is reached
+- `filter(pred)` keeps elements matching the predicate
+- `map(fn)` transforms each element (same count, different value/type)
+- `flatMap(fn)` maps each element to a stream, then flattens all streams into one
+- `distinct()`, `sorted()`, `limit(n)`, `peek(action)` are handy intermediate helpers
+
+**Up next:** Terminal operations — reduce, count, findFirst, and the match family.

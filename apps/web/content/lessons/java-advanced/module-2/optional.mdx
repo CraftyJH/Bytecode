@@ -1,0 +1,235 @@
+export const meta = {
+  title: "Optional — Eliminating Null Checks",
+  duration: 13,
+  order: 7,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "opt-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the key difference between `orElse(value)` and `orElseGet(supplier)`?",
+    options: [
+      { text: "They are interchangeable — both evaluate the argument only when the Optional is empty.", correct: false, feedback: "`orElse` always evaluates its argument, even when the Optional already has a value. `orElseGet` evaluates the supplier lazily, only when needed." },
+      { text: "`orElse(value)` always evaluates `value`; `orElseGet(supplier)` only invokes the supplier when the Optional is empty.", correct: true, feedback: "Correct — `orElse(expensiveCall())` computes `expensiveCall()` even when the Optional is present. `orElseGet(() -> expensiveCall())` skips it entirely when the value exists." },
+      { text: "`orElseGet` is for non-null defaults; `orElse` is for null defaults.", correct: false, feedback: "Both accept non-null fallback values. The distinction is eager vs lazy evaluation, not nullability." },
+      { text: "`orElse` is deprecated since Java 11.", correct: false, feedback: "`orElse` is not deprecated. Both methods are current API." },
+    ],
+    explanation: "Prefer `orElseGet` when the fallback is expensive to compute (e.g., a database lookup or object construction). For cheap constants like `orElse(0)` or `orElse(\"\")`, either form is fine. The eagerness of `orElse` is a common source of unexpected work and subtle bugs.",
+  },
+  endQ1: {
+    id: "opt-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    static Optional<String> findUser(int id) {
+        return id == 1 ? Optional.of("Alice") : Optional.empty();
+    }
+
+    public static void main(String[] args) {
+        String name = findUser(1)
+            .map(String::toUpperCase)
+            .filter(s -> s.startsWith("A"))
+            .orElse("nobody");
+        System.out.println(name);
+
+        String other = findUser(99)
+            .map(String::toUpperCase)
+            .orElse("nobody");
+        System.out.println(other);
+    }
+}`,
+    expectedOutput: "ALICE\nnobody",
+    explanation: "For `id=1`, `findUser` returns `Optional.of(\"Alice\")`. `map(String::toUpperCase)` produces `Optional.of(\"ALICE\")`. `filter(s -> s.startsWith(\"A\"))` passes because `\"ALICE\"` starts with A. `orElse` is not triggered — result is `\"ALICE\"`. For `id=99`, `findUser` returns `Optional.empty()`. All subsequent operations on an empty Optional produce an empty Optional, and `orElse(\"nobody\")` supplies the fallback.",
+  },
+  endQ2: {
+    id: "opt-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the method that creates an Optional from a value that *might* be null (does not throw on null):",
+    code: `String value = null;
+Optional<String> opt = Optional.___(value);`,
+    correctAnswers: ["ofNullable"],
+    caseSensitive: true,
+    explanation: "`Optional.ofNullable(value)` returns `Optional.empty()` when `value` is null, or `Optional.of(value)` otherwise. Using `Optional.of(null)` throws `NullPointerException` immediately.",
+  },
+  endQ3: {
+    id: "opt-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Optional<String> name = Optional.of("Alice");
+        if (name.isPresent()) {
+            System.out.println(name.get());
+        }
+
+        Optional<String> empty = Optional.empty();
+        System.out.println(empty.get());
+    }
+}`,
+    buggyLine: 10,
+    issue: "Calling `Optional.get()` on an empty Optional throws `NoSuchElementException`. Always use `orElse`, `orElseGet`, `orElseThrow`, or check `isPresent()` first.",
+    explanation: "`Optional.get()` is the most dangerous method on Optional — it throws `NoSuchElementException` when the Optional is empty, which defeats the purpose of using Optional in the first place. Replace `empty.get()` with `empty.orElse(\"default\")` or `empty.orElseThrow()` with an informative message.",
+  },
+};
+
+`NullPointerException` is the most common runtime error in Java. For decades, the only defense was defensive null checks scattered through every method that touched a potentially-absent value. Java 8 introduced `Optional<T>` — a container that explicitly models the presence or absence of a value. Used correctly, it moves the possibility of absence into the type system, forcing callers to handle it instead of forgetting.
+
+## Creating an Optional
+
+```java
+Optional<String> present  = Optional.of("hello");       // must be non-null
+Optional<String> nullable = Optional.ofNullable(name);  // null -> empty
+Optional<String> empty    = Optional.empty();            // explicitly empty
+```
+
+`Optional.of(null)` throws `NullPointerException` immediately — use it when you *know* the value is non-null. `Optional.ofNullable` is the safe choice when the value might be null (e.g., results from legacy APIs or database queries).
+
+## Extracting the value
+
+The safest approaches avoid `get()` entirely:
+
+```java
+Optional<String> opt = Optional.of("hello");
+
+// orElse — fallback constant (always evaluated)
+String s1 = opt.orElse("default");              // "hello"
+
+// orElseGet — fallback supplier (lazy, only called when empty)
+String s2 = opt.orElseGet(() -> computeDefault()); // "hello" (supplier not called)
+
+// orElseThrow — throw an exception when empty
+String s3 = opt.orElseThrow(() -> new IllegalStateException("not found"));
+
+// ifPresent — side effect only when present
+opt.ifPresent(System.out::println);             // prints "hello"
+```
+
+<Note>Avoid `Optional.get()` — it throws `NoSuchElementException` on an empty Optional, exactly like a null dereference would throw NPE. If you find yourself writing `opt.get()`, ask whether `orElseThrow` would be more explicit about the failure mode.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Transforming with map and flatMap
+
+Optional is a functor and a monad — it has `map` and `flatMap` that mirror the stream versions:
+
+```java
+Optional<String> user = findUser(42);
+
+// map: transform if present, stay empty if absent
+Optional<String> upper = user.map(String::toUpperCase);
+
+// filter: keep if predicate matches, otherwise become empty
+Optional<String> longName = user.filter(s -> s.length() > 4);
+
+// Chain operations without null checks:
+String display = findUser(42)
+    .map(String::toUpperCase)
+    .filter(s -> s.startsWith("A"))
+    .orElse("(none)");
+```
+
+`flatMap` is for when the mapping function itself returns an `Optional` — it avoids `Optional<Optional<T>>`:
+
+```java
+// Without flatMap: Optional<Optional<String>>
+Optional<Optional<String>> nested = user.map(u -> findEmail(u));
+
+// With flatMap: Optional<String>
+Optional<String> email = user.flatMap(u -> findEmail(u));
+```
+
+## Two patterns to avoid
+
+**Anti-pattern 1: Storing Optional in a field**
+
+```java
+// BAD — Optional is a return-type hint, not a field type
+public class User {
+    private Optional<String> nickname; // don't do this
+}
+
+// GOOD — use null or a dedicated absent-value type
+public class User {
+    private String nickname; // nullable, documented with @Nullable
+}
+```
+
+Optional adds overhead (an extra wrapper object) and is not `Serializable`. It was designed as a return type, not a storage type.
+
+**Anti-pattern 2: Optional.get() without isPresent()**
+
+```java
+// BAD — same risk as null dereference, just with a different exception
+Optional<String> opt = findSomething();
+opt.get(); // NoSuchElementException if empty
+
+// GOOD — use expressive extraction
+opt.orElseThrow(() -> new EntityNotFoundException("not found"));
+```
+
+## Try it
+
+Model a user lookup that returns `Optional<String>`, then chain `map`, `filter`, and `orElse`:
+
+```java
+import java.util.*;
+
+public class Main {
+    static Optional<String> findUser(int id) {
+        Map<Integer, String> db = Map.of(1, "Alice", 2, "Bob", 3, "Charlie");
+        return Optional.ofNullable(db.get(id));
+    }
+
+    public static void main(String[] args) {
+        // Chain operations
+        String result = findUser(1)
+            .map(name -> "User: " + name)
+            .filter(s -> s.length() > 5)
+            .orElse("not found");
+        System.out.println(result); // User: Alice
+
+        // Missing user
+        System.out.println(findUser(99).orElse("not found")); // not found
+
+        // ifPresent
+        findUser(2).ifPresent(name -> System.out.println("Found: " + name));
+    }
+}
+```
+
+Experiment: change `findUser(1)` to `findUser(99)` and trace the Optional through each operation.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Calling `Optional.get()` without a guard** — use `orElse`, `orElseGet`, or `orElseThrow` instead. `get()` is a trap.
+- **Using `orElse` with an expensive expression** — `orElse(new Connection())` constructs a `Connection` even when it is never used. Use `orElseGet(() -> new Connection())` for lazy evaluation.
+- **Storing Optional in fields or using it as a method parameter** — Optional is a return-type signal. Fields should be nullable types; method parameters that might be absent usually indicate the need for method overloading.
+- **Checking `isPresent()` and calling `get()` instead of using `ifPresent` or `map`** — `if (opt.isPresent()) { use(opt.get()); }` is the old imperative style; `opt.ifPresent(this::use)` is more idiomatic.
+
+## Recap
+
+- `Optional.of(v)` for non-null; `Optional.ofNullable(v)` for nullable; `Optional.empty()` explicitly
+- Extract safely with `orElse`, `orElseGet`, `orElseThrow`, or `ifPresent` — never with naked `get()`
+- `orElse` is eager; `orElseGet` is lazy — prefer the latter for expensive defaults
+- `map`, `filter`, `flatMap` let you transform and chain without unwrapping
+- Do not store `Optional` in fields or use it as a parameter type
+
+**Up next:** Composing functions with `andThen`, `compose`, and `Predicate.and/or`.

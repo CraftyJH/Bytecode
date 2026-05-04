@@ -1,0 +1,243 @@
+export const meta = {
+  title: "Composing Functions — andThen, compose, Predicate.and/or",
+  duration: 13,
+  order: 8,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "cf-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Function<Integer, Integer> times2 = n -> n * 2;
+        Function<Integer, Integer> plus10 = n -> n + 10;
+
+        Function<Integer, Integer> f = times2.andThen(plus10);
+        Function<Integer, Integer> g = times2.compose(plus10);
+
+        System.out.println(f.apply(5));
+        System.out.println(g.apply(5));
+    }
+}`,
+    expectedOutput: "20\n30",
+    explanation: "`andThen` applies left-to-right: `times2` first gives 10, then `plus10` gives 20. `compose` applies right-to-left: `plus10` first gives 15, then `times2` gives 30. The same two functions in different order produce different results.",
+  },
+  endQ1: {
+    id: "cf-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Given `Predicate<String> p = s -> s.length() > 3`, what does `p.negate().test(\"hi\")` return?",
+    options: [
+      { text: "`false`", correct: false, feedback: "`p.test(\"hi\")` returns `false` (\"hi\" has length 2, not > 3). Negating `false` gives `true`." },
+      { text: "`true`", correct: true, feedback: "Correct — `p.test(\"hi\")` is `false` (2 is not > 3). `negate()` inverts the result to `true`." },
+      { text: "Throws a `NullPointerException`.", correct: false, feedback: "\"hi\" is not null. No exception occurs." },
+      { text: "`null`", correct: false, feedback: "`Predicate.test()` returns a primitive `boolean`, never `null`." },
+    ],
+    explanation: "`negate()` returns a Predicate that is the logical inverse. `p.test(\"hi\")` → `false` → `negate()` → `true`. Think of `negate()` as `!` applied to the whole predicate.",
+  },
+  endQ2: {
+    id: "cf-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Fill in the composition method so that `pipeline` first trims whitespace, then converts to lowercase:",
+    code: `Function<String, String> trim  = String::trim;
+Function<String, String> lower = String::toLowerCase;
+Function<String, String> pipeline = trim.___(lower);`,
+    correctAnswers: ["andThen"],
+    caseSensitive: true,
+    explanation: "`andThen` chains left-to-right: `trim` runs first, then `lower`. Using `compose` here would reverse the order: `lower` would run on the untrimmed string, then `trim` would run on the already-lowercased result (which still works here but is not the intended semantic order).",
+  },
+  endQ3: {
+    id: "cf-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `import java.util.function.*;
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Predicate<String> longWord  = s -> s.length() > 4;
+        Predicate<String> noSpaces  = s -> !s.contains(" ");
+        Predicate<String> startsA   = s -> s.startsWith("A");
+
+        List<String> words = List.of("Apple", "An ant", "Avocado", "Fig", "Apricot");
+        List<String> result = words.stream()
+            .filter(longWord.and(noSpaces).or(startsA))
+            .collect(Collectors.toList());
+        System.out.println(result);
+    }
+}`,
+    buggyLine: 9,
+    issue: "Operator precedence: `longWord.and(noSpaces).or(startsA)` is parsed as `(longWord AND noSpaces) OR startsA`, which includes short words starting with 'A'. The likely intent is `longWord AND (noSpaces OR startsA)`. Parenthesise with an explicit variable.",
+    explanation: "`Predicate` composition follows Java method-call order, not boolean precedence. `a.and(b).or(c)` means `(a && b) || c`. If the intent is `a && (b || c)`, write `longWord.and(noSpaces.or(startsA))`. Always use intermediate variables or explicit grouping to make complex predicate logic readable.",
+  },
+};
+
+Software systems built on small, tested, composable pieces are easier to change than those built on large, tangled methods. Functional composition is the mechanism that lets you snap small functions together into larger ones without copying code or introducing shared mutable state. Java's `Function` and `Predicate` types expose composition directly, so you can build validation pipelines, data transformation chains, and rule engines from reusable building blocks.
+
+## Function.andThen vs Function.compose
+
+Both combine two `Function`s into one. The difference is the order of execution:
+
+```
+f.andThen(g)  →  x  →  f(x)  →  g(f(x))    // f first, then g
+f.compose(g)  →  x  →  g(x)  →  f(g(x))    // g first, then f
+```
+
+```java
+import java.util.function.*;
+
+Function<String, String> trim  = String::trim;
+Function<String, String> upper = String::toUpperCase;
+Function<String, Integer> len  = String::length;
+
+// andThen: left-to-right (reads naturally as a pipeline)
+Function<String, String> cleanAndShout = trim.andThen(upper);
+System.out.println(cleanAndShout.apply("  hello  ")); // HELLO
+
+// You can chain as many steps as needed
+Function<String, Integer> cleanAndCount = trim.andThen(upper).andThen(len);
+System.out.println(cleanAndCount.apply("  hello  ")); // 5
+```
+
+`compose` is the mathematical convention (g ∘ f means "apply f, then g") — useful when thinking in mathematical terms but less readable in most application code. In practice, `andThen` is almost always what you want.
+
+## Predicate.and, or, negate
+
+`Predicate` composition builds boolean logic from named predicates:
+
+```java
+Predicate<String> longEnough   = s -> s.length() >= 5;
+Predicate<String> alphanumeric = s -> s.matches("[a-zA-Z0-9]+");
+Predicate<String> notBlank     = Predicate.not(String::isBlank);
+
+// AND: both must be true
+Predicate<String> valid = longEnough.and(alphanumeric);
+
+// OR: at least one must be true
+Predicate<String> acceptable = longEnough.or(alphanumeric);
+
+// NOT: inverse
+Predicate<String> tooShort = longEnough.negate();
+```
+
+This pattern enables a validation pipeline that reads like a specification:
+
+```java
+List<String> inputs = List.of("hello", "hi!", "world2", "ok", "java8");
+List<String> accepted = inputs.stream()
+    .filter(longEnough.and(alphanumeric))
+    .collect(Collectors.toList());
+// [hello, world2, java8]
+```
+
+<Note>Since Java 11, `Predicate.not(pred)` is a static factory for negation — it reads more naturally than `pred.negate()` when wrapping a method reference: `Predicate.not(String::isBlank)` is clearer than `((Predicate<String>) String::isBlank).negate()`.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Building pipelines from small pieces
+
+Composition becomes powerful when you name your building blocks and assemble them for different contexts:
+
+```java
+Function<String, String> trim    = String::trim;
+Function<String, String> lower   = String::toLowerCase;
+Function<String, String> noSpaces = s -> s.replace(" ", "_");
+
+// Pipeline for a URL slug
+Function<String, String> toSlug = trim.andThen(lower).andThen(noSpaces);
+System.out.println(toSlug.apply("  Hello World  ")); // hello_world
+
+// Reuse pieces in a different pipeline
+Function<String, String> forDisplay = trim.andThen(lower);
+System.out.println(forDisplay.apply("  ALICE  ")); // alice
+```
+
+Point-free style names the *transformation* rather than the *data*. Each `Function` variable is a reusable piece of logic that can be tested in isolation and wired into any pipeline that needs it.
+
+## Composing with streams
+
+Composition integrates seamlessly with streams:
+
+```java
+import java.util.function.*;
+import java.util.*;
+import java.util.stream.*;
+
+Predicate<Integer> positive  = n -> n > 0;
+Predicate<Integer> even      = n -> n % 2 == 0;
+Function<Integer, Integer> doubleIt = n -> n * 2;
+
+List<Integer> result = Stream.of(-3, 0, 1, 2, 4, 5, 6)
+    .filter(positive.and(even))  // keep positive evens: 2, 4, 6
+    .map(doubleIt)               // double: 4, 8, 12
+    .collect(Collectors.toList());
+System.out.println(result); // [4, 8, 12]
+```
+
+## Try it
+
+Build a validation pipeline by composing `Predicate`s:
+
+```java
+import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Predicate<String> notEmpty    = s -> !s.isBlank();
+        Predicate<String> longEnough  = s -> s.length() >= 4;
+        Predicate<String> noNumbers   = s -> s.chars().noneMatch(Character::isDigit);
+
+        Predicate<String> validName = notEmpty.and(longEnough).and(noNumbers);
+
+        List<String> candidates = List.of("Alice", "Bo", "Carol3", "Dave", "", "Eve");
+        List<String> valid = candidates.stream()
+            .filter(validName)
+            .collect(Collectors.toList());
+        System.out.println(valid); // [Alice, Dave]
+
+        // Compose a transform pipeline
+        Function<String, String> normalise =
+            ((Function<String,String>) String::trim)
+                .andThen(String::toLowerCase);
+        System.out.println(normalise.apply("  ALICE  ")); // alice
+    }
+}
+```
+
+Try adding a fourth predicate that checks the name starts with an uppercase letter, then compose it in.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Confusing `andThen` and `compose` order** — `f.andThen(g)` runs `f` first; `f.compose(g)` runs `g` first. When in doubt, draw the data flow: `input → f → g → output` is `f.andThen(g)`.
+- **Predicate precedence surprises** — `a.and(b).or(c)` is `(a && b) || c`, not `a && (b || c)`. Use intermediate variables to make grouping explicit.
+- **Casting method references for composition** — `String::trim` inferred as `UnaryOperator<String>` won't have `.andThen` from `Function`. Cast explicitly: `(Function<String,String>) String::trim` or assign to a typed variable first.
+- **Making predicates too coarse** — a single predicate doing five checks is hard to reuse and debug. Split into named predicates and compose — each piece can be unit-tested independently.
+
+## Recap
+
+- `f.andThen(g)` runs `f` first, then `g` (left-to-right, pipeline order)
+- `f.compose(g)` runs `g` first, then `f` (mathematical convention, rarely used in application code)
+- `Predicate.and`, `.or`, `.negate` build boolean logic from named predicates
+- `Predicate.not(ref)` is the readable way to negate a method reference
+- Composition enables reuse: name small pieces, test them individually, wire them together
+
+**Up next:** Parallel streams — when fork-join helps, when it hurts, and how to use it correctly.

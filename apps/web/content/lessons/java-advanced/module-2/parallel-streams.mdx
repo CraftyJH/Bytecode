@@ -1,0 +1,223 @@
+export const meta = {
+  title: "Parallel Streams — When to Use Them",
+  duration: 14,
+  order: 9,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "ps-mid-1",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Which of the following operations is unsafe in a parallel stream?",
+    options: [
+      { text: "`.map(n -> n * 2)`", correct: false, feedback: "`map` with a stateless lambda is perfectly safe in parallel — each element is transformed independently with no shared state." },
+      { text: "`.filter(n -> n > 0)`", correct: false, feedback: "`filter` with a stateless predicate is safe — each element is tested independently." },
+      { text: "`.forEach(list::add)` where `list` is an `ArrayList`", correct: true, feedback: "Correct — `ArrayList` is not thread-safe. Concurrent `add` calls from multiple threads will corrupt the list. Use `collect(Collectors.toList())` instead, which is thread-safe." },
+      { text: "`.reduce(0, Integer::sum)`", correct: false, feedback: "`reduce` with a correct identity and associative operator is safe in parallel — the JVM splits, reduces in parallel, then combines the partial results." },
+    ],
+    explanation: "Parallel streams distribute work across threads. Any operation that mutates shared mutable state (like adding to a non-thread-safe collection) will produce incorrect or corrupted results. The golden rule: keep lambda bodies stateless and side-effect-free, and use `collect` rather than `forEach` to accumulate results.",
+  },
+  endQ1: {
+    id: "ps-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What thread pool does the common fork-join pool use by default?",
+    options: [
+      { text: "A cached thread pool with unbounded threads.", correct: false, feedback: "The common fork-join pool is bounded, not unbounded. It defaults to `Runtime.getRuntime().availableProcessors() - 1` threads." },
+      { text: "`Runtime.getRuntime().availableProcessors() - 1` worker threads (one core left for the main thread).", correct: true, feedback: "Correct — the common pool targets CPU-bound work and reserves one processor for the calling thread. This makes it unsuitable for blocking I/O operations." },
+      { text: "A single background thread regardless of core count.", correct: false, feedback: "The pool scales to the number of available processors, not a fixed single thread." },
+      { text: "A new dedicated thread pool created for each parallel stream.", correct: false, feedback: "All parallel streams share the *common* fork-join pool by default. Creating a new pool per stream would be extremely wasteful." },
+    ],
+    explanation: "The common fork-join pool is a shared resource. Blocking operations (I/O, `Thread.sleep`) inside a parallel stream starve the pool for all other tasks in the same JVM. For I/O-heavy work, use a dedicated `ForkJoinPool` with a custom size, or use async/reactive approaches.",
+  },
+  endQ2: {
+    id: "ps-end-2",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        int sum = IntStream.rangeClosed(1, 100)
+            .parallel()
+            .reduce(0, Integer::sum);
+        System.out.println(sum);
+    }
+}`,
+    expectedOutput: "5050",
+    explanation: "`reduce(0, Integer::sum)` with identity `0` and associative operation `+` is correct for parallel use. The JVM partitions the range, reduces each partition independently, and combines the partial sums. The final result is identical to sequential: 1+2+...+100 = 5050.",
+  },
+  endQ3: {
+    id: "ps-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the method call that converts a sequential stream to a parallel stream:",
+    code: `List<Integer> nums = List.of(1, 2, 3, 4, 5);
+long count = nums.stream()
+    .___()
+    .filter(n -> n > 2)
+    .count();`,
+    correctAnswers: ["parallel"],
+    caseSensitive: true,
+    explanation: "`.parallel()` is an intermediate operation that marks the stream as parallel. From that point, the pipeline may execute on multiple threads from the common fork-join pool. You can also start directly with `nums.parallelStream()`.",
+  },
+};
+
+Modern CPUs have multiple cores, but a sequential stream uses only one. Parallel streams are Java's built-in way to split a computation across the common fork-join pool, potentially cutting wall-clock time for CPU-bound work. The catch: parallel streams are not always faster, and used incorrectly they produce wrong answers or silently corrupt data. This lesson gives you the mental model to make the right call.
+
+## How parallel streams work
+
+When you call `.parallel()` on a stream (or start with `.parallelStream()`), the JVM routes the pipeline through the common `ForkJoinPool`. The pool splits the data source into chunks using a *spliterator*, processes each chunk on a separate thread, and combines the results.
+
+```java
+List<Integer> nums = List.of(1, 2, 3, 4, 5, 6, 7, 8);
+
+// Sequential
+long seqSum = nums.stream().mapToLong(n -> n).sum();
+
+// Parallel — same result, potentially using multiple cores
+long parSum = nums.parallelStream().mapToLong(n -> n).sum();
+
+// Or: convert mid-pipeline
+long parSum2 = nums.stream().parallel().mapToLong(n -> n).sum();
+```
+
+For a tiny list of eight numbers, the parallel version is almost certainly *slower* due to thread coordination overhead. Parallelism pays off only when:
+
+1. The work per element is significant (CPU-heavy, not just a field lookup)
+2. The dataset is large (thousands to millions of elements)
+3. The operation is *stateless* and *associative*
+
+## Stateless vs stateful operations
+
+**Stateless** — each element is processed independently, no shared mutable state:
+
+```java
+// Safe: map and filter are stateless
+stream.parallel()
+    .filter(n -> n > 0)        // no shared state
+    .map(n -> n * n)           // no shared state
+    .sum();                    // safe reduction
+```
+
+**Stateful** — results depend on other elements seen so far:
+
+```java
+// UNSAFE: ArrayList is not thread-safe
+List<Integer> results = new ArrayList<>();
+stream.parallel().forEach(results::add); // data corruption!
+
+// Safe alternative: use collect
+List<Integer> results = stream.parallel()
+    .filter(n -> n > 0)
+    .collect(Collectors.toList()); // thread-safe via Collector
+```
+
+<Note>Sorted and distinct operations have to collect some state to work correctly (what they've seen so far), so they perform worse in parallel than purely stateless operations. Avoid `.sorted()` and `.distinct()` immediately before a parallel terminal if performance is critical.</Note>
+
+## reduce — identity requirement
+
+For `reduce(identity, op)` to give correct results in parallel, the operation must be **associative** and the identity must be **genuinely neutral**:
+
+```java
+// Correct: 0 is neutral for sum, + is associative
+int sum = IntStream.rangeClosed(1, 10).parallel().reduce(0, Integer::sum); // 55
+
+// WRONG identity: using 1 instead of 0 for sum
+// In parallel, the identity is applied once per *partition*, not once overall
+int wrong = IntStream.rangeClosed(1, 10).parallel().reduce(1, Integer::sum);
+// Result is unpredictable — adds extra 1s depending on partition count
+```
+
+The JVM applies the identity to *each partition* before combining. This is correct behaviour when the identity is truly neutral (1+x = x for `+` with identity 0). A wrong identity causes extra contributions from each partition.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Encounter order
+
+Some sources have a guaranteed *encounter order* (arrays, `ArrayList`, ranges); some do not (`HashSet`). Parallel streams preserve encounter order only when the source and operations support it:
+
+```java
+// Ordered — result list order matches source order
+List<Integer> sorted = IntStream.rangeClosed(1, 10)
+    .parallel()
+    .filter(n -> n % 2 == 0)
+    .boxed()
+    .collect(Collectors.toList());
+// [2, 4, 6, 8, 10] — order preserved
+
+// If you don't need order, hint with unordered() for better performance
+long count = IntStream.rangeClosed(1, 1_000_000)
+    .parallel()
+    .unordered()
+    .filter(n -> n % 7 == 0)
+    .count();
+```
+
+## When parallel helps vs hurts
+
+| Scenario | Parallel? |
+|---|---|
+| Large data (millions of elements), CPU-bound transform | Yes |
+| Stateless map/filter/reduce | Yes |
+| Small collections (< thousands) | No — overhead dominates |
+| I/O operations inside the lambda | No — blocks pool threads |
+| `.sorted()` / `.distinct()` | Usually no — coordination overhead |
+| Shared mutable state | Never |
+
+## Try it
+
+Measure the difference between sequential and parallel sum on a large range:
+
+```java
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        int n = 10_000_000;
+
+        long start = System.nanoTime();
+        long seqSum = LongStream.rangeClosed(1, n).sum();
+        long seqTime = System.nanoTime() - start;
+
+        start = System.nanoTime();
+        long parSum = LongStream.rangeClosed(1, n).parallel().sum();
+        long parTime = System.nanoTime() - start;
+
+        System.out.println("Sequential sum: " + seqSum + " in " + seqTime / 1_000_000 + " ms");
+        System.out.println("Parallel sum:   " + parSum + " in " + parTime / 1_000_000 + " ms");
+    }
+}
+```
+
+The results vary by machine and JVM warmup. On a multi-core box with 10 million elements, the parallel version is often 2-4x faster for this pure arithmetic task.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using parallel on small collections** — the fork-join overhead makes the parallel version slower. Always measure before optimising.
+- **Mutating shared state inside a parallel stream** — adds to a non-thread-safe collection, increments a shared counter, etc. The results are silently wrong or throw `ConcurrentModificationException`.
+- **Blocking inside a parallel lambda** — sleeping, waiting on I/O, or acquiring a lock inside a `.parallel()` pipeline starves the common fork-join pool, hurting every other parallel operation in the JVM.
+- **Wrong identity in parallel reduce** — the identity is applied per partition. `reduce(1, Integer::sum)` gives wrong results in parallel (adds an extra 1 per partition). Use `reduce(0, Integer::sum)`.
+
+## Recap
+
+- `.parallel()` or `.parallelStream()` routes work through the common fork-join pool
+- The default pool size is `availableProcessors - 1`
+- Only stateless, side-effect-free operations are safe in parallel
+- Use `collect` to gather results — never mutate a shared collection from `forEach`
+- `reduce(identity, op)` requires a truly neutral identity and an associative operator
+- Parallel helps for large, CPU-bound, stateless work; hurts for small data, I/O, or stateful ops
+
+**Up next:** Functional design patterns — strategy, pipeline, memoization, and building a fluent API.
