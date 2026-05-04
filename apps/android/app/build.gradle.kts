@@ -1,8 +1,42 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+val localProperties = Properties().apply {
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        localPropsFile.inputStream().use { load(it) }
+    }
+}
+
+fun propOrEnv(name: String, envName: String = name): String =
+    (localProperties.getProperty(name) ?: System.getenv(envName)).orEmpty().trim()
+
+fun quoted(value: String): String {
+    val escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
+    return "\"$escaped\""
+}
+
+val supabaseUrl = propOrEnv("SUPABASE_URL")
+val supabasePublishableKey = propOrEnv("SUPABASE_PUBLISHABLE_KEY")
+val bytecodeApiUrl = propOrEnv("BYTECODE_API_URL").ifBlank { "https://bytecode-web.craftyjhs-projects.vercel.app" }
+val webBaseUrl = propOrEnv("WEB_BASE_URL").ifBlank { "https://bytecode-web.craftyjhs-projects.vercel.app" }
+
+val releaseStoreFilePath = propOrEnv("ANDROID_SIGNING_STORE_FILE")
+val releaseStorePassword = propOrEnv("ANDROID_SIGNING_STORE_PASSWORD")
+val releaseKeyAlias = propOrEnv("ANDROID_SIGNING_KEY_ALIAS")
+val releaseKeyPassword = propOrEnv("ANDROID_SIGNING_KEY_PASSWORD")
+val releaseStoreFile = releaseStoreFilePath
+    .takeIf { it.isNotBlank() }
+    ?.let { file(it) }
+val hasReleaseSigning = releaseStoreFile?.exists() == true &&
+    releaseStorePassword.isNotBlank() &&
+    releaseKeyAlias.isNotBlank() &&
+    releaseKeyPassword.isNotBlank()
 
 android {
     namespace = "dev.bytecode.android"
@@ -20,15 +54,31 @@ android {
             useSupportLibrary = true
         }
 
-        buildConfigField("String", "SUPABASE_URL", "\"\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"\"")
-        buildConfigField("String", "BYTECODE_API_URL", "\"https://bytecode-web.craftyjhs-projects.vercel.app\"")
-        buildConfigField("String", "WEB_BASE_URL", "\"https://bytecode-web.craftyjhs-projects.vercel.app\"")
+        buildConfigField("String", "SUPABASE_URL", quoted(supabaseUrl))
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", quoted(supabasePublishableKey))
+        buildConfigField("String", "BYTECODE_API_URL", quoted(bytecodeApiUrl))
+        buildConfigField("String", "WEB_BASE_URL", quoted(webBaseUrl))
+    }
+
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
