@@ -84,10 +84,7 @@ export async function syncFromInvoicePaymentFailed(
     typeof invoice.customer === "string"
       ? invoice.customer
       : invoice.customer?.id ?? null;
-  const subscriptionId =
-    typeof invoice.subscription === "string"
-      ? invoice.subscription
-      : invoice.subscription?.id ?? null;
+  const subscriptionId = readInvoiceSubscriptionId(invoice);
   const priceId = invoice.lines.data[0]?.pricing?.price_details?.price ?? null;
   const mappedPlan = resolvePlanByPriceId(priceId)?.slug ?? null;
   const subscriptionSnapshot = await fetchSubscriptionSnapshot(subscriptionId);
@@ -134,10 +131,7 @@ export async function syncFromInvoicePaid(
     typeof invoice.customer === "string"
       ? invoice.customer
       : invoice.customer?.id ?? null;
-  const subscriptionId =
-    typeof invoice.subscription === "string"
-      ? invoice.subscription
-      : invoice.subscription?.id ?? null;
+  const subscriptionId = readInvoiceSubscriptionId(invoice);
   const priceId = invoice.lines.data[0]?.pricing?.price_details?.price ?? null;
   const subscriptionSnapshot = await fetchSubscriptionSnapshot(subscriptionId);
   const userIdFromSubscription = subscriptionSnapshot
@@ -233,6 +227,27 @@ async function syncToInternalApi(input: MinimalSyncPayload) {
 function readMetadataUserId(metadata?: Stripe.Metadata | null): string | null {
   const raw = metadata?.supabase_user_id;
   return raw && raw.trim() ? raw : null;
+}
+
+function readInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+  const fromParent = (
+    invoice as unknown as { parent?: { subscription_details?: { subscription?: unknown } } }
+  ).parent?.subscription_details?.subscription;
+  if (typeof fromParent === "string") return fromParent;
+  if (fromParent && typeof fromParent === "object") {
+    const id = (fromParent as { id?: unknown }).id;
+    if (typeof id === "string") return id;
+  }
+
+  // Backward compatibility for older API responses carrying `invoice.subscription`.
+  const legacy = (invoice as unknown as { subscription?: unknown }).subscription;
+  if (typeof legacy === "string") return legacy;
+  if (legacy && typeof legacy === "object") {
+    const id = (legacy as { id?: unknown }).id;
+    if (typeof id === "string") return id;
+  }
+
+  return null;
 }
 
 async function resolveUserIdFromStripe(

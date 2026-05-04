@@ -7,7 +7,7 @@ import {
   syncFromSubscriptionDeleted,
   syncFromSubscriptionEvent,
 } from "@/lib/billing-sync";
-import { getStripe, requireInternalBillingSyncToken, requireWebhookSecret } from "@/lib/stripe";
+import { getStripe, requireWebhookSecret } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -83,44 +83,5 @@ async function handleEvent(event: Stripe.Event) {
     default:
       return;
   }
-}
-
-async function maybeProcessGraceWindow(invoice: Stripe.Invoice) {
-  let token: string;
-  try {
-    token = requireInternalBillingSyncToken();
-  } catch {
-    return;
-  }
-
-  const stripeCustomerId =
-    typeof invoice.customer === "string"
-      ? invoice.customer
-      : invoice.customer?.id ?? null;
-  const stripeSubscriptionId =
-    typeof invoice.subscription === "string"
-      ? invoice.subscription
-      : invoice.subscription?.id ?? null;
-  if (!stripeCustomerId && !stripeSubscriptionId) return;
-
-  const siteBase =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-
-  setTimeout(() => {
-    void fetch(`${siteBase.replace(/\/$/, "")}/api/internal/billing/process-grace`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Bytecode-Internal-Token": token,
-      },
-      body: JSON.stringify({
-        stripeCustomerId,
-        stripeSubscriptionId,
-        force: false,
-      }),
-      cache: "no-store",
-    });
-  }, 24 * 60 * 60 * 1000);
 }
 
