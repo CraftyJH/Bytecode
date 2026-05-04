@@ -71,7 +71,7 @@ For decades, the Java threading model worked like this: one platform thread per 
 | Managed by | OS | JVM |
 | Typical stack | 512 KB–1 MB | ~1 KB (grows on demand) |
 | Practical limit | ~10 000 | ~1 000 000+ |
-| Blocking behaviour | Holds OS thread | Unmounts from carrier thread |
+| Blocking behavior | Holds OS thread | Unmounts from carrier thread |
 | Best for | CPU-bound work | I/O-bound work |
 
 A virtual thread is *mounted* on a carrier (platform) thread from a small pool. When it blocks (I/O, `sleep`, lock waiting), it *unmounts* — the carrier thread is freed to run another virtual thread. When the blocking operation completes, the virtual thread is rescheduled on a (possibly different) carrier.

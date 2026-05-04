@@ -134,7 +134,7 @@ static double add(double a, double b) {
 // add(1.5, 2.5)  → calls the double version → 4.0
 ```
 
-Overloading is useful for convenience methods that work with different types. Don't overload just to avoid naming things — different behaviour should usually get different names.
+Overloading is useful for convenience methods that work with different types. Don't overload just to avoid naming things — different behavior should usually get different names.
 
 <Note>Overloading is resolved at compile time based on the argument types the compiler can see. If you pass `3` and `4`, the compiler picks the `int` version. If you pass `3.0` and `4.0`, it picks `double`. There's no runtime guesswork involved.</Note>
 

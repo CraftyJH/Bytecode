@@ -109,7 +109,7 @@ After:   [a, b, c, d, e, f, _, _]   capacity=8, size=6
 
 Each individual resize is O(n), but it happens so rarely (the list has to fill up first) that if you average the cost across all the `add()` calls that preceded it, each `add` costs O(1) **amortized**. This is the same analysis as a bank account: make small deposits regularly, occasionally make one big withdrawal — average cost per transaction is still small.
 
-<Note>If you **know** in advance how many elements you'll add, construct the list with an initial capacity to avoid any resize at all: `new ArrayList<>(1000)`. This is a micro-optimisation — only worth it for very large lists in tight loops.</Note>
+<Note>If you **know** in advance how many elements you'll add, construct the list with an initial capacity to avoid any resize at all: `new ArrayList<>(1000)`. This is a micro-optimization — only worth it for very large lists in tight loops.</Note>
 
 ## Operation complexity
 

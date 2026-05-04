@@ -14,7 +14,7 @@ export const quizzes = {
     options: [
       { text: "The new value just stored.", correct: false, feedback: "If it returned the new value, callers couldn't easily detect whether the key already existed." },
       { text: "The previous value associated with the key, or null if the key was not present.", correct: true, feedback: "Correct! This lets you detect whether a key was replaced (non-null return) or newly added (null return)." },
-      { text: "true if the entry was added, false if the key already existed.", correct: false, feedback: "That's the behaviour of Set.add(). Map.put() returns the old value, not a boolean." },
+      { text: "true if the entry was added, false if the key already existed.", correct: false, feedback: "That's the behavior of Set.add(). Map.put() returns the old value, not a boolean." },
       { text: "The index of the bucket where the entry was stored.", correct: false, feedback: "Bucket indices are an internal implementation detail — the Map API never exposes them." },
     ],
     explanation: "`put(k, v)` inserts or replaces an entry and returns the **old** value (or `null` if the key is new). This return value is frequently ignored, but it's useful when you want to know what was there before.",

@@ -15,9 +15,9 @@ export const quizzes = {
       { text: "Enums are faster to instantiate than regular classes.", correct: false, feedback: "Performance is not the main reason. Both approaches are fast enough for singleton use." },
       { text: "The JVM guarantees enum instances are created exactly once and are serialization-safe, with no extra code needed.", correct: true, feedback: "Correct! The JVM spec (JLS §12.4) ensures class initialisation happens exactly once. Enum values are instances, so they get the same guarantee — plus the JVM prevents a second instance from being created during deserialization." },
       { text: "DCL is deprecated in Java 21.", correct: false, feedback: "DCL is not deprecated; it is simply fragile. The volatile keyword makes it work, but the enum approach is still simpler and safer." },
-      { text: "Enums cannot be subclassed, which prevents singleton inheritance bugs.", correct: false, feedback: "Subclassing prevention is a nice property, but it's not the primary safety argument. The main argument is guaranteed single-instance initialisation and serialisation safety." },
+      { text: "Enums cannot be subclassed, which prevents singleton inheritance bugs.", correct: false, feedback: "Subclassing prevention is a nice property, but it's not the primary safety argument. The main argument is guaranteed single-instance initialisation and serialization safety." },
     ],
-    explanation: "Enum singletons leverage two JVM guarantees: class-loading initialises enum constants exactly once (thread-safe without locks), and the serialisation mechanism never deserialises a second copy of an enum value. DCL requires a `volatile` field and a careful double-null check that is easy to write incorrectly.",
+    explanation: "Enum singletons leverage two JVM guarantees: class-loading initialises enum constants exactly once (thread-safe without locks), and the serialization mechanism never deserialises a second copy of an enum value. DCL requires a `volatile` field and a careful double-null check that is easy to write incorrectly.",
   },
   endQ1: {
     id: "sf-end-1",

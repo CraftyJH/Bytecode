@@ -227,7 +227,7 @@ A single implementation satisfies both contracts simultaneously because the sign
 - **Forgetting one method from one interface** — if a class implements three interfaces and each has two methods, you owe six implementations. Read compiler errors carefully — they name the exact interface and method that's missing.
 - **Thinking each interface gets its own method copy** — implementing `Runnable` and `Callable` doesn't give you two run-like methods. One method body satisfies whichever interface declared it (or both, if signatures match).
 - **Confusing interface type with class type** — `Printable p = new Printable()` is illegal. Interfaces cannot be instantiated. You instantiate a class, then assign it to an interface variable.
-- **Assuming interface order matters** — `class Foo implements A, B` and `class Foo implements B, A` are equivalent. The order does not affect which methods must be implemented or the object's runtime behaviour.
+- **Assuming interface order matters** — `class Foo implements A, B` and `class Foo implements B, A` are equivalent. The order does not affect which methods must be implemented or the object's runtime behavior.
 
 ## Recap
 

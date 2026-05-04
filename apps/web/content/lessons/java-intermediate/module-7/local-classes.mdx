@@ -89,7 +89,7 @@ export const quizzes = {
 
 A **local class** is a class declared inside a method body, a constructor, or an initializer block. Its scope is exactly the surrounding block — once you pass the closing brace, the class name is gone, just like any other local declaration.
 
-Local classes were a clever workaround back when Java had no lambdas. They let you bundle a small bit of state and behaviour together inside a single method, then expose it to callers through a supertype (interface or abstract class). Today, lambdas have replaced most uses, but local classes are still useful when you need a class with multiple methods, mutable state, or a constructor.
+Local classes were a clever workaround back when Java had no lambdas. They let you bundle a small bit of state and behavior together inside a single method, then expose it to callers through a supertype (interface or abstract class). Today, lambdas have replaced most uses, but local classes are still useful when you need a class with multiple methods, mutable state, or a constructor.
 
 ## Declaring a local class
 
@@ -149,7 +149,7 @@ static Runnable broken() {
 
 The compiler error reads `Variable used in lambda expression should be final or effectively final`. The same message applies to local classes.
 
-<Note>Effectively final was added in Java 8 alongside lambdas. Before that, you had to write `final int x = 10;` explicitly to capture in an anonymous class. The keyword is no longer required, but the *behaviour* must be the same.</Note>
+<Note>Effectively final was added in Java 8 alongside lambdas. Before that, you had to write `final int x = 10;` explicitly to capture in an anonymous class. The keyword is no longer required, but the *behavior* must be the same.</Note>
 
 ## Local classes vs lambdas
 

@@ -59,7 +59,7 @@ void divideByZeroThrows() {
     question: "Which technique groups inputs into categories where the system is expected to behave identically for all values in the same group?",
     options: [
       { text: "Boundary value analysis", correct: false, feedback: "Boundary value analysis focuses on the edges (min, max, just inside, just outside) of a range — not on grouping equivalent inputs." },
-      { text: "Equivalence partitioning", correct: true, feedback: "Correct — equivalence partitioning divides inputs into classes (valid, invalid, edge) where all members of a class should trigger the same behaviour. Test one representative from each class." },
+      { text: "Equivalence partitioning", correct: true, feedback: "Correct — equivalence partitioning divides inputs into classes (valid, invalid, edge) where all members of a class should trigger the same behavior. Test one representative from each class." },
       { text: "Property-based testing", correct: false, feedback: "Property-based testing generates random inputs that satisfy a property invariant. It overlaps with partitioning but is a distinct automated technique." },
       { text: "Mutation testing", correct: false, feedback: "Mutation testing evaluates test quality by introducing deliberate code bugs (mutants) and checking whether tests catch them." },
     ],
@@ -269,7 +269,7 @@ Write tests covering these equivalence classes and boundaries:
 3. Zero numerator (result is zero, no exception)
 4. Zero denominator — verify exception type AND message
 5. `Integer.MAX_VALUE / 1` — verify no overflow occurs
-6. `Integer.MIN_VALUE / -1` — this overflows silently in Java; document the behaviour with a test
+6. `Integer.MIN_VALUE / -1` — this overflows silently in Java; document the behavior with a test
 
 ## End-of-lesson quiz
 
@@ -295,6 +295,6 @@ Write tests covering these equivalence classes and boundaries:
 - Always test null inputs for any public method that does not accept null
 - **Boundary value analysis**: test at min, just below, just above, at max, just above max
 - **Equivalence partitioning**: group inputs into classes; test one representative per class
-- Integer overflow is silent in Java — document and test its behaviour explicitly
+- Integer overflow is silent in Java — document and test its behavior explicitly
 
 **Up next:** Test structure — naming conventions, isolation, and the taxonomy of test doubles.

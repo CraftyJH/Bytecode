@@ -43,7 +43,7 @@ public class Main {
     prompt: "To append to an existing file instead of overwriting it, pass <code>StandardOpenOption.___</code> as an extra argument to <code>Files.writeString</code>.",
     correctAnswers: ["APPEND", "append"],
     caseSensitive: false,
-    explanation: "StandardOpenOption.APPEND tells the underlying writer to seek to the end of the file before writing. Without it, the default behaviour truncates.",
+    explanation: "StandardOpenOption.APPEND tells the underlying writer to seek to the end of the file before writing. Without it, the default behavior truncates.",
   },
   endQ3: {
     id: "wtf-end-3",
@@ -73,7 +73,7 @@ public class Main {
   },
 };
 
-Writing text to a file is symmetric to reading it: one method call, no resource management, one important option to know about. This lesson covers `writeString`, `write`, and the open options that change their behaviour.
+Writing text to a file is symmetric to reading it: one method call, no resource management, one important option to know about. This lesson covers `writeString`, `write`, and the open options that change their behavior.
 
 ## The two main writes
 
@@ -97,7 +97,7 @@ The choice is just convenience: if you already have a String, use `writeString`.
 
 <Note>The directory containing the file must already exist. If <code>/tmp/some-dir/notes.txt</code> is the target but <code>/tmp/some-dir</code> doesn't exist, the call throws <code>NoSuchFileException</code>. Use <code>Files.createDirectories</code> to ensure the parent exists first.</Note>
 
-## Default behaviour: TRUNCATE then WRITE
+## Default behavior: TRUNCATE then WRITE
 
 By default, `writeString` and `write` follow these rules:
 

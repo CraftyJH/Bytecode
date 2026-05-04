@@ -412,5 +412,5 @@ public class Main {
 - Second block prints `Error: Host required` (the constructor throws before open is set, so `close()` is never called)
 - No unhandled exceptions escape `main`
 
-<Note>Hint: try-with-resources only calls `close()` if the resource was successfully constructed. When `new Connection("")` throws in the constructor, the resource was never opened, so `close()` does not run — which is correct behaviour here.</Note>
+<Note>Hint: try-with-resources only calls `close()` if the resource was successfully constructed. When `new Connection("")` throws in the constructor, the resource was never opened, so `close()` does not run — which is correct behavior here.</Note>
 </Exercise>

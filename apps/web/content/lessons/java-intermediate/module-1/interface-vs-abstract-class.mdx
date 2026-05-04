@@ -117,7 +117,7 @@ Prefer an interface when:
 
 ```java
 interface Serializable {
-    byte[] serialise();
+    byte[] serialize();
 }
 
 // Totally unrelated classes can all become Serializable:
@@ -171,7 +171,7 @@ abstract class Report {
 
 ## Combining both: the best-of-both-worlds pattern
 
-The most powerful pattern is to declare a public interface (the contract the whole world sees) and then provide an abstract class that implements common behaviour:
+The most powerful pattern is to declare a public interface (the contract the whole world sees) and then provide an abstract class that implements common behavior:
 
 ```java
 // Public contract — anyone can implement it

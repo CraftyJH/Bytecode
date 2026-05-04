@@ -120,7 +120,7 @@ final void checkForComodification() {
 }
 ```
 
-If the numbers don't match, *something* changed the collection through a path the iterator didn't know about — so the iterator throws rather than silently return stale data. This is **fail-fast** behaviour, and it's a feature, not a bug. Without it you might skip elements, double-visit elements, or read garbage.
+If the numbers don't match, *something* changed the collection through a path the iterator didn't know about — so the iterator throws rather than silently return stale data. This is **fail-fast** behavior, and it's a feature, not a bug. Without it you might skip elements, double-visit elements, or read garbage.
 
 ## The right way: `Iterator.remove()`
 
@@ -249,7 +249,7 @@ Java collections protect you from yourself: they fail fast when something modifi
 - Use **`Iterator.remove()`** to delete the most recently returned element safely
 - Java 8+ offers **`Collection.removeIf(predicate)`** as a clean one-liner for predicate-based deletion
 - `Iterator.remove()` itself throws `IllegalStateException` if called before `next()` or twice in a row
-- The fail-fast behaviour is a *feature* — silent corruption would be far worse
+- The fail-fast behavior is a *feature* — silent corruption would be far worse
 
 **Up next:** Building a Custom Iterable — make your own classes for-each compatible by implementing `Iterable<T>`.
 

@@ -59,7 +59,7 @@ class Item {
       { text: "When the method should run faster.", correct: false, feedback: "Static methods are not meaningfully faster than instance methods." },
       { text: "When the method needs access to private fields.", correct: false, feedback: "Static methods cannot access instance fields directly — they have no `this`." },
     ],
-    explanation: "Static methods can't reach object state, so they're appropriate for utilities like `Math.max(a, b)` whose result is a pure function of the inputs. Use instance methods when the behaviour depends on a specific object's fields.",
+    explanation: "Static methods can't reach object state, so they're appropriate for utilities like `Math.max(a, b)` whose result is a pure function of the inputs. Use instance methods when the behavior depends on a specific object's fields.",
   },
   endFill: {
     id: "st-end-3",
@@ -238,7 +238,7 @@ Static members are the bridge between procedural and object-oriented code. Utili
 - `static` makes a field or method belong to the class, not to any one instance
 - Access static members through the class name (`User.count`, `Math.max(...)`)
 - Static methods have no `this` — they can't read instance fields without an explicit object
-- Use static for utilities and class-wide state; use instance for behaviour tied to a specific object
+- Use static for utilities and class-wide state; use instance for behavior tied to a specific object
 - `static final UPPER_SNAKE_CASE` is the standard for constants
 
 **Up next:** Inheritance — define one class as an extension of another and reuse its fields and methods.

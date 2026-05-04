@@ -15,7 +15,7 @@ export const quizzes = {
       { text: "Feature Envy — the class is too interested in other classes.", correct: false, feedback: "Feature Envy is when a method uses data from another class more than its own. A 2 000-line monolith is the God Class anti-pattern." },
       { text: "God Class — a class that knows or does too much.", correct: true, feedback: "Correct! A God Class accumulates responsibilities that should be distributed across multiple focused classes. It violates the Single Responsibility Principle." },
       { text: "Primitive Obsession — the class uses too many primitive types.", correct: false, feedback: "Primitive Obsession describes using `int`, `String`, etc. where value objects should exist. A 2 000-line multi-responsibility class is a God Class." },
-      { text: "Anemic Domain Model — the class has no behaviour.", correct: false, feedback: "Anemic Domain Model is when domain objects have only getters/setters and no business logic — the opposite of a God Class." },
+      { text: "Anemic Domain Model — the class has no behavior.", correct: false, feedback: "Anemic Domain Model is when domain objects have only getters/setters and no business logic — the opposite of a God Class." },
     ],
     explanation: "A **God Class** centralises too many responsibilities. It is the most common structural anti-pattern in Java applications and typically grows through years of 'just add it here' decisions. The fix is to split responsibilities using patterns like Strategy, Observer, and proper value objects.",
   },
@@ -69,9 +69,9 @@ export const quizzes = {
       { text: "12 more classes; fix with Singleton.", correct: false, feedback: "Singleton controls instance count, not class hierarchies." },
       { text: "Up to 96 classes (12 × 8 ability combinations); fix with Strategy (composition over inheritance).", correct: true, feedback: "Correct! With 3 binary abilities that can combine freely, 12 × 2³ = 96 subclasses. Composition via Strategy replaces combinatorial inheritance: inject `MovementStrategy` as a field." },
       { text: "3 more abstract classes; fix with Template Method.", correct: false, feedback: "Template Method still uses inheritance. Introducing 3 ability abstract classes doesn't solve the combinatorial explosion." },
-      { text: "No extra classes needed; Java interfaces with default methods handle all combinations.", correct: false, feedback: "Interface default methods can provide implementations but don't solve the class explosion for runtime-configurable behaviour combinations." },
+      { text: "No extra classes needed; Java interfaces with default methods handle all combinations.", correct: false, feedback: "Interface default methods can provide implementations but don't solve the class explosion for runtime-configurable behavior combinations." },
     ],
-    explanation: "**Spaghetti inheritance** (combinatorial subclass explosion) occurs when you try to model behaviour combinations through class hierarchies. The fix is **composition over inheritance**: give each `Animal` a `MovementStrategy` field. Any combination of movement behaviours can be assembled at runtime without new subclasses.",
+    explanation: "**Spaghetti inheritance** (combinatorial subclass explosion) occurs when you try to model behavior combinations through class hierarchies. The fix is **composition over inheritance**: give each `Animal` a `MovementStrategy` field. Any combination of movement behaviours can be assembled at runtime without new subclasses.",
   },
 };
 
@@ -287,7 +287,7 @@ public class OrderManager {
     }
 }
 
-// Fix: move behaviour to where the data lives
+// Fix: move behavior to where the data lives
 public class Customer {
     public String buildGreeting() {
         return "Dear " + loyaltyTier + " member " + name
@@ -300,7 +300,7 @@ public class Customer {
 
 ## Anemic Domain Model
 
-Domain objects are pure data bags — all getters/setters, zero behaviour. All logic lives in service classes:
+Domain objects are pure data bags — all getters/setters, zero behavior. All logic lives in service classes:
 
 ```java
 // Anti-pattern: Order is just a DTO
@@ -308,7 +308,7 @@ public class Order {
     private List<Item> items;
     private double total;
     private String status;
-    // only getters and setters — no behaviour
+    // only getters and setters — no behavior
 }
 
 // All logic scattered in service
@@ -351,7 +351,7 @@ public class Main {
         private List<String> items = new ArrayList<>();
         private double total;
         private double discountPct;
-        // only getters and setters — no behaviour
+        // only getters and setters — no behavior
         public List<String> getItems()           { return items; }
         public double getTotal()                 { return total; }
         public void setTotal(double t)           { total = t; }
@@ -410,7 +410,7 @@ public class Main {
 
 ## Spaghetti inheritance
 
-Modelling every behaviour combination through subclasses:
+Modelling every behavior combination through subclasses:
 
 ```java
 // Anti-pattern: class explosion
@@ -503,9 +503,9 @@ public class OrderService {
 ## Common mistakes
 
 - **Refactoring too aggressively at once** — break one responsibility out at a time. Large-scale rewrites introduce regressions and make code review impossible.
-- **Replacing one God Class with several Feature Envy services** — distributing behaviour into services that all reach back into domain objects is not a real improvement. Move logic to where the data lives.
+- **Replacing one God Class with several Feature Envy services** — distributing behavior into services that all reach back into domain objects is not a real improvement. Move logic to where the data lives.
 - **Over-applying patterns as the fix** — not every God Class becomes a Strategy + Observer + Builder. Use the simplest fix that eliminates the problem.
-- **Forgetting to test the seams** — before refactoring, write characterisation tests that capture current behaviour. After, verify they still pass.
+- **Forgetting to test the seams** — before refactoring, write characterization tests that capture current behavior. After, verify they still pass.
 
 ## Recap
 
@@ -513,7 +513,7 @@ public class OrderService {
 - **Primitive Obsession** — introduce value objects (`Money`, `EmailAddress`, `AccountId`) — Java records make this cheap
 - **Feature Envy** — move methods to the class that owns the data they consume
 - **Anemic Domain Model** — put domain logic back into domain objects; services should orchestrate, not implement
-- **Spaghetti Inheritance** — replace class hierarchies of behaviour combinations with **composition over inheritance** (Strategy)
+- **Spaghetti Inheritance** — replace class hierarchies of behavior combinations with **composition over inheritance** (Strategy)
 
 ## Module recap
 

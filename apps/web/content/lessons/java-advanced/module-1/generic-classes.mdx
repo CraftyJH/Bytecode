@@ -78,6 +78,8 @@ export const quizzes = {
 
 Generics are one of the most impactful features in the Java type system. Before generics arrived in Java 5, every collection returned `Object` — every element retrieval required a manual cast, and a mismatched cast crashed at runtime with `ClassCastException`. Generics move that error to compile time, where it costs nothing to fix. Production codebases today use generic classes everywhere: `List<Order>`, `Map<UserId, Account>`, `Optional<Config>`, `CompletableFuture<Response>`. Understanding how to *write* generic classes — not just consume them — unlocks a whole tier of reusable library-quality code.
 
+<Note>Track baseline: Java 21 (LTS). Where later-version features are used, lessons will call that out explicitly.</Note>
+
 ## Declaring a generic class
 
 A type parameter is declared in angle brackets immediately after the class name. By convention, single-letter uppercase names are used: `T` for a general type, `E` for an element, `K`/`V` for key/value, `R` for a return type.

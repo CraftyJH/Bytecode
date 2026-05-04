@@ -14,7 +14,7 @@ export const quizzes = {
     options: [
       { text: "ReentrantLock prevents the same thread from re-entering a locked block.", correct: false, feedback: "The word 'reentrant' means the same thread CAN re-enter. Both ReentrantLock and synchronized are reentrant." },
       { text: "ReentrantLock supports timed and interruptible lock acquisition via tryLock() and lockInterruptibly().", correct: true, feedback: "Correct. synchronized blocks indefinitely with no way to interrupt or time out. ReentrantLock lets you set a deadline or respond to thread interruption." },
-      { text: "ReentrantLock is faster than synchronized in all scenarios.", correct: false, feedback: "For simple scenarios, modern JVMs optimise synchronized (biased locking, lightweight locking) to be as fast or faster. ReentrantLock is not universally faster." },
+      { text: "ReentrantLock is faster than synchronized in all scenarios.", correct: false, feedback: "For simple scenarios, modern JVMs optimize synchronized (biased locking, lightweight locking) to be as fast or faster. ReentrantLock is not universally faster." },
       { text: "ReentrantLock releases the lock automatically at the end of the method.", correct: false, feedback: "The opposite is true. synchronized releases automatically; ReentrantLock requires an explicit unlock() in a finally block." },
     ],
     explanation: "`ReentrantLock` offers capabilities `synchronized` lacks: `tryLock()` (non-blocking attempt), `tryLock(timeout, unit)` (bounded wait), `lockInterruptibly()` (interruptible wait), and multiple `Condition` objects per lock. Use `synchronized` for simple cases and reach for `ReentrantLock` when you need these extras.",

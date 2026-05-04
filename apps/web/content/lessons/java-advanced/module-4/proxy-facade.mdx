@@ -12,8 +12,8 @@ export const quizzes = {
     difficulty: "medium",
     question: "What is the key conceptual difference between Proxy and Decorator?",
     options: [
-      { text: "Proxy always adds new behaviour; Decorator controls access.", correct: false, feedback: "It's the reverse. Decorator adds behaviour; Proxy controls access to the real subject." },
-      { text: "Proxy controls access to the real subject; Decorator transparently adds behaviour.", correct: true, feedback: "Correct! Proxy may limit, delay, or mediate access. Decorator enriches what the real object does. Both wrap an object behind the same interface, but their intent differs." },
+      { text: "Proxy always adds new behavior; Decorator controls access.", correct: false, feedback: "It's the reverse. Decorator adds behavior; Proxy controls access to the real subject." },
+      { text: "Proxy controls access to the real subject; Decorator transparently adds behavior.", correct: true, feedback: "Correct! Proxy may limit, delay, or mediate access. Decorator enriches what the real object does. Both wrap an object behind the same interface, but their intent differs." },
       { text: "Proxy requires the subject interface; Decorator does not.", correct: false, feedback: "Both patterns typically implement the same interface as the object they wrap." },
       { text: "Proxy cannot be stacked; Decorator can.", correct: false, feedback: "Proxies can be chained (e.g., a caching proxy in front of a logging proxy), just like Decorators." },
     ],
@@ -401,7 +401,7 @@ public class Main {
 - **Confusing Proxy with Decorator** — same structure, different intent. If the wrapper controls access, it's a Proxy; if it adds transparent features, it's a Decorator.
 - **Tight coupling in Facade constructors** — never `new` subsystem objects inside the Facade constructor. Inject them so they can be tested and swapped.
 - **Dynamic proxies only work with interfaces** — `java.lang.reflect.Proxy` cannot proxy concrete classes. For class proxying you need a library like CGLIB (used internally by Spring).
-- **Forgetting to synchronise lazy proxy init** — `LazyImageProxy` as written is not thread-safe. In multithreaded code, protect the null check with `synchronized` or a `volatile` field.
+- **Forgetting to synchronize lazy proxy init** — `LazyImageProxy` as written is not thread-safe. In multithreaded code, protect the null check with `synchronized` or a `volatile` field.
 
 ## Recap
 

@@ -1,5 +1,5 @@
 export const meta = {
-  title: "Synchronisation — synchronized Keyword",
+  title: "Synchronization — synchronized Keyword",
   duration: 14,
   order: 2,
   isPremium: true,
@@ -25,7 +25,7 @@ export const quizzes = {
     }
 }`,
     expectedOutput: "A value ≤ 2000 (often less — e.g. 1643 or 1872)",
-    explanation: "Without synchronisation the increment `counter++` is not atomic: it compiles to a read, an add, and a write. When two threads interleave those three steps they can both read the same value, increment it independently, and write back, losing one update. The final total is therefore unpredictable and usually less than 2000.",
+    explanation: "Without synchronization the increment `counter++` is not atomic: it compiles to a read, an add, and a write. When two threads interleave those three steps they can both read the same value, increment it independently, and write back, losing one update. The final total is therefore unpredictable and usually less than 2000.",
   },
   endQ1: {
     id: "sy-end-1",
@@ -33,7 +33,7 @@ export const quizzes = {
     difficulty: "medium",
     question: "Two `synchronized` methods `foo()` and `bar()` exist on the same object. Thread A is inside `foo()`. Can Thread B enter `bar()` at the same time?",
     options: [
-      { text: "Yes — each method has its own lock.", correct: false, feedback: "Both methods synchronise on the same intrinsic lock: the `this` object. Only one thread can hold it at a time." },
+      { text: "Yes — each method has its own lock.", correct: false, feedback: "Both methods synchronize on the same intrinsic lock: the `this` object. Only one thread can hold it at a time." },
       { text: "No — both methods share the object's intrinsic lock.", correct: true, feedback: "Correct. `synchronized` instance methods all lock on `this`. Thread B must wait until A releases the lock by exiting foo()." },
       { text: "Yes — synchronized only blocks threads calling the same method.", correct: false, feedback: "synchronized blocks any thread trying to acquire the *same* lock, regardless of which synchronized method it wants to enter." },
       { text: "It depends on whether the methods are static.", correct: false, feedback: "For instance (non-static) methods the lock is always `this`. Static synchronized methods use the Class object as the lock." },
@@ -71,7 +71,7 @@ export const quizzes = {
 }`,
     buggyLine: 8,
     issue: "`getCount()` is not synchronized, so a reading thread may see a stale cached value of `count` even though `increment()` is synchronized.",
-    explanation: "Synchronisation provides both mutual exclusion *and* visibility. If the reader is not synchronized on the same lock, the Java Memory Model does not guarantee it will see the latest write. Both the writer (increment) and the reader (getCount) must synchronise on the same lock.",
+    explanation: "Synchronization provides both mutual exclusion *and* visibility. If the reader is not synchronized on the same lock, the Java Memory Model does not guarantee it will see the latest write. Both the writer (increment) and the reader (getCount) must synchronize on the same lock.",
   },
 };
 
@@ -155,7 +155,7 @@ public class SafeCounter {
 
 Only one thread can hold the intrinsic lock at a time. Any other thread that calls a `synchronized` method on the same object blocks until the lock is free.
 
-<Note>Both the write *and* the read must be synchronised on the same lock to guarantee visibility. A non-synchronised `getCount()` can return a stale cached value even when `increment()` is properly synchronised.</Note>
+<Note>Both the write *and* the read must be synchronized on the same lock to guarantee visibility. A non-synchronized `getCount()` can return a stale cached value even when `increment()` is properly synchronized.</Note>
 
 ## synchronized blocks
 
@@ -178,7 +178,7 @@ public class BatchCounter {
 }
 ```
 
-Using a dedicated private `lock` object (rather than `this`) is often better practice: it prevents external code from locking on `this` and interfering with your synchronisation strategy.
+Using a dedicated private `lock` object (rather than `this`) is often better practice: it prevents external code from locking on `this` and interfering with your synchronization strategy.
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 
@@ -291,9 +291,9 @@ public class Main {
 
 ## Common mistakes
 
-- **Synchronising only the writer, not the reader** — `synchronized` must be applied consistently on both read and write paths to guarantee visibility.
+- **Synchronizing only the writer, not the reader** — `synchronized` must be applied consistently on both read and write paths to guarantee visibility.
 - **Locking on different objects** — `synchronized (lock1)` and `synchronized (lock2)` provide no mutual exclusion between them. All threads protecting the same data must lock on the *same* object.
-- **Holding the lock too long** — synchronising an entire method that does I/O, network calls, or heavy computation blocks all other threads for far too long. Narrow the critical section to only the shared-state access.
+- **Holding the lock too long** — synchronizing an entire method that does I/O, network calls, or heavy computation blocks all other threads for far too long. Narrow the critical section to only the shared-state access.
 - **Confusing instance locks and class locks** — `synchronized` on an instance method and `static synchronized` use completely separate locks; they do not protect each other.
 
 ## Recap
@@ -301,7 +301,7 @@ public class Main {
 - **Race conditions** arise when multiple threads read and write shared mutable state without coordination.
 - `synchronized` on a method acquires the object's intrinsic lock for the duration of the call, providing mutual exclusion and visibility.
 - `synchronized (expr) { ... }` lets you lock any object and narrow the critical section.
-- Both reads and writes to shared variables must be synchronised on the same lock.
+- Both reads and writes to shared variables must be synchronized on the same lock.
 - Static `synchronized` methods lock on the `Class` object, not on `this`.
 
 **Up next:** `synchronized` can be heavy-handed. Lesson 3 introduces `volatile` and the `Atomic` classes for lighter-weight visibility and atomicity guarantees.

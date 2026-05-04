@@ -42,7 +42,7 @@ export const quizzes = {
         reader.join();
     }
 }`,
-    expectedOutput: "42 (but the program may hang or print 0 — behaviour is undefined without volatile)",
+    expectedOutput: "42 (but the program may hang or print 0 — behavior is undefined without volatile)",
     explanation: "Because `ready` and `value` are plain fields, the JMM permits the JIT or CPU to reorder the writes, cache them in registers, or delay flushing to main memory. The reader may spin forever (never seeing `ready = true`) or see `ready = true` but `value = 0`. Declaring both `volatile` fixes visibility.",
   },
   endQ2: {

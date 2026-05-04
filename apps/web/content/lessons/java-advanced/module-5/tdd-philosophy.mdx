@@ -58,13 +58,13 @@ void ___EmptyStack_WhenPopCalled_ThenThrowsException() { }`,
   },
 };
 
-Testing is one of the clearest dividing lines between code written for an assignment and code written for production. Professional Java teams ship with confidence because they have a test suite that catches regressions, documents behaviour, and makes refactoring safe. Test-Driven Development (TDD) goes one step further: tests are not an afterthought — they drive the design itself.
+Testing is one of the clearest dividing lines between code written for an assignment and code written for production. Professional Java teams ship with confidence because they have a test suite that catches regressions, documents behavior, and makes refactoring safe. Test-Driven Development (TDD) goes one step further: tests are not an afterthought — they drive the design itself.
 
 ## The TDD cycle: Red → Green → Refactor
 
-TDD is built on a three-step loop that you repeat for every small piece of behaviour:
+TDD is built on a three-step loop that you repeat for every small piece of behavior:
 
-1. **Red** — Write a test for behaviour that does not exist yet. Run it. Watch it fail. The red failure confirms the test is actually testing something.
+1. **Red** — Write a test for behavior that does not exist yet. Run it. Watch it fail. The red failure confirms the test is actually testing something.
 2. **Green** — Write the *minimum* production code required to make the test pass. Resist the urge to over-engineer at this stage.
 3. **Refactor** — With a passing test providing a safety net, clean up duplication, rename poorly chosen identifiers, and improve structure. Run the tests again to confirm nothing broke.
 
@@ -102,7 +102,7 @@ public class Main {
         System.out.println("PASS: " + msg);
     }
 
-    // Step 1 (Red): write checks for behaviour that doesn't exist yet
+    // Step 1 (Red): write checks for behavior that doesn't exist yet
     // Step 2 (Green): implement reverse() so all checks pass
     // Step 3 (Refactor): clean up if needed
 

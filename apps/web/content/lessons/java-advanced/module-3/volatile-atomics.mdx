@@ -14,7 +14,7 @@ export const quizzes = {
     options: [
       { text: "Yes — volatile makes all operations on the field atomic.", correct: false, feedback: "volatile only guarantees visibility (reads/writes go to main memory). Compound operations like ++ are still non-atomic." },
       { text: "No — volatile guarantees visibility but not atomicity. `counter++` is still a read-modify-write sequence that can interleave.", correct: true, feedback: "Correct. volatile is sufficient for a single boolean flag but not for compound read-modify-write operations like increment." },
-      { text: "Yes — the JVM optimises volatile increments into a single instruction.", correct: false, feedback: "No such JVM optimisation exists. The three-step read-add-write sequence remains non-atomic regardless of volatile." },
+      { text: "Yes — the JVM optimises volatile increments into a single instruction.", correct: false, feedback: "No such JVM optimization exists. The three-step read-add-write sequence remains non-atomic regardless of volatile." },
       { text: "It depends on the CPU architecture.", correct: false, feedback: "The Java Memory Model specifies volatile semantics independently of CPU; it does not make ++ atomic on any platform." },
     ],
     explanation: "`volatile` guarantees that every read of the field sees the most recent write (visibility), and that reads/writes are not reordered with other volatile accesses (ordering). It does NOT make compound operations like `counter++` (read + increment + write) atomic. For atomic compound operations, use `AtomicInteger` or `synchronized`.",
@@ -74,7 +74,7 @@ boolean updated = ref.___(\"old\", \"new\");`,
 
 ## The visibility problem
 
-Modern CPUs do not read and write directly to main memory for every operation. They maintain per-core caches, and the JVM compiler can keep a value in a register across multiple iterations of a loop. This is a valid optimisation for single-threaded code, but it means that a write by Thread A may not be visible to Thread B without a memory barrier.
+Modern CPUs do not read and write directly to main memory for every operation. They maintain per-core caches, and the JVM compiler can keep a value in a register across multiple iterations of a loop. This is a valid optimization for single-threaded code, but it means that a write by Thread A may not be visible to Thread B without a memory barrier.
 
 ```java
 // Without volatile — the reader thread may loop forever
@@ -307,4 +307,4 @@ public class Main {
 - `compareAndSet(expected, update)` succeeds only if the current value equals `expected`, returning a boolean result.
 - Use atomics for single-variable operations; use `synchronized` when multiple variables must be updated together.
 
-**Up next:** Lesson 4 examines what happens when synchronisation goes wrong in a very specific way — deadlock — and how to prevent it.
+**Up next:** Lesson 4 examines what happens when synchronization goes wrong in a very specific way — deadlock — and how to prevent it.

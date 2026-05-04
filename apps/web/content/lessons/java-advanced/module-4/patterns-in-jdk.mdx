@@ -12,12 +12,12 @@ export const quizzes = {
     difficulty: "easy",
     question: "Which JDK class is a classic example of the Decorator pattern?",
     options: [
-      { text: "`java.lang.StringBuilder`", correct: false, feedback: "`StringBuilder` is a Builder-style API, not a Decorator. It does not wrap another `CharSequence` to add behaviour." },
-      { text: "`java.util.Collections.unmodifiableList(...)`", correct: false, feedback: "The wrapper returned by `unmodifiableList` is closer to a Proxy (access control) than a Decorator (behaviour addition)." },
+      { text: "`java.lang.StringBuilder`", correct: false, feedback: "`StringBuilder` is a Builder-style API, not a Decorator. It does not wrap another `CharSequence` to add behavior." },
+      { text: "`java.util.Collections.unmodifiableList(...)`", correct: false, feedback: "The wrapper returned by `unmodifiableList` is closer to a Proxy (access control) than a Decorator (behavior addition)." },
       { text: "`java.io.BufferedInputStream`", correct: true, feedback: "Correct! `BufferedInputStream` wraps any `InputStream` and adds a read buffer. It implements `InputStream` and holds a reference to another `InputStream` — the textbook Decorator structure." },
       { text: "`java.util.TreeMap`", correct: false, feedback: "`TreeMap` is a concrete sorted map implementation — it extends `AbstractMap`, not a Decorator wrapping another Map." },
     ],
-    explanation: "`BufferedInputStream` is the canonical JDK Decorator: it implements `InputStream`, holds a reference to another `InputStream`, and adds buffering behaviour layer by layer. The entire `java.io` stream hierarchy is built on this pattern.",
+    explanation: "`BufferedInputStream` is the canonical JDK Decorator: it implements `InputStream`, holds a reference to another `InputStream`, and adds buffering behavior layer by layer. The entire `java.io` stream hierarchy is built on this pattern.",
   },
   endQ1: {
     id: "jdk-end-1",
@@ -26,7 +26,7 @@ export const quizzes = {
     question: "The `Comparator` interface passed to `List.sort()` is an example of which pattern?",
     options: [
       { text: "Observer — it listens for comparison events.", correct: false, feedback: "`Comparator` is not a listener. It provides an algorithm (comparison) on demand." },
-      { text: "Template Method — `List.sort()` defines a skeleton and `Comparator` fills in a step.", correct: false, feedback: "`List.sort()` does not define an overridable skeleton. The sort algorithm is self-contained; `Comparator` is purely a pluggable behaviour." },
+      { text: "Template Method — `List.sort()` defines a skeleton and `Comparator` fills in a step.", correct: false, feedback: "`List.sort()` does not define an overridable skeleton. The sort algorithm is self-contained; `Comparator` is purely a pluggable behavior." },
       { text: "Strategy — `Comparator` is a pluggable, interchangeable ordering algorithm.", correct: true, feedback: "Correct! Every `Comparator` is a Strategy. `List.sort()` accepts any implementation of the `Comparator` interface, making the ordering algorithm a runtime-configurable object." },
       { text: "Command — the comparison is an encapsulated request.", correct: false, feedback: "Command encapsulates a request that can be queued and undone. `Comparator` is a pure algorithm with no side effects, queuing, or reversal — that's Strategy." },
     ],
@@ -86,7 +86,7 @@ The most durable way to cement your knowledge of design patterns is to spot them
 
 | Pattern | JDK Example | Key signal |
 |---|---|---|
-| **Decorator** | `BufferedInputStream`, `InputStreamReader` | Wraps same interface, adds behaviour |
+| **Decorator** | `BufferedInputStream`, `InputStreamReader` | Wraps same interface, adds behavior |
 | **Observer** | `PropertyChangeListener`, `EventListener` | `addXxxListener` / `removeXxxListener` |
 | **Strategy** | `Comparator`, `Predicate`, `Function` | Single-method interface, passed as argument |
 | **Builder** | `StringBuilder`, `Stream`, `ProcessBuilder` | Fluent chain ending in a terminal method |

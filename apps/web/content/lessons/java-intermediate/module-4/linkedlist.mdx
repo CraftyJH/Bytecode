@@ -162,11 +162,11 @@ public class DequeDemo {
 }
 ```
 
-<Note>Prefer `ArrayDeque` over `LinkedList` when you only need stack or queue behaviour. `ArrayDeque` is backed by a resizable circular array, which has better cache performance (memory-contiguous) and no per-node allocation overhead. Use `LinkedList` when you need both `List` and `Deque` behaviour, or when you're inserting/removing in the **middle** via an iterator.</Note>
+<Note>Prefer `ArrayDeque` over `LinkedList` when you only need stack or queue behavior. `ArrayDeque` is backed by a resizable circular array, which has better cache performance (memory-contiguous) and no per-node allocation overhead. Use `LinkedList` when you need both `List` and `Deque` behavior, or when you're inserting/removing in the **middle** via an iterator.</Note>
 
 ## Queue interface: the FIFO contract
 
-`Queue` defines two pairs of methods that do the same logical thing but differ in their failure behaviour:
+`Queue` defines two pairs of methods that do the same logical thing but differ in their failure behavior:
 
 | Operation | Throws exception | Returns null / false |
 |-----------|-----------------|---------------------|
@@ -260,7 +260,7 @@ public class Demo {
 
 - **Calling `get(i)` inside a for-index loop on a LinkedList** — this turns O(n) iteration into O(n²). Always use a for-each or iterator to traverse a `LinkedList`.
 - **Using LinkedList for a pure stack** — `ArrayDeque` is faster for push/pop-only usage. Use `LinkedList` only when you also need `List` methods.
-- **Confusing `push`/`pop` with `offer`/`poll`** — `push` and `pop` operate on the *front* (stack/LIFO); `offer` adds to the *tail* and `poll` removes from the *front* (queue/FIFO). Mixing them produces confusing behaviour.
+- **Confusing `push`/`pop` with `offer`/`poll`** — `push` and `pop` operate on the *front* (stack/LIFO); `offer` adds to the *tail* and `poll` removes from the *front* (queue/FIFO). Mixing them produces confusing behavior.
 - **Calling `remove()` or `element()` on an empty queue** — these throw `NoSuchElementException`. Use `poll()` and `peek()` if the queue may be empty, and check for `null`.
 - **Ignoring memory overhead** — linked lists consume far more memory per element than arrays. For collections with millions of elements, the difference matters.
 

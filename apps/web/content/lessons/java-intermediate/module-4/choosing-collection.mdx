@@ -12,7 +12,7 @@ export const quizzes = {
     difficulty: "easy",
     question: "Which collection would you use to process HTTP requests in the order they arrive, handling one at a time?",
     options: [
-      { text: "TreeSet<Request>", correct: false, feedback: "A Set deduplates — two identical requests would be merged. You also need ordering by arrival, not by key value." },
+      { text: "TreeSet<Request>", correct: false, feedback: "A Set deduplicates — two identical requests would be merged. You also need ordering by arrival, not by key value." },
       { text: "HashMap<Integer, Request>", correct: false, feedback: "A Map is for key-value lookup. You don't need to look up requests by key; you need FIFO processing." },
       { text: "Queue<Request> (e.g. LinkedList or ArrayDeque)", correct: true, feedback: "Correct! A Queue models first-in-first-out. Incoming requests enqueue at the tail; the handler dequeues from the head." },
       { text: "ArrayList<Request> with removeFirst()", correct: false, feedback: "ArrayList.remove(0) is O(n) because every remaining element shifts left. A Queue's `poll()` is O(1)." },
@@ -206,7 +206,7 @@ new TreeMap<>(byDept).forEach((dept, names) -> {
 ```java
 TreeMap<Integer, String> errors = new TreeMap<>();
 errors.put(400, "Bad Request");
-errors.put(401, "Unauthorised");
+errors.put(401, "Unauthorized");
 errors.put(404, "Not Found");
 errors.put(500, "Internal Server Error");
 
@@ -290,7 +290,7 @@ sharedMap.put("requests", 0);
 sharedMap.merge("requests", 1, Integer::sum); // thread-safe increment
 ```
 
-This is just a preview — concurrent programming deserves its own module. The key point: **never share standard collections across threads without synchronisation**.
+This is just a preview — concurrent programming deserves its own module. The key point: **never share standard collections across threads without synchronization**.
 
 ## Choosing between List.of and Collections.unmodifiableList
 
@@ -350,7 +350,7 @@ public class Demo {
 - **Using `List` for membership tests in hot code** — `list.contains(x)` is O(n). If you run this in a loop, switch to a `Set`. The pattern `new HashSet<>(list).contains(x)` inside a loop is still O(n) per call — build the set once, outside the loop.
 - **Sharing `Collections.unmodifiableList` and thinking the original is protected** — the wrapper blocks mutations through the read-only reference, but the original list is still mutable. If you want true immutability, use `List.of()` or copy into `new ArrayList<>(original)` before wrapping.
 - **Using `List.of()` when the list might grow** — `List.of()` and `Set.of()` are structurally immutable; you cannot add, remove, or set elements. Use them only for constants, not for collections that may be modified.
-- **Ignoring thread safety** — passing a `HashMap` or `ArrayList` between threads without synchronisation causes race conditions. Even reads can be unsafe if another thread is concurrently writing. Always use `java.util.concurrent` types or explicit synchronisation.
+- **Ignoring thread safety** — passing a `HashMap` or `ArrayList` between threads without synchronization causes race conditions. Even reads can be unsafe if another thread is concurrently writing. Always use `java.util.concurrent` types or explicit synchronization.
 
 ## Recap
 

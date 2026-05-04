@@ -10,14 +10,14 @@ export const quizzes = {
     id: "ts-mid-1",
     type: "multiple_choice",
     difficulty: "medium",
-    question: "Which characteristic most commonly makes a test brittle (prone to breaking for reasons unrelated to the behaviour under test)?",
+    question: "Which characteristic most commonly makes a test brittle (prone to breaking for reasons unrelated to the behavior under test)?",
     options: [
       { text: "The test has a single, focused assertion.", correct: false, feedback: "Focused assertions make tests more robust, not more brittle — a failure tells you exactly what broke." },
-      { text: "The test asserts on the internal implementation detail of the class, not its observable output.", correct: true, feedback: "Correct — when tests verify private field values, call sequences, or internal state rather than the class's public contract, every internal refactoring breaks the tests even when behaviour is unchanged." },
+      { text: "The test asserts on the internal implementation detail of the class, not its observable output.", correct: true, feedback: "Correct — when tests verify private field values, call sequences, or internal state rather than the class's public contract, every internal refactoring breaks the tests even when behavior is unchanged." },
       { text: "The test uses @BeforeEach to initialise objects.", correct: false, feedback: "@BeforeEach improves isolation and reduces brittle shared state. It is a good pattern, not a source of brittleness." },
       { text: "The test uses a descriptive @DisplayName.", correct: false, feedback: "Display names have no effect on test brittleness." },
     ],
-    explanation: "Tests that reach into private state or verify exact method call sequences couple the test to the implementation. Rename a private field, extract a helper method, or change an internal algorithm and dozens of tests fail even though no external behaviour changed. Test the contract, not the implementation.",
+    explanation: "Tests that reach into private state or verify exact method call sequences couple the test to the implementation. Rename a private field, extract a helper method, or change an internal algorithm and dozens of tests fail even though no external behavior changed. Test the contract, not the implementation.",
   },
   endQ1: {
     id: "ts-end-1",
@@ -289,7 +289,7 @@ The word "mock" is often used loosely to mean any kind of substitute object. Ger
 | **Mock** | Pre-programmed with expectations, verified | `verify(gateway).charge(100.0)` |
 | **Fake** | Simplified but working implementation | `InMemoryUserRepository` used in tests |
 
-Knowing which type you are using makes the test's intent clear. A test that uses a **stub** is checking return-value logic. A test that uses a **mock** is verifying interaction behaviour. A test that uses a **fake** is running a slice of real logic cheaply.
+Knowing which type you are using makes the test's intent clear. A test that uses a **stub** is checking return-value logic. A test that uses a **mock** is verifying interaction behavior. A test that uses a **fake** is running a slice of real logic cheaply.
 
 <Note>Fakes are underused. An in-memory repository fake lets service-layer tests run against real repository logic without a database, without Mockito ceremony, and without the fragility of interaction verification.</Note>
 
@@ -348,7 +348,7 @@ Rewrite with proper `@BeforeEach` isolation, `should_when` names, single-scenari
 - **Static mutable fields in test classes** — they persist across tests, causing subtle order-dependent failures that are hard to diagnose. Use instance fields initialised in `@BeforeEach`.
 - **Asserting on private implementation details** — accessing private fields via reflection or testing exact internal call sequences makes every refactoring break the tests. Test the public contract.
 - **Identical setup duplicated across test methods** — copy-pasted `new BankAccount(100.0)` in every test method means a single constructor signature change requires updating dozens of lines. Factor setup into `@BeforeEach`.
-- **Using mocks when a fake would be clearer** — Mockito interaction verification for every call on a repository creates fragile tests that break when the implementation is optimised. An in-memory fake lets the test focus on outcome, not call sequence.
+- **Using mocks when a fake would be clearer** — Mockito interaction verification for every call on a repository creates fragile tests that break when the implementation is optimized. An in-memory fake lets the test focus on outcome, not call sequence.
 
 ## Recap
 

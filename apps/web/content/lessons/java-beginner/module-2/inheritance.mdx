@@ -54,7 +54,7 @@ class Cat extends Animal {
     void purr() { System.out.println(name + " purrs"); }
 }`,
     expectedOutput: "An animal named Whiskers\nWhiskers purrs",
-    explanation: "Cat doesn't override describe(), so the inherited Animal version runs. Cat adds a new method purr() that uses the inherited name field. Inheritance gives you the parent's behaviour for free, plus whatever you add.",
+    explanation: "Cat doesn't override describe(), so the inherited Animal version runs. Cat adds a new method purr() that uses the inherited name field. Inheritance gives you the parent's behavior for free, plus whatever you add.",
   },
   endChoice: {
     id: "inh-end-2",
@@ -95,11 +95,11 @@ class Dog extends Animal {
     code: "class Dog ___ Animal { ... }",
     correctAnswers: ["extends"],
     caseSensitive: true,
-    explanation: "`extends` declares a parent-child relationship. Dog gets all of Animal's non-private fields and methods, and may add or override behaviour.",
+    explanation: "`extends` declares a parent-child relationship. Dog gets all of Animal's non-private fields and methods, and may add or override behavior.",
   },
 };
 
-When two classes share most of their data and behaviour, you don't have to copy code between them. **Inheritance** lets you declare one class as an extension of another — a `Dog` is an `Animal`, a `Manager` is an `Employee` — and reuse everything the parent already does.
+When two classes share most of their data and behavior, you don't have to copy code between them. **Inheritance** lets you declare one class as an extension of another — a `Dog` is an `Animal`, a `Manager` is an `Employee` — and reuse everything the parent already does.
 
 Think of it like specialization in biology. An Animal defines the general traits: every animal has a name, can make a sound, needs food. A Dog is an Animal with all those general traits, plus specific ones: it barks, fetches, and wags its tail. Inheritance in code mirrors this relationship: the subclass gets the parent's fields and methods automatically, then adds its own.
 
@@ -156,7 +156,7 @@ class Dog extends Animal {
 
 ## Overriding methods
 
-When the inherited behaviour isn't what you want, **override** it: write a method in the subclass with the same signature as the parent's, and add `@Override` so the compiler can verify it really is replacing something:
+When the inherited behavior isn't what you want, **override** it: write a method in the subclass with the same signature as the parent's, and add `@Override` so the compiler can verify it really is replacing something:
 
 ```java
 class Dog extends Animal {
@@ -182,7 +182,7 @@ The `@Override` annotation is optional but strongly recommended. If you mistype 
 
 ## Calling the parent's version
 
-Inside an override, you can still reach the parent's behaviour with `super.methodName(...)`:
+Inside an override, you can still reach the parent's behavior with `super.methodName(...)`:
 
 ```java
 class Dog extends Animal {
@@ -196,7 +196,7 @@ class Dog extends Animal {
 }
 ```
 
-This is useful when you want to extend the parent's behaviour rather than replace it entirely.
+This is useful when you want to extend the parent's behavior rather than replace it entirely.
 
 ## What's inherited (and what isn't)
 
@@ -253,7 +253,7 @@ class Cat extends Animal {
 
 ## Recap
 
-Inheritance is powerful when used for genuine "is a" relationships. It eliminates duplication and provides a natural place to add shared behaviour. But it creates tight coupling — a change to the parent affects every subclass — so use it judiciously.
+Inheritance is powerful when used for genuine "is a" relationships. It eliminates duplication and provides a natural place to add shared behavior. But it creates tight coupling — a change to the parent affects every subclass — so use it judiciously.
 
 - `class B extends A` makes B a subclass of A, inheriting non-private members
 - `super(args)` calls a parent constructor; must be the first statement of a child constructor

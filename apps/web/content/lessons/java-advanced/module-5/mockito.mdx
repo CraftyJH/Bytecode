@@ -13,7 +13,7 @@ export const quizzes = {
     question: "What is the key difference between a Mockito mock and a Mockito spy?",
     options: [
       { text: "Mocks are for interfaces; spies are for concrete classes.", correct: false, feedback: "Mockito can mock both interfaces and concrete classes. The distinction between mock and spy is not about the type being mocked." },
-      { text: "A mock replaces all behaviour with no-ops by default; a spy wraps a real object and delegates to real methods unless stubbed.", correct: true, feedback: "Correct — mock() creates a complete substitute where every method returns a default (null, 0, false, empty collection). spy() wraps a real instance so unstubbed calls go through to the real implementation." },
+      { text: "A mock replaces all behavior with no-ops by default; a spy wraps a real object and delegates to real methods unless stubbed.", correct: true, feedback: "Correct — mock() creates a complete substitute where every method returns a default (null, 0, false, empty collection). spy() wraps a real instance so unstubbed calls go through to the real implementation." },
       { text: "A spy records interactions; a mock does not.", correct: false, feedback: "Both mocks and spies record interactions — you can call verify() on either." },
       { text: "Mocks can only be created with @Mock; spies require spy().", correct: false, feedback: "Both can be created programmatically (mock()/spy()) or via annotations (@Mock/@Spy)." },
     ],
@@ -323,7 +323,7 @@ Write three tests:
 - **Calling real methods on a mock** — `spy()` delegates to the real method; `mock()` does not. Accidentally using `spy()` when you wanted `mock()` can cause unexpected side effects during test setup.
 - **Mixing argument matchers and raw values** — `when(m.method(anyInt(), "hello"))` is a compile-time valid but runtime-invalid mix. Once you use a matcher for one argument, all arguments in that call must use matchers (`eq("hello")` for the fixed value).
 - **Stubbing after execution** — placing `when(...)` after the method under test has already run creates unused stubs and never affects the already-completed call. Always stub before the action (Act) step.
-- **Over-verifying** — asserting every method call on every mock is brittle. Verify only the interactions that matter for the behaviour being tested; leave incidental internal calls unverified.
+- **Over-verifying** — asserting every method call on every mock is brittle. Verify only the interactions that matter for the behavior being tested; leave incidental internal calls unverified.
 
 ## Recap
 

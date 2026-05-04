@@ -149,7 +149,7 @@ The signature must take `Object`, not `Point`. If you write `equals(Point p)`, y
 
 The structure of a correct `equals`:
 
-1. Quick reference check (`this == o`) — optional optimisation.
+1. Quick reference check (`this == o`) — optional optimization.
 2. Type check via `instanceof`.
 3. Cast to your type.
 4. Compare the fields that matter.
@@ -183,7 +183,7 @@ Get this wrong and you'll have bugs that look like memory corruption: you put a 
 
 ## When to override the Big Three
 
-Override all three together for any class whose objects you want to compare by value, store in a `Set`, or use as `Map` keys. For purely behavioural classes (a `Logger`, a `RequestHandler`), the defaults are usually fine — there's no meaningful "equal Logger" concept.
+Override all three together for any class whose objects you want to compare by value, store in a `Set`, or use as `Map` keys. For purely behavioral classes (a `Logger`, a `RequestHandler`), the defaults are usually fine — there's no meaningful "equal Logger" concept.
 
 Modern Java has `record` types that auto-generate all three for you. We'll cover those later — for now, learn to write them by hand, because you'll see the pattern in every Java codebase.
 

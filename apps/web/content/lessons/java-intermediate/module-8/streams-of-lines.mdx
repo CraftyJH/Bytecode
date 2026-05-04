@@ -56,7 +56,7 @@ public class Main {
     options: [
       { text: "It returns the count twice as fast (cached).", correct: false, feedback: "Streams are not cached — they're a one-shot pipeline." },
       { text: "It throws <code>IllegalStateException</code>: stream has already been operated upon.", correct: true },
-      { text: "It silently returns 0 the second time.", correct: false, feedback: "The behaviour is to throw, not silently fail." },
+      { text: "It silently returns 0 the second time.", correct: false, feedback: "The behavior is to throw, not silently fail." },
       { text: "It re-reads the file from the start.", correct: false, feedback: "Streams don't auto-rewind. To re-read, open a new stream." },
     ],
     explanation: "Java streams are single-pass: any terminal operation (count, collect, forEach, etc.) consumes the stream. Use it once and discard, or open a fresh Files.lines for each pass.",
@@ -242,7 +242,7 @@ If the file handle has trouble closing, the close exception is attached as suppr
 - Common patterns: `filter` + `count`, `filter` + `collect`, `map` + `forEach`, `skip` + `map`, `findFirst`.
 - Stream operations are lazy until a terminal op (`count`, `collect`, `forEach`, `findFirst`, etc.) triggers consumption.
 
-**Up next:** This is the final lesson of the Java Intermediate track. Take the Module 8 Capstone (when available) or move on to Java Advanced for lambdas, streams in depth, concurrency, and JVM internals.
+**Up next:** This is the final lesson of the Java Intermediate track. Move on to Java Advanced for deeper stream internals, concurrency, and JVM internals.
 
 <Exercise>
 Open `/tmp/log.txt` twice — first to count ERROR lines, then to print the INFO lines. Use `Files.lines` and try-with-resources for both.

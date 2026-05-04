@@ -209,7 +209,7 @@ This is the same rule that applies inside any static method: no implicit `this`,
 
 ## Try it
 
-Click **Run** on the starter code below. The program defines a tiny `Pair` class as a static nested class inside `Main` and prints a pair plus the sum of its parts. You should see:
+Complete the TODOs in the starter code below, then click **Run**. The program defines a tiny `Pair` class as a static nested class inside `Main` and prints a pair plus the sum of its parts. You should see:
 
 ```
 Pair: (3,7)
@@ -259,7 +259,7 @@ Static nested classes are the friendliest member of the nested-class family. The
 **Up next:** Inner Classes — the non-static cousin that really does carry an enclosing instance with it.
 
 <Exercise>
-The starter program declares a static nested class `Pair` inside `Main`. Run it as-is and confirm the output. Then experiment: try removing the `static` keyword from `Pair` — what error does the compiler give you? (Put the `static` back when you're done; the test relies on it.)
+Declare a static nested class `Pair` inside `Main`, then instantiate it and print both the pair and the sum of its parts.
 
 ```java
 public class Main {
@@ -268,11 +268,13 @@ public class Main {
         final int second;
         Pair(int a, int b) { first = a; second = b; }
         @Override
-        public String toString() { return "(" + first + "," + second + ")"; }
+        // TODO: return "(first,second)"
+        public String toString() { return ""; }
     }
 
     public static void main(String[] args) {
-        Pair p = new Pair(3, 7);
+        // TODO: instantiate Pair(3, 7)
+        Pair p = new Pair(0, 0);
         System.out.println("Pair: " + p);
         System.out.println("Sum: " + (p.first + p.second));
     }

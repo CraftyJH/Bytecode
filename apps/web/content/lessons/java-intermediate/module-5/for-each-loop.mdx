@@ -193,7 +193,7 @@ A handy rule of thumb: if you're not using `i` for anything except `list.get(i)`
 
 ## Try it
 
-Click **Run** on the starter code. The TODOs are already filled in for you so you can see the for-each loop in action. You should see the four languages printed with `- ` prefixes, followed by `sum=15`.
+Fill in the TODOs in the starter code, then click **Run**. You should see the four languages printed with `- ` prefixes, followed by `sum=15`.
 
 ## Auto-unboxing in the loop variable
 
@@ -263,7 +263,7 @@ The for-each loop is the default way to read every element of a collection or ar
 **Up next:** Using Iterator Directly — when the syntactic sugar isn't enough, you reach for the underlying tool.
 
 <Exercise>
-Use a for-each loop to print each language with a `"- "` prefix, then sum the integer array using a second for-each loop. The starter already shows one valid solution; experiment by changing the prefix or the array contents to make sure you understand each piece.
+Use a for-each loop to print each language with a `"- "` prefix, then sum the integer array using a second for-each loop.
 
 ```java
 import java.util.*;
@@ -272,14 +272,12 @@ public class Main {
     public static void main(String[] args) {
         List<String> langs = Arrays.asList("Java", "Kotlin", "Scala", "Groovy");
         // TODO: print each language using a for-each loop, prefixed with "- "
-        for (String lang : langs) {
-            System.out.println("- " + lang);
-        }
+        // TODO: print each language using a for-each loop, prefixed with "- "
 
         int[] nums = {1, 2, 3, 4, 5};
         int sum = 0;
         // TODO: sum the array using for-each
-        for (int n : nums) sum += n;
+        // TODO: sum the array using for-each
         System.out.println("sum=" + sum);
     }
 }

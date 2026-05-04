@@ -14,7 +14,7 @@ export const quizzes = {
     options: [
       { text: "ConcurrentHashMap allows null keys and values; Hashtable does not.", correct: false, feedback: "It's the opposite — ConcurrentHashMap does NOT allow null keys or values. This is not the performance reason." },
       { text: "ConcurrentHashMap uses segment-level or bucket-level locking so multiple threads can read and write concurrently without blocking the entire map.", correct: true, feedback: "Correct. Hashtable and synchronizedMap lock the entire structure on every operation. ConcurrentHashMap allows high concurrency by locking only the affected bucket (or using CAS for reads)." },
-      { text: "ConcurrentHashMap is faster because it is unsynchronised.", correct: false, feedback: "ConcurrentHashMap is synchronised — just more granularly. It uses CAS and fine-grained locks rather than a single coarse lock." },
+      { text: "ConcurrentHashMap is faster because it is unsynchronised.", correct: false, feedback: "ConcurrentHashMap is synchronized — just more granularly. It uses CAS and fine-grained locks rather than a single coarse lock." },
       { text: "ConcurrentHashMap implements a different interface than Hashtable.", correct: false, feedback: "Both implement java.util.Map. The advantage is internal concurrency strategy, not the interface." },
     ],
     explanation: "`Hashtable` and `Collections.synchronizedMap` wrap every method in a single `synchronized (this)` lock, serialising all access. `ConcurrentHashMap` (Java 8+) uses CAS operations for reads and fine-grained bucket locking for writes, allowing full concurrent reads and high write parallelism.",
@@ -331,7 +331,7 @@ The queue's capacity of 5 creates natural back-pressure: the producer blocks whe
 
 ## Common mistakes
 
-- **Using `Collections.synchronizedList` and iterating without external synchronisation** — the wrapper synchronises individual calls, but iteration requires manually locking the list for the entire loop. `CopyOnWriteArrayList` handles this transparently.
+- **Using `Collections.synchronizedList` and iterating without external synchronization** — the wrapper synchronises individual calls, but iteration requires manually locking the list for the entire loop. `CopyOnWriteArrayList` handles this transparently.
 - **Calling `size()` then `take()` as a pair** — `size() > 0` then `take()` is not atomic; another thread can drain the queue between the two calls. Use `poll()` and check for null, or just `take()` with a timeout.
 - **Using `CopyOnWriteArrayList` for write-heavy workloads** — every write copies the entire array; on a large, frequently modified list this is a severe performance problem.
 - **Not using `putIfAbsent` or `computeIfAbsent`** — a separate `containsKey` + `put` has a race window. Always use the atomic compound methods on `ConcurrentHashMap`.

@@ -194,7 +194,7 @@ If the two lists have different sizes, the loop stops at the shorter one — a s
 
 ## Try it
 
-Click **Run** on the starter code. You should see:
+Fill in the TODO in the starter code, then click **Run**. You should see:
 
 ```
 doing: eat
@@ -203,7 +203,7 @@ doing: code
 done
 ```
 
-The starter already shows the canonical `while (it.hasNext()) { ... it.next(); ... }` pattern.
+This exercise is the canonical `while (it.hasNext()) { ... it.next(); ... }` pattern.
 
 ## Iterator vs Iterable
 
@@ -264,7 +264,7 @@ Anywhere else, write the `while (it.hasNext())` shape and let the loop terminate
 **Up next:** Removing Elements Safely While Iterating — what happens when the collection changes under your cursor, and the two correct ways to fix it.
 
 <Exercise>
-The starter walks a list of tasks using `Iterator.hasNext()` and `Iterator.next()` and prints `"doing: <task>"` for each one, then `done` at the end. Run it as-is to see the canonical pattern, then experiment: try adding a task, or printing the index alongside the task using a manual counter.
+Walk a list of tasks using `Iterator.hasNext()` and `Iterator.next()`, print `"doing: <task>"` for each one, then print `done` at the end.
 
 ```java
 import java.util.*;
@@ -274,10 +274,7 @@ public class Main {
         List<String> tasks = new ArrayList<>(Arrays.asList("eat", "sleep", "code"));
         Iterator<String> it = tasks.iterator();
         // TODO: walk the iterator with hasNext / next, printing "doing: <task>"
-        while (it.hasNext()) {
-            String task = it.next();
-            System.out.println("doing: " + task);
-        }
+        // TODO: walk the iterator with hasNext / next, printing "doing: <task>"
         System.out.println("done");
     }
 }

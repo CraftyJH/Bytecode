@@ -131,7 +131,7 @@ int wrong = IntStream.rangeClosed(1, 10).parallel().reduce(1, Integer::sum);
 // Result is unpredictable — adds extra 1s depending on partition count
 ```
 
-The JVM applies the identity to *each partition* before combining. This is correct behaviour when the identity is truly neutral (1+x = x for `+` with identity 0). A wrong identity causes extra contributions from each partition.
+The JVM applies the identity to *each partition* before combining. This is correct behavior when the identity is truly neutral (1+x = x for `+` with identity 0). A wrong identity causes extra contributions from each partition.
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 

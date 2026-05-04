@@ -99,7 +99,7 @@ public class Main {
   },
 };
 
-Inheritance gives subclasses their own behaviour. **Polymorphism** — literally "many forms" — is what happens when you write code that doesn't care *which* subclass it's working with: one variable type, multiple actual classes, each behaving as itself.
+Inheritance gives subclasses their own behavior. **Polymorphism** — literally "many forms" — is what happens when you write code that doesn't care *which* subclass it's working with: one variable type, multiple actual classes, each behaving as itself.
 
 The payoff is code that stays the same while the world around it grows. You write a loop that processes `Animal` objects. Next month someone adds a `Parrot` class. The loop doesn't change — it still calls `speak()`, and the Parrot speaks in its own way. That's polymorphism at work.
 
@@ -169,7 +169,7 @@ if (a instanceof Dog) {
 
 ## Abstract — methods that *must* be overridden
 
-Sometimes the parent class has no useful default behaviour — every subclass should provide its own. Mark those methods `abstract`:
+Sometimes the parent class has no useful default behavior — every subclass should provide its own. Mark those methods `abstract`:
 
 ```java
 abstract class Shape {

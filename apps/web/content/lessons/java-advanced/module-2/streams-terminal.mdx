@@ -91,7 +91,7 @@ names.stream().forEach(System.out::println);
 long n = names.stream().filter(s -> s.length() > 3).count(); // 2
 ```
 
-`forEach` processes every element for its side effect. `count` is equivalent to `reduce(0L, (acc, e) -> acc + 1)` but may be optimised by the JVM.
+`forEach` processes every element for its side effect. `count` is equivalent to `reduce(0L, (acc, e) -> acc + 1)` but may be optimized by the JVM.
 
 ## Primitive stream arithmetic: sum, average, min, max
 

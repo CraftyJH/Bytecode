@@ -54,7 +54,7 @@ public class Main {
     options: [
       { text: "Because Box is not a concrete class.", correct: false, feedback: "Box is a concrete class — it's the type argument that's the problem, not Box itself." },
       { text: "Because at runtime, type erasure removes `<String>`, so the JVM cannot distinguish Box<String> from Box<Integer>.", correct: true, feedback: "Correct. After erasure, all parameterisations of Box are the same class. The runtime check `instanceof Box<String>` would always behave as `instanceof Box`, making the check meaningless and misleading." },
-      { text: "Because instanceof only works with interfaces.", correct: false, feedback: "instanceof works with any reference type — classes and interfaces. The restriction is specifically about parameterised types." },
+      { text: "Because instanceof only works with interfaces.", correct: false, feedback: "instanceof works with any reference type — classes and interfaces. The restriction is specifically about parameterized types." },
       { text: "Because you must use a cast before instanceof.", correct: false, feedback: "instanceof can be used without a prior cast. The issue is that the generic type argument `<String>` is not present at runtime." },
     ],
     explanation: "Type erasure removes all generic type information from instances at runtime. A `Box<String>` instance and a `Box<Integer>` instance are identical to the JVM — both are just `Box`. The pattern `instanceof Box<String>` would be a lie, so the compiler rejects it.",
@@ -149,7 +149,7 @@ public class Main {
 // ILLEGAL — T is not available at runtime:
 T obj = new T();             // cannot instantiate T
 T[] arr = new T[10];        // cannot create generic array
-if (x instanceof Box<String>) { ... }  // cannot check parameterised type
+if (x instanceof Box<String>) { ... }  // cannot check parameterized type
 Class<T> c = T.class;       // no class literal for type parameters
 ```
 
@@ -307,7 +307,7 @@ public class Main {
 
 - **Mixing raw and generic types** — assigning a raw `List` to a `List<String>` reference compiles with warnings and causes heap pollution. Enable `-Xlint:unchecked` and treat all warnings as errors in new code.
 - **Casting to a type parameter** — `(T) someObject` at runtime erases to `(Object)` — the cast does nothing and defers the error to wherever the result is used. Use a `Class<T>` type token and `type.cast()` for genuine runtime safety.
-- **Expecting `getClass()` to return the parameterised type** — `new ArrayList<String>().getClass()` returns `class java.util.ArrayList`, not `ArrayList<String>`. The parameter is gone.
+- **Expecting `getClass()` to return the parameterized type** — `new ArrayList<String>().getClass()` returns `class java.util.ArrayList`, not `ArrayList<String>`. The parameter is gone.
 - **Trying `new T[n]`** — create `Object[]` and cast the array reference: `T[] arr = (T[]) new Object[n]`. This is an unchecked cast but is the standard workaround (see lesson 7).
 
 ## Recap

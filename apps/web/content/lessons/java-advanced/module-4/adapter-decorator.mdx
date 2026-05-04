@@ -12,7 +12,7 @@ export const quizzes = {
     difficulty: "easy",
     question: "What core problem does the Adapter pattern solve?",
     options: [
-      { text: "Adding new behaviour to an object at runtime without subclassing.", correct: false, feedback: "That's the Decorator pattern's job. Decorator wraps an object to extend its behaviour." },
+      { text: "Adding new behavior to an object at runtime without subclassing.", correct: false, feedback: "That's the Decorator pattern's job. Decorator wraps an object to extend its behavior." },
       { text: "Making two incompatible interfaces work together without modifying either.", correct: true, feedback: "Correct! Adapter acts as a translator between a client that expects one interface and a class that provides a different one." },
       { text: "Ensuring a class has only one instance.", correct: false, feedback: "That's the Singleton pattern's responsibility." },
       { text: "Simplifying access to a complex subsystem.", correct: false, feedback: "That's the Facade pattern. Adapter is about interface compatibility, not simplification." },
@@ -62,11 +62,11 @@ export const quizzes = {
     question: "In the `java.io` package, wrapping a `FileInputStream` in a `BufferedInputStream` is an example of which pattern?",
     options: [
       { text: "Adapter — translating FileInputStream's interface to BufferedInputStream's.", correct: false, feedback: "Adapter changes interfaces. Both `FileInputStream` and `BufferedInputStream` implement `InputStream` — the interface is the same. This is Decorator." },
-      { text: "Decorator — adding buffering behaviour by wrapping the original stream.", correct: true, feedback: "Correct! `BufferedInputStream` wraps any `InputStream` and adds buffering without changing the interface. That's exactly Decorator." },
+      { text: "Decorator — adding buffering behavior by wrapping the original stream.", correct: true, feedback: "Correct! `BufferedInputStream` wraps any `InputStream` and adds buffering without changing the interface. That's exactly Decorator." },
       { text: "Proxy — controlling access to the underlying file.", correct: false, feedback: "Proxy controls access (e.g., lazy loading, security). `BufferedInputStream` adds a performance feature — buffering — not access control." },
       { text: "Facade — hiding the complexity of file I/O.", correct: false, feedback: "Facade exposes a simplified interface. `BufferedInputStream` exposes the same `InputStream` API — it doesn't simplify it." },
     ],
-    explanation: "`java.io` is the canonical Decorator example in Java. Every stream wrapper (`BufferedInputStream`, `DataInputStream`, `GZIPInputStream`) implements `InputStream` AND wraps another `InputStream`, adding behaviour layer by layer without subclassing.",
+    explanation: "`java.io` is the canonical Decorator example in Java. Every stream wrapper (`BufferedInputStream`, `DataInputStream`, `GZIPInputStream`) implements `InputStream` AND wraps another `InputStream`, adding behavior layer by layer without subclassing.",
   },
   endQ3: {
     id: "ad-end-3",
@@ -333,10 +333,10 @@ public class Main {
 
 ## Common mistakes
 
-- **Confusing Adapter with Decorator** — Adapter changes the interface; Decorator keeps the same interface and adds behaviour. If the interface changes, it's an Adapter.
+- **Confusing Adapter with Decorator** — Adapter changes the interface; Decorator keeps the same interface and adds behavior. If the interface changes, it's an Adapter.
 - **Storing the adaptee as the concrete type in the Decorator** — always type the wrapped field as the component interface, not a concrete class. This enables stacking.
 - **Deep inheritance chains for combinations** — whenever you find yourself creating `BufferedLoggingTimedPrinter`, reach for Decorator instead.
-- **Forgetting to delegate in the Decorator** — if a Decorator overrides a method and forgets to call `wrapped.method()`, it silently drops the wrapped behaviour.
+- **Forgetting to delegate in the Decorator** — if a Decorator overrides a method and forgets to call `wrapped.method()`, it silently drops the wrapped behavior.
 
 ## Recap
 

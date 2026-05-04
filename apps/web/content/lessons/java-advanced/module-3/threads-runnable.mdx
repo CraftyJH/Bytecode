@@ -61,7 +61,7 @@ t.start();`,
 }`,
     buggyLine: 6,
     issue: "`t.run()` executes the Runnable on the current (main) thread instead of spawning a new one. It should be `t.start()`.",
-    explanation: "The symptoms are subtle: the code prints correctly but never uses a second thread. Under load or in tests that assert concurrency this produces wrong behaviour. Always call `start()` to actually launch a thread.",
+    explanation: "The symptoms are subtle: the code prints correctly but never uses a second thread. Under load or in tests that assert concurrency this produces wrong behavior. Always call `start()` to actually launch a thread.",
   },
 };
 

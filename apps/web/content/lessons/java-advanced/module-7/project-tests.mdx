@@ -33,7 +33,7 @@ export const quizzes = {
         feedback: "CompletableFuture is fully testable. `.join()` or `.get()` on the test thread makes the async result synchronous for the duration of the assertion.",
       },
     ],
-    explanation: "`.join()` is the idiomatic test-time synchronisation for `CompletableFuture`. Unlike `.get()`, it rethrows exceptions as `CompletionException` (unchecked), so JUnit 5 catches failures automatically. For cases where you want a timeout, use `.get(5, TimeUnit.SECONDS)` to prevent tests hanging forever.",
+    explanation: "`.join()` is the idiomatic test-time synchronization for `CompletableFuture`. Unlike `.get()`, it rethrows exceptions as `CompletionException` (unchecked), so JUnit 5 catches failures automatically. For cases where you want a timeout, use `.get(5, TimeUnit.SECONDS)` to prevent tests hanging forever.",
   },
   endQ1: {
     id: "test-end-1",
@@ -59,7 +59,7 @@ export const quizzes = {
       {
         text: "They allow the test to run on multiple JVM versions simultaneously.",
         correct: false,
-        feedback: "JVM version selection is a build tool concern, unrelated to parameterised tests.",
+        feedback: "JVM version selection is a build tool concern, unrelated to parameterized tests.",
       },
     ],
     explanation: "Parameterised tests give you **one failure per failing case**. With five transition pairs in one `@Test`, a single failure tells you nothing about the other four. With `@ParameterizedTest`, the CI report names each case: `[2] IN_PROGRESS → DONE` vs `[5] TODO → DONE (invalid)` — instant diagnosis without re-running.",
@@ -109,14 +109,14 @@ void notifyAsync_logsMessage() {
     assertFalse(future.isCompletedExceptionally());
 }`,
     buggyLine: 7,
-    issue: "The test passes `Runnable::run` as the executor, which runs tasks synchronously on the calling thread. This works for the happy path, but the assertion `future.isDone()` passes only because of this synchronous executor — the test does not verify behaviour under real async execution. It also doesn't assert the *content* of the notification (what was logged), making it a weak test.",
+    issue: "The test passes `Runnable::run` as the executor, which runs tasks synchronously on the calling thread. This works for the happy path, but the assertion `future.isDone()` passes only because of this synchronous executor — the test does not verify behavior under real async execution. It also doesn't assert the *content* of the notification (what was logged), making it a weak test.",
     explanation: "Using `Runnable::run` as a synchronous executor is a valid testing trick, but it must be done intentionally. Document it with a comment. More importantly, capture the log output (e.g., with a custom `Handler` or a `ListAppender`) and assert on it — otherwise the test proves nothing about what `notifyAsync` actually does.",
   },
 };
 
 Four parts in, we have a domain model, a generic repository, a service layer with functional validation, and concurrent background workers. Before we add more features it is time to verify what we have. This lesson covers the full testing strategy for the Task Management System, from fast unit tests on the domain model all the way to multi-threaded stress tests on the repository.
 
-Testing connects to every previous module: parameterised tests use streams to generate inputs, integration tests exercise the service + repository stack together, and concurrent tests expose races that single-threaded tests never catch. This is also where the discipline of the architecture pays off — because domain, repository, and service are cleanly separated, we can test each in isolation.
+Testing connects to every previous module: parameterized tests use streams to generate inputs, integration tests exercise the service + repository stack together, and concurrent tests expose races that single-threaded tests never catch. This is also where the discipline of the architecture pays off — because domain, repository, and service are cleanly separated, we can test each in isolation.
 
 ## Testing pyramid for this system
 
@@ -588,7 +588,7 @@ class NotificationServiceTest {
 
 Write the full test suite for the system:
 
-1. **`TaskStatusTest`** — parameterised over all six transition combinations as shown.
+1. **`TaskStatusTest`** — parameterized over all six transition combinations as shown.
 2. **`TaskTest`** — test blank-title rejection, `withStatus` immutability, and the invalid-transition exception.
 3. **`TaskServiceIntegrationTest`** — test all five scenarios: valid create, blank-title create, valid status update, invalid status update, `countByStatus` correctness.
 4. **`RepositoryConcurrencyTest`** — the 10-thread concurrent create test shown above.
@@ -615,10 +615,10 @@ Stretch goal: Add a `@RepeatedTest(50)` annotation to the concurrency test — r
 
 ## Recap
 
-- A **parameterised test** with `@MethodSource` gives each test case a separate named result in the CI report — critical for state-machine transition matrices.
-- **Integration tests** with real in-memory implementations are preferred over mocks for testing service + repository interactions; they are fast enough and test real behaviour.
+- A **parameterized test** with `@MethodSource` gives each test case a separate named result in the CI report — critical for state-machine transition matrices.
+- **Integration tests** with real in-memory implementations are preferred over mocks for testing service + repository interactions; they are fast enough and test real behavior.
 - `CountDownLatch` with a shared `start` latch forces maximum thread contention in concurrency tests, surfacing races that staggered starts would miss.
-- `CompletableFuture` tests use `.join()` or `.get(timeout, unit)` to synchronise the test thread before asserting.
+- `CompletableFuture` tests use `.join()` or `.get(timeout, unit)` to synchronize the test thread before asserting.
 - Test coverage goals: 100% on domain logic and validation, ≥ 90% on the service layer, at least one concurrent stress test per shared mutable resource.
 
 **Up next: Part 6** — polish, patterns, and reflection: Command, Observer, Builder, Javadoc, and the grand recap of the Java Advanced track.

@@ -35,7 +35,7 @@ public class Main {
       { text: "`flatMap` applies the function in parallel; `map` runs sequentially.", correct: false, feedback: "Neither `map` nor `flatMap` controls parallelism — that's determined by whether the stream itself is parallel." },
       { text: "`flatMap` maps each element to a Stream and merges all those streams into one; `map` keeps each result as a separate element.", correct: true, feedback: "Correct — `flatMap(f)` is equivalent to `map(f)` followed by a flatten step that concatenates all the inner streams into a single stream." },
       { text: "`flatMap` removes `null` elements; `map` does not.", correct: false, feedback: "`flatMap` does not remove nulls automatically. It merges inner streams — if those streams are empty, those elements simply disappear." },
-      { text: "`flatMap` is an optimised version of `map` for primitive types.", correct: false, feedback: "Primitive specialisations use `mapToInt`, `mapToLong`, `mapToDouble`. `flatMap` is about flattening nested structure, not primitive performance." },
+      { text: "`flatMap` is an optimized version of `map` for primitive types.", correct: false, feedback: "Primitive specialisations use `mapToInt`, `mapToLong`, `mapToDouble`. `flatMap` is about flattening nested structure, not primitive performance." },
     ],
     explanation: "`flatMap` is essential when each element maps to *multiple* elements — e.g., each sentence maps to a stream of words. Without it, you'd get a `Stream<Stream<String>>`; `flatMap` collapses that to a flat `Stream<String>`.",
   },

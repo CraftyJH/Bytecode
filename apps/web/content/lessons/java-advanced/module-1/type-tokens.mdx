@@ -335,7 +335,7 @@ Extend the exercise: add a `remove(Class<T>)` method and verify that `get` retur
 
 - **Using `(T)` instead of `type.cast()`** — the unchecked cast `(T)` does nothing at runtime (it erases to `(Object)`). The error surfaces at the distant call site. Always use `type.cast()` for a genuine checked cast.
 - **Trying to store multiple values per type** — `TypedMap` as designed stores at most one value per type. If you need multiple values of the same type, key by `Class<?> + String` name, or use a `Multimap`.
-- **Using parameterised types as tokens** — `List<String>.class` doesn't compile. `List.class` gives `Class<List>`, which loses the element type. For parameterised tokens, libraries like Guava's `TypeToken` or Jackson's `TypeReference` provide super-type tokens. That pattern is out of scope here.
+- **Using parameterized types as tokens** — `List<String>.class` doesn't compile. `List.class` gives `Class<List>`, which loses the element type. For parameterized tokens, libraries like Guava's `TypeToken` or Jackson's `TypeReference` provide super-type tokens. That pattern is out of scope here.
 - **Forgetting null handling** — `type.cast(null)` returns null. If null is not a valid value in your container, check before storing and after retrieval.
 
 ## Recap

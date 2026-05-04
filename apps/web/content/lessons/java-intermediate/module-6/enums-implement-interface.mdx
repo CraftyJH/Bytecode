@@ -74,11 +74,11 @@ export const quizzes = {
     question: "If every constant of `Lang` would return the same greeting, what is the cleanest way to satisfy `Greetable`?",
     options: [
       { text: "Make `greet()` `abstract` and copy the same body into every constant.", correct: false, feedback: "That works, but it is repetitive and easy to get wrong if the string ever needs to change." },
-      { text: "Implement `greet()` once as a normal concrete method on the enum.", correct: true, feedback: "Correct — when the behaviour is shared, a single concrete method is simpler, more readable, and easier to maintain." },
+      { text: "Implement `greet()` once as a normal concrete method on the enum.", correct: true, feedback: "Correct — when the behavior is shared, a single concrete method is simpler, more readable, and easier to maintain." },
       { text: "Use a per-constant body for the first constant only and let the rest inherit.", correct: false, feedback: "Per-constant bodies do not inherit from each other; every constant uses either its own body or the enum's concrete method." },
       { text: "Skip the interface and rely on duck typing.", correct: false, feedback: "Java is statically typed — there is no duck typing. The enum must explicitly implement the interface to be passable as `Greetable`." },
     ],
-    explanation: "A central concrete implementation is the right tool when the behaviour is shared. Per-constant bodies shine when the behaviour genuinely differs.",
+    explanation: "A central concrete implementation is the right tool when the behavior is shared. Per-constant bodies shine when the behavior genuinely differs.",
     hint: "Think about whether the work each constant does is the same or different.",
   },
 };
@@ -111,7 +111,7 @@ Once you have `enum Lang implements Greetable`, you must provide a body for `gre
 
 ### Pattern A — per-constant bodies
 
-Each constant overrides the method individually. Use this when the behaviour really does differ per constant:
+Each constant overrides the method individually. Use this when the behavior really does differ per constant:
 
 ```java
 enum Lang implements Greetable {
@@ -143,7 +143,7 @@ enum Lang implements Greetable {
 
 The data lives in a `private final` field (lesson 2 territory), and a single `greet()` returns it. There is no duplication and the language list is easy to extend.
 
-The right choice is dictated by whether the behaviour is uniform. If `greet()` boils down to "return the stored word," Pattern B wins. If `greet()` does something genuinely different per constant — different formatting, different side effects — Pattern A wins.
+The right choice is dictated by whether the behavior is uniform. If `greet()` boils down to "return the stored word," Pattern B wins. If `greet()` does something genuinely different per constant — different formatting, different side effects — Pattern A wins.
 
 ## Why interfaces matter for enums
 
@@ -167,7 +167,7 @@ The `say` function knows nothing about `Lang`. Tomorrow you can add a `Robot imp
 Even without writing `implements` yourself, every enum already satisfies two interfaces from the standard library:
 
 - **`Comparable<E>`** — through `java.lang.Enum`, every constant compares to others of the same type by `ordinal()`. That means you can sort, use them as keys in `TreeMap`, or call `Collections.min`/`max` for free.
-- **`Serializable`** — enums serialise cleanly without any extra effort, and deserialisation preserves the singleton invariant.
+- **`Serializable`** — enums serialize cleanly without any extra effort, and deserialization preserves the singleton invariant.
 
 ```java
 List<Lang> langs = new ArrayList<>(Arrays.asList(Lang.SPANISH, Lang.ENGLISH, Lang.FRENCH));
@@ -268,7 +268,7 @@ enum Lang implements Greetable {
 }
 ```
 
-Identical behaviour, less code, and adding a new language is a single line. This is a small but real example of the rule of thumb from lesson 3: prefer per-constant bodies when the *logic* differs, prefer a shared method when only the *data* differs.
+Identical behavior, less code, and adding a new language is a single line. This is a small but real example of the rule of thumb from lesson 3: prefer per-constant bodies when the *logic* differs, prefer a shared method when only the *data* differs.
 
 ## A real-world analogy: USB devices
 
@@ -285,9 +285,9 @@ A USB port is an interface — a strict, published contract about pins and proto
 
 ## Common mistakes
 
-- **Trying to `extends` another class.** Enums implicitly extend `java.lang.Enum` and cannot extend anything else. Use an interface to share behaviour across enums and other classes.
+- **Trying to `extends` another class.** Enums implicitly extend `java.lang.Enum` and cannot extend anything else. Use an interface to share behavior across enums and other classes.
 - **Forgetting `public` on the interface methods.** Interface methods are `public` by definition. The compiler rejects any implementation that is less accessible. Always write `public` explicitly on the override.
-- **Using per-constant bodies when the behaviour is uniform.** It compiles, but it duplicates code. If every constant returns its stored field, write a single concrete method instead.
+- **Using per-constant bodies when the behavior is uniform.** It compiles, but it duplicates code. If every constant returns its stored field, write a single concrete method instead.
 - **Relying on the natural ordering for business meaning.** Enums implement `Comparable` via `ordinal()`. If you reorder constants, your sorted output changes. Provide an explicit `Comparator` for any ordering with real meaning.
 - **Assuming you cannot mix abstract and concrete methods.** You absolutely can. Implement the interface centrally for shared work and add per-constant bodies for the parts that genuinely differ.
 

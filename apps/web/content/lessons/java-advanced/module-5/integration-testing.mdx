@@ -245,7 +245,7 @@ public class Main {
 
 ## Test containers — real databases in CI
 
-When you need exact production database behaviour (specific SQL dialect, constraint enforcement, stored procedures), Testcontainers spins up a real Docker container during the test run:
+When you need exact production database behavior (specific SQL dialect, constraint enforcement, stored procedures), Testcontainers spins up a real Docker container during the test run:
 
 ```java
 @Testcontainers
@@ -586,7 +586,7 @@ Implement `InMemoryTaskRepository` and write integration tests for:
 
 ## Common mistakes
 
-- **Writing integration tests for everything** — integration tests are slower and more complex than unit tests. Start with unit tests; add integration tests at the boundaries that matter (database queries, HTTP clients, event serialisation).
+- **Writing integration tests for everything** — integration tests are slower and more complex than unit tests. Start with unit tests; add integration tests at the boundaries that matter (database queries, HTTP clients, event serialization).
 - **Using @SpringBootTest when a slice annotation would suffice** — loading the full application context to test one JPA repository adds seconds of startup time per test class. Use `@DataJpaTest` for repository tests; it loads only the persistence layer.
 - **Not cleaning up between tests** — in-memory fakes are naturally reset by `@BeforeEach`. Real databases persist state. Always truncate or delete data in `@BeforeEach` (or rely on transaction rollback knowingly), or use Testcontainers with a fresh container per class.
 - **Mocking the class under test in integration tests** — an integration test that mocks the service being tested is neither a unit test nor an integration test. It tests nothing meaningful. Integration tests exist precisely to test the wiring; do not undermine that with mocks of the SUT.

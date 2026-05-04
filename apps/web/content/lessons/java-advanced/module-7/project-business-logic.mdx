@@ -119,7 +119,7 @@ The domain model and repository layer are in place. Now we need a **service laye
 - Validates inputs before they touch the domain.
 - Orchestrates multi-step operations (create task → add to project → notify assignee).
 - Returns `Optional<T>` or a result type rather than throwing exceptions for expected failures.
-- Has no knowledge of HTTP, serialisation, or UI.
+- Has no knowledge of HTTP, serialization, or UI.
 
 This lesson draws heavily on Module 2 (functional programming, Optional, Predicate composition) and Module 3 (stream pipelines). It also introduces a lightweight **Result** type that gives richer error feedback than `Optional`.
 
@@ -545,7 +545,7 @@ Stretch goal: Add a `bulkUpdatePriority(List<UUID> taskIds, Priority newPriority
 
 ## Recap
 
-- The **service layer** owns business rules, validation, and orchestration; it never contains HTTP, serialisation, or UI concerns.
+- The **service layer** owns business rules, validation, and orchestration; it never contains HTTP, serialization, or UI concerns.
 - A `sealed interface Result<T, E>` provides richer error feedback than `Optional<T>` when callers need to know *why* an operation failed.
 - **Predicate composition** (`and`, `or`, `negate`) builds validation pipelines that are readable, testable, and reusable.
 - Stream pipelines in the service layer express complex queries — filter, sort, group — with a single coherent expression.

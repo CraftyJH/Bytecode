@@ -205,7 +205,7 @@ Notice that `introduce()` in the abstract class calls `speak()` — a method it 
 Abstract classes are best when:
 
 - You want to share **fields and state** across subclasses (interfaces cannot hold instance fields).
-- Subclasses share significant **common behaviour** that shouldn't be duplicated.
+- Subclasses share significant **common behavior** that shouldn't be duplicated.
 - You need to **control construction** — abstract classes can enforce initialization through constructors.
 
 ```java
@@ -246,7 +246,7 @@ No subclass can skip the `url` — it's baked into the constructor chain.
 
 ## Recap
 
-Abstract classes let you express partial templates: concrete shared behaviour combined with abstract obligations that subclasses must fulfil. They are fundamental to the Template Method pattern and any design where a family of related classes share a common algorithmic skeleton.
+Abstract classes let you express partial templates: concrete shared behavior combined with abstract obligations that subclasses must fulfil. They are fundamental to the Template Method pattern and any design where a family of related classes share a common algorithmic skeleton.
 
 - Declared with `abstract class ClassName`
 - Cannot be instantiated with `new` — only concrete subclasses can

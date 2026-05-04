@@ -72,7 +72,7 @@ public class Main {
       { text: "It makes the interface automatically implement a lambda.", correct: false, feedback: "Lambdas implement interfaces — not the other way around. `@FunctionalInterface` does not generate any implementation." },
       { text: "It causes a compile error if the interface has more or fewer than one abstract method.", correct: true, feedback: "Correct — it is a compile-time guard. If you accidentally add a second abstract method, the compiler rejects the file immediately, catching the mistake early." },
       { text: "It prevents the interface from having `default` methods.", correct: false, feedback: "`@FunctionalInterface` interfaces may freely have `default` and `static` methods. Only the count of *abstract* methods is restricted to exactly one." },
-      { text: "It makes all implementing classes automatically serializable.", correct: false, feedback: "`@FunctionalInterface` is purely a design-time annotation with no runtime effect on serialisation or anything else." },
+      { text: "It makes all implementing classes automatically serializable.", correct: false, feedback: "`@FunctionalInterface` is purely a design-time annotation with no runtime effect on serialization or anything else." },
     ],
     explanation: "`@FunctionalInterface` is a documentation and compile-time-safety annotation. It tells both readers and the compiler 'this interface must have exactly one abstract method.' Adding a second abstract method immediately becomes a compile error, guarding the invariant that enables lambdas.",
     hint: "Annotations often enforce compile-time contracts. What contract does this annotation enforce?",
@@ -148,7 +148,7 @@ System.out.println(randomPrice.get());  // e.g., 73.41...
 
 ## Try it
 
-The starter code uses all four interfaces. Run it as-is first — it works because no implementation is needed from you this time. Study each block and trace the output before reading the expected result:
+Complete the TODOs in the starter code, then click **Run**. You should see:
 
 ```
 false
@@ -236,7 +236,7 @@ Functional interfaces are the bridge between Java's object-oriented type system 
 **Up next:** Module 2 — Exception Handling (first lesson: What Are Exceptions?).
 
 <Exercise>
-Study the four functional interface usages in `main`. No changes are needed — but make sure you understand each one before moving on. The exercise is to read, predict the output, then click Run to verify.
+Implement one example of each functional interface in `main`: `Predicate`, `Function`, `Consumer`, and `Supplier`.
 
 ```java
 import java.util.function.*;
@@ -245,24 +245,28 @@ import java.util.*;
 public class Main {
     public static void main(String[] args) {
         // Predicate<T>: tests a condition → boolean
-        Predicate<String> isLong = s -> s.length() > 5;
+        // TODO: Predicate<String> that returns true when length > 5
+        Predicate<String> isLong = null;
         System.out.println(isLong.test("Hi"));
         System.out.println(isLong.test("Hello, World"));
 
         // Function<T,R>: transforms a value
-        Function<Integer, String> toLabel = n -> "Item #" + n;
+        // TODO: Function<Integer, String> that returns "Item #<n>"
+        Function<Integer, String> toLabel = null;
         System.out.println(toLabel.apply(1));
         System.out.println(toLabel.apply(42));
 
         // Consumer<T>: acts on a value, returns nothing
         List<String> seen = new ArrayList<>();
-        Consumer<String> record = s -> seen.add(s.toUpperCase());
+        // TODO: Consumer<String> that adds uppercased input to seen
+        Consumer<String> record = null;
         record.accept("apple");
         record.accept("banana");
         System.out.println(seen);
 
         // Supplier<T>: produces a value, takes nothing
-        Supplier<String> greeting = () -> "Hello, Java!";
+        // TODO: Supplier<String> that returns "Hello, Java!"
+        Supplier<String> greeting = null;
         System.out.println(greeting.get());
     }
 }

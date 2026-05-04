@@ -61,7 +61,7 @@ class Lamp {
       { text: "Instance methods cannot have parameters.", correct: false, feedback: "Instance methods can have any parameters they like." },
       { text: "Static methods can call instance methods directly without an object.", correct: false, feedback: "A static method needs an object to call any instance method on it." },
     ],
-    explanation: "Static methods are called on the class (`Math.max(...)`) and have no `this`. Instance methods are called on an object (`d.bark()`) and have access to the object's fields via `this`. Use instance methods when behaviour depends on object state; use static when it doesn't.",
+    explanation: "Static methods are called on the class (`Math.max(...)`) and have no `this`. Instance methods are called on an object (`d.bark()`) and have access to the object's fields via `this`. Use instance methods when behavior depends on object state; use static when it doesn't.",
   },
   endFill: {
     id: "im-end-3",
@@ -199,7 +199,7 @@ class Math2 {
 Math2.square(5);                   // 25 — call on the class
 ```
 
-Use **static** for utilities whose result depends only on the inputs (`Math.max`, `Math.sqrt`). Use **instance** when the behaviour depends on the object's state (`dog.bark()`, `account.deposit(50)`).
+Use **static** for utilities whose result depends only on the inputs (`Math.max`, `Math.sqrt`). Use **instance** when the behavior depends on the object's state (`dog.bark()`, `account.deposit(50)`).
 
 A static method has no `this` — if you try to read an instance field from inside one, you get a compile error.
 

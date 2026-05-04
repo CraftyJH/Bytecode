@@ -28,9 +28,9 @@ export const quizzes = {
         feedback: "Observer handles event propagation to multiple subscribers. It does not model operations as reversible objects.",
       },
       {
-        text: "Decorator — wrap TaskService to add extra behaviour.",
+        text: "Decorator — wrap TaskService to add extra behavior.",
         correct: false,
-        feedback: "A Decorator adds behaviour around a method but does not inherently track history or support reversal.",
+        feedback: "A Decorator adds behavior around a method but does not inherently track history or support reversal.",
       },
     ],
     explanation: "The **Command pattern** (GoF) encapsulates a request as an object, storing all information needed to perform and reverse it. An `UndoableTaskService` holds a `Deque<Command>` as a history stack. Each time the user calls `undo()`, the top command's `undo()` method is invoked, restoring the previous state.",
@@ -728,7 +728,7 @@ You have reached the end of the **Java Advanced** track. Over seven modules you 
 - **Functional Java** — lambdas, streams, Optional, method references, and the functional interfaces of `java.util.function`
 - **Concurrency** — threads, executors, locks, atomic types, `CompletableFuture`, and concurrent collections
 - **Design patterns** — Strategy, Template Method, Decorator, Observer, Command, Builder, and more applied to real problems
-- **Testing** — unit, integration, parameterised, and concurrent tests with JUnit 5
+- **Testing** — unit, integration, parameterized, and concurrent tests with JUnit 5
 - **JVM internals** — class loading, garbage collection, the JIT compiler, and performance profiling
 - **This capstone** — a full Task Management System wiring every concept into a coherent, production-ready architecture
 

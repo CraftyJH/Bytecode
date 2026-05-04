@@ -30,7 +30,7 @@ export const quizzes = {
       {
         text: "Replacing `ConcurrentHashMap` with `Hashtable`.",
         correct: false,
-        feedback: "`Hashtable` uses coarse-grained synchronisation and is considered obsolete. `ConcurrentHashMap` is the correct choice for concurrent map access.",
+        feedback: "`Hashtable` uses coarse-grained synchronization and is considered obsolete. `ConcurrentHashMap` is the correct choice for concurrent map access.",
       },
     ],
     explanation: "`ConcurrentHashMap` guarantees that individual operations like `get` and `put` are atomic, but a *read followed by a conditional write* is not. Two threads could both read the old value before either writes the new one. `map.compute(id, (k, v) -> applyUpdate(v))` performs the whole lambda atomically, closing the race window.",
@@ -578,4 +578,4 @@ Stretch goal: Add an **optimistic lock** to `TaskService.updateStatus`. Add a `v
 - `ConcurrentHashMap.compute` performs atomic read-modify-write operations; plain `put` + `get` has a race window.
 - Always shut down executor services in `AutoCloseable.close()`, awaiting termination before calling `shutdownNow`.
 
-**Up next: Part 5** — testing the full system: unit tests, integration tests, parameterised tests, and strategies for testing concurrent code.
+**Up next: Part 5** — testing the full system: unit tests, integration tests, parameterized tests, and strategies for testing concurrent code.

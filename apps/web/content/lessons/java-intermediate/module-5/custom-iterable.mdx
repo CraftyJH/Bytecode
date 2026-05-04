@@ -81,7 +81,7 @@ public class Main {
       { text: "Return `null`", correct: false, feedback: "Returning `null` is ambiguous (a real element could be `null`) and violates the `Iterator` contract." },
       { text: "Throw `NoSuchElementException`", correct: true, feedback: "Correct — the contract demands `NoSuchElementException` when there are no more elements. Standard library code relies on that." },
       { text: "Return the last element again", correct: false, feedback: "That would silently double-count the final element." },
-      { text: "Loop back to the first element", correct: false, feedback: "Iterators are single-pass. Reset behaviour is not part of the contract — that would be a *cyclic iterator*, which is its own design." },
+      { text: "Loop back to the first element", correct: false, feedback: "Iterators are single-pass. Reset behavior is not part of the contract — that would be a *cyclic iterator*, which is its own design." },
     ],
     explanation: "`Iterator.next()` is contractually required to throw `NoSuchElementException` when the iterator is exhausted. The for-each loop relies on `hasNext()` to avoid that, but defensive `next()` implementations still throw to catch misuse.",
     hint: "Look back at lesson 2 — there's a specific named exception for 'nothing left'.",

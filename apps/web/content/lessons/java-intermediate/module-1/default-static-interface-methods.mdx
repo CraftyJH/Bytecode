@@ -78,7 +78,7 @@ class UpperFormatter implements Formatter {
 }`,
     buggyLine: 12,
     issue: "The override of formatAndWrap removes the wrapping parentheses, producing different output than the documented default contract",
-    explanation: "The override compiles fine, but it loses the wrapping behaviour. If the design intent is that `formatAndWrap` always wraps its result in parentheses, the override should call `\"(\" + format(text) + \")\"` or simply omit the override entirely and let the default run. Silently overriding a `default` method with weaker behaviour is a logic bug, not a compile error.",
+    explanation: "The override compiles fine, but it loses the wrapping behavior. If the design intent is that `formatAndWrap` always wraps its result in parentheses, the override should call `\"(\" + format(text) + \")\"` or simply omit the override entirely and let the default run. Silently overriding a `default` method with weaker behavior is a logic bug, not a compile error.",
     hint: "Look at what the `default` version returns vs what the override returns.",
   },
   endQ4: {
@@ -226,7 +226,7 @@ avaj
 |---|---|---|
 | Called on | An instance (or via interface ref) | The interface type only |
 | Inherited? | Yes — by implementing classes | No |
-| Best for | Shared convenience behaviour, evolving APIs | Factory methods, utility helpers |
+| Best for | Shared convenience behavior, evolving APIs | Factory methods, utility helpers |
 | Can call abstract methods? | Yes | No (no `this` reference) |
 
 ## End-of-lesson quiz
@@ -241,7 +241,7 @@ avaj
 ## Common mistakes
 
 - **Calling a static interface method through an instance** — `myFormatter.format(...)` where `format` is `static` is a compile error. Use `Formatter.format(...)`. The compiler will not silently allow the instance-based call the way it does for static class methods.
-- **Forgetting that `default` methods can be overridden** — a `default` is a fallback, not a final. If your class needs different behaviour, override it freely. The `@Override` annotation works here too and catches typos in the signature.
+- **Forgetting that `default` methods can be overridden** — a `default` is a fallback, not a final. If your class needs different behavior, override it freely. The `@Override` annotation works here too and catches typos in the signature.
 - **Assuming `default` methods can access fields** — interfaces have no instance fields. A `default` method can only use its parameters, call other interface methods, or call static methods. For stateful helpers, use an abstract class.
 - **Diamond problem with conflicting defaults** — if two interfaces both declare `default void doIt()`, a class implementing both *must* override `doIt()`. The compiler enforces this; the override can explicitly delegate to one interface's default with `InterfaceName.super.doIt()`.
 - **Overriding a `default` method with weaker semantics** — technically legal, but dangerous. If the `default` documents a contract (e.g., "always wraps output in brackets"), silently breaking that contract in an override causes confusing bugs for anyone using the interface type.
@@ -250,7 +250,7 @@ avaj
 
 Default and static interface methods dramatically increased the power of interfaces in Java 8. They let library designers evolve APIs over time and keep utility logic co-located with the interface that motivates it.
 
-- **`default` methods** provide concrete inherited behaviour — ideal for adding methods to existing interfaces without breaking implementors
+- **`default` methods** provide concrete inherited behavior — ideal for adding methods to existing interfaces without breaking implementors
 - **`static` methods** provide type-level utilities — called as `Interface.method()`, not inherited
 - `default` methods can call abstract methods (dynamically dispatched at runtime)
 - Conflicting `default` methods from two interfaces must be resolved by an explicit override

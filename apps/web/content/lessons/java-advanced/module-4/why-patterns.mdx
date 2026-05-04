@@ -41,7 +41,7 @@ export const quizzes = {
       { text: "Good defensive design", correct: false, feedback: "Anticipating change is good, but adding three patterns to a single integer is premature complexity, not defence." },
       { text: "Over-engineering / pattern abuse", correct: true, feedback: "Correct. Applying patterns where they add no current value is over-engineering — a common anti-pattern in itself." },
       { text: "Behavioral pattern usage", correct: false, feedback: "Observer and Strategy are behavioral patterns, but the question is about whether applying them here is appropriate — which it isn't." },
-      { text: "Refactoring", correct: false, feedback: "Refactoring improves existing code without changing behaviour. Adding unnecessary patterns to a simple field is the opposite of simplifying." },
+      { text: "Refactoring", correct: false, feedback: "Refactoring improves existing code without changing behavior. Adding unnecessary patterns to a simple field is the opposite of simplifying." },
     ],
     explanation: "Patterns solve recurring problems in context. Applying them where there is no problem — especially to simple constructs — is called **over-engineering**. Always ask: 'what problem does this pattern solve here?'",
   },
@@ -58,7 +58,7 @@ export const quizzes = {
   },
 };
 
-Software development is full of recurring problems. How do you create an object without hard-coding its exact class? How do you add behaviour to an object at runtime without altering its class? How do you notify many objects when something changes? Experienced engineers solved these problems, recognised the solutions were reusable, and wrote them down. The result — the 1994 book by Gamma, Helm, Johnson, and Vlissides — became one of the most influential software engineering texts ever written.
+Software development is full of recurring problems. How do you create an object without hard-coding its exact class? How do you add behavior to an object at runtime without altering its class? How do you notify many objects when something changes? Experienced engineers solved these problems, recognised the solutions were reusable, and wrote them down. The result — the 1994 book by Gamma, Helm, Johnson, and Vlissides — became one of the most influential software engineering texts ever written.
 
 ## What is a design pattern?
 
@@ -91,7 +91,7 @@ The 23 GoF patterns are grouped by their primary purpose:
 // Creational: you say WHAT you need, not HOW to build it
 Shape s = ShapeFactory.create("circle");   // Factory Method
 
-// Structural: you compose behaviour without changing the original class
+// Structural: you compose behavior without changing the original class
 InputStream in = new BufferedInputStream(new FileInputStream("data.bin")); // Decorator
 
 // Behavioral: you define how objects interact
@@ -262,7 +262,7 @@ public class Main {
 ## Common mistakes
 
 - **Treating patterns as requirements** — patterns are optional tools. Do not force every class to use one.
-- **Confusing category with intent** — Decorator is Structural, not Behavioral, even though it changes behaviour. Always check the intent column.
+- **Confusing category with intent** — Decorator is Structural, not Behavioral, even though it changes behavior. Always check the intent column.
 - **Memorising UML instead of understanding it** — focus on what each arrow communicates about dependency and ownership.
 - **Equating patterns with best practices** — a pattern is a known trade-off, not an uncritically good idea. Understand the liabilities column of each pattern.
 
