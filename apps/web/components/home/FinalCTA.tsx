@@ -21,7 +21,7 @@ export function FinalCTA() {
         deeply, deliberately, without anxiety mechanics.
       </p>
       <Button as="a" href="/signup" variant="primary" size="lg">
-        Start your first lesson — free
+        Create your account — it&apos;s free
       </Button>
     </section>
   );
