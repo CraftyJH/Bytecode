@@ -157,6 +157,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun openLesson(trackSlug: String, moduleSlug: String, lessonSlug: String) {
         viewModelScope.launch {
             val currentState = _uiState.value as? AppUiState.LoggedIn ?: return@launch
+            if (
+                currentState.selectedTrackSlug == trackSlug &&
+                currentState.selectedModuleSlug == moduleSlug &&
+                currentState.selectedLessonSlug == lessonSlug &&
+                currentState.selectedLesson != null
+            ) {
+                return@launch
+            }
             val selectedState = currentState.copy(
                 selectedTrackSlug = trackSlug,
                 selectedModuleSlug = moduleSlug,
@@ -210,6 +218,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    fun selectedLessonRouteOrNull(): String? {
+        val state = _uiState.value as? AppUiState.LoggedIn ?: return null
+        val track = state.selectedTrackSlug ?: return null
+        val module = state.selectedModuleSlug ?: return null
+        val lesson = state.selectedLessonSlug ?: return null
+        return "$track::$module::$lesson"
     }
 
     fun clearLessonSelection() {

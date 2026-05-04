@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,11 +38,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.navigation
 import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.MobileLessonSummary
 import dev.bytecode.android.ui.state.AppUiState
 import dev.bytecode.android.ui.state.selectedLessonSummary
 import dev.bytecode.android.ui.theme.BytecodeTheme
+
+private object AppRoutes {
+    const val AuthGraph = "auth"
+    const val AppGraph = "app"
+    const val SignIn = "auth/sign-in"
+    const val Dashboard = "app/dashboard"
+    const val LessonPattern = "app/lesson/{track}/{module}/{lesson}"
+
+    fun lesson(track: String, module: String, lesson: String): String =
+        "app/lesson/${Uri.encode(track)}/${Uri.encode(module)}/${Uri.encode(lesson)}"
+}
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -88,44 +107,140 @@ private fun AppScreen(
     onCloseLesson: () -> Unit,
     onOpenBilling: () -> Unit,
 ) {
-    when (state) {
-        is AppUiState.Loading -> {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("Loading…")
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+
+    LaunchedEffect(state, currentRoute) {
+        when (state) {
+            is AppUiState.LoggedIn -> {
+                if (currentRoute == null || !currentRoute.startsWith(AppRoutes.AppGraph)) {
+                    navController.navigate(AppRoutes.Dashboard) {
+                        popUpTo(AppRoutes.AuthGraph) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
+            is AppUiState.LoggedOut,
+            is AppUiState.Error,
+            -> {
+                if (currentRoute == null || !currentRoute.startsWith(AppRoutes.AuthGraph)) {
+                    navController.navigate(AppRoutes.SignIn) {
+                        popUpTo(AppRoutes.AppGraph) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
+            AppUiState.Loading -> Unit
+        }
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = AppRoutes.AuthGraph,
+    ) {
+        navigation(
+            route = AppRoutes.AuthGraph,
+            startDestination = AppRoutes.SignIn,
+        ) {
+            composable(AppRoutes.SignIn) {
+                when (state) {
+                    is AppUiState.LoggedOut -> {
+                        SignInScreen(
+                            loading = state.loading,
+                            error = state.error,
+                            onSignIn = onSignIn,
+                        )
+                    }
+                    is AppUiState.Error -> {
+                        SignInScreen(
+                            loading = false,
+                            error = state.message,
+                            onSignIn = onSignIn,
+                        )
+                    }
+                    AppUiState.Loading -> LoadingScreen("Loading…")
+                    is AppUiState.LoggedIn -> LoadingScreen("Opening dashboard…")
+                }
             }
         }
-        is AppUiState.LoggedOut -> {
-            SignInScreen(
-                loading = state.loading,
-                error = state.error,
-                onSignIn = onSignIn,
-            )
+
+        navigation(
+            route = AppRoutes.AppGraph,
+            startDestination = AppRoutes.Dashboard,
+        ) {
+            composable(AppRoutes.Dashboard) {
+                val loggedInState = state as? AppUiState.LoggedIn
+                if (loggedInState == null) {
+                    LoadingScreen("Loading dashboard…")
+                } else {
+                    DashboardScreen(
+                        state = loggedInState,
+                        onSignOut = onSignOut,
+                        onRefresh = onRefresh,
+                        onOpenLesson = { trackSlug, moduleSlug, lessonSlug ->
+                            onOpenLesson(trackSlug, moduleSlug, lessonSlug)
+                            navController.navigate(
+                                AppRoutes.lesson(trackSlug, moduleSlug, lessonSlug),
+                            ) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenBilling = onOpenBilling,
+                    )
+                }
+            }
+
+            composable(
+                route = AppRoutes.LessonPattern,
+                arguments = listOf(
+                    navArgument("track") { type = NavType.StringType },
+                    navArgument("module") { type = NavType.StringType },
+                    navArgument("lesson") { type = NavType.StringType },
+                ),
+            ) { entry ->
+                val trackSlug = Uri.decode(entry.arguments?.getString("track").orEmpty())
+                val moduleSlug = Uri.decode(entry.arguments?.getString("module").orEmpty())
+                val lessonSlug = Uri.decode(entry.arguments?.getString("lesson").orEmpty())
+
+                val loggedInState = state as? AppUiState.LoggedIn
+                if (loggedInState == null) {
+                    LoadingScreen("Loading lesson…")
+                } else {
+                    LessonRouteScreen(
+                        state = loggedInState,
+                        trackSlug = trackSlug,
+                        moduleSlug = moduleSlug,
+                        lessonSlug = lessonSlug,
+                        onOpenLesson = onOpenLesson,
+                        onBack = {
+                            onCloseLesson()
+                            if (!navController.popBackStack()) {
+                                navController.navigate(AppRoutes.Dashboard) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        },
+                        onOpenBilling = onOpenBilling,
+                    )
+                }
+            }
         }
-        is AppUiState.Error -> {
-            SignInScreen(
-                loading = false,
-                error = state.message,
-                onSignIn = onSignIn,
-            )
-        }
-        is AppUiState.LoggedIn -> {
-            DashboardScreen(
-                state = state,
-                onSignOut = onSignOut,
-                onRefresh = onRefresh,
-                onOpenLesson = onOpenLesson,
-                onCloseLesson = onCloseLesson,
-                onOpenBilling = onOpenBilling,
-            )
-        }
+    }
+}
+
+@Composable
+private fun LoadingScreen(message: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator()
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(message)
     }
 }
 
@@ -195,30 +310,8 @@ private fun DashboardScreen(
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
     onOpenLesson: (String, String, String) -> Unit,
-    onCloseLesson: () -> Unit,
     onOpenBilling: () -> Unit,
 ) {
-    if (state.selectedLessonSlug != null) {
-        val selectedTrackSlug = state.selectedTrackSlug
-        val selectedModuleSlug = state.selectedModuleSlug
-        val selectedLessonSlug = state.selectedLessonSlug
-        LessonScreen(
-            state = state,
-            onBack = onCloseLesson,
-            onRetry = {
-                if (
-                    selectedTrackSlug != null &&
-                    selectedModuleSlug != null &&
-                    selectedLessonSlug != null
-                ) {
-                    onOpenLesson(selectedTrackSlug, selectedModuleSlug, selectedLessonSlug)
-                }
-            },
-            onOpenBilling = onOpenBilling,
-        )
-        return
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -373,6 +466,34 @@ private fun LessonButtons(
 }
 
 @Composable
+private fun LessonRouteScreen(
+    state: AppUiState.LoggedIn,
+    trackSlug: String,
+    moduleSlug: String,
+    lessonSlug: String,
+    onOpenLesson: (String, String, String) -> Unit,
+    onBack: () -> Unit,
+    onOpenBilling: () -> Unit,
+) {
+    LaunchedEffect(trackSlug, moduleSlug, lessonSlug) {
+        if (
+            state.selectedTrackSlug != trackSlug ||
+            state.selectedModuleSlug != moduleSlug ||
+            state.selectedLessonSlug != lessonSlug
+        ) {
+            onOpenLesson(trackSlug, moduleSlug, lessonSlug)
+        }
+    }
+
+    LessonScreen(
+        state = state,
+        onBack = onBack,
+        onRetry = { onOpenLesson(trackSlug, moduleSlug, lessonSlug) },
+        onOpenBilling = onOpenBilling,
+    )
+}
+
+@Composable
 private fun LessonScreen(
     state: AppUiState.LoggedIn,
     onBack: () -> Unit,
@@ -458,4 +579,3 @@ private fun LessonScreen(
         }
     }
 }
-
