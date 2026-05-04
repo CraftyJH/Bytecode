@@ -14,6 +14,10 @@ export function SectionHeader({
   className = "",
 }: SectionHeaderProps) {
   const alignClass = align === "center" ? "text-center" : "";
+  const subheadingClass =
+    align === "center"
+      ? "mt-4 text-lg text-prose-muted max-w-2xl leading-relaxed mx-auto"
+      : "mt-4 text-lg text-prose-muted max-w-2xl leading-relaxed";
 
   return (
     <div className={`${alignClass} ${className}`}>
@@ -26,11 +30,7 @@ export function SectionHeader({
       <h2 className="text-3xl font-semibold text-prose leading-tight tracking-tight">
         {heading}
       </h2>
-      {subheading && (
-        <p className="mt-4 text-lg text-prose-muted max-w-2xl leading-relaxed">
-          {subheading}
-        </p>
-      )}
+      {subheading && <p className={subheadingClass}>{subheading}</p>}
     </div>
   );
 }

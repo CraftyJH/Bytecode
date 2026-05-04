@@ -18,6 +18,7 @@ export default function TermsPage() {
               label="terms of service"
               heading="Rules for using Bytecode"
               subheading="This is a starter terms page for the current product. Replace with attorney-reviewed terms before broad commercial rollout."
+              align="center"
             />
             <p className="text-sm text-prose-faint mt-6">Last updated: {updatedAt}</p>
           </div>
@@ -42,7 +43,7 @@ export default function TermsPage() {
             <Card padding="md">
               <h2 className="text-lg font-semibold text-prose mb-3">3) Subscription and billing</h2>
               <p className="text-sm text-prose-muted leading-relaxed">
-                Bytecode offers Free and Premium plans. Premium billing is charged on the selected cycle (monthly or yearly) and may auto-renew unless canceled. Prices may change in the future with notice where required. Trial eligibility and duration may vary by offer.
+                Bytecode offers Free and Premium plans. Premium billing is charged on the selected cycle (monthly or yearly) and may auto-renew unless canceled. Prices may change in the future with notice where required.
               </p>
             </Card>
 

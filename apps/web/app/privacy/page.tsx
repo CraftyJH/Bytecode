@@ -18,6 +18,7 @@ export default function PrivacyPage() {
               label="privacy policy"
               heading="How Bytecode handles your data"
               subheading="This is a starter policy for the current product. Replace with attorney-reviewed language before launch to production scale."
+              align="center"
             />
             <p className="text-sm text-prose-faint mt-6">Last updated: {updatedAt}</p>
           </div>

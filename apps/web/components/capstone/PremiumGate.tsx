@@ -39,7 +39,7 @@ export function PremiumGate({ nextPath }: Props) {
             $9.99/mo · $59/yr · Cancel anytime in 2 clicks.
           </p>
           <Button as="a" href="/pricing" variant="primary" size="sm" className="w-full justify-center">
-            Start Premium trial
+            Go Premium
           </Button>
           <Button as="a" href={nextPath} variant="ghost" size="sm" className="w-full justify-center text-prose-faint">
             Skip for now, continue to Module 2 →

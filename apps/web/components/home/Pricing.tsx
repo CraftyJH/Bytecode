@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 
 const freeFeatures = [
-  "Full Java Beginner track + half of Java Intermediate",
+  "Full Java Beginner + full Java Intermediate tracks",
   "Every quiz, every lesson",
+  "Capstone briefs (submissions are Premium-only)",
   "One full project — CLI Todo App",
   "Full forum access",
-  "Unlimited code playground",
+  "Preview access to the code playground",
   "No ads. Ever.",
 ];
 
@@ -16,10 +17,10 @@ const premiumFeatures = [
   "Full Java + full Kotlin tracks",
   "Every capstone challenge and project",
   "Daily coding challenges",
+  "Unlimited code playground",
   "Saved playground snippets",
   "Certificates of completion",
   "Priority forum tag",
-  "7-day free trial on annual",
 ];
 
 function FeatureItem({ text, dim }: { text: string; dim?: boolean }) {
@@ -117,7 +118,7 @@ export function Pricing() {
               <p className="text-sm text-prose-faint mt-1">
                 or{" "}
                 <span className="text-prose-muted font-medium">$59/yr</span>{" "}
-                (~$4.92/mo) · 7-day free trial
+                (~$4.92/mo)
               </p>
             </div>
             <ul className="space-y-3 flex-1 mb-8">

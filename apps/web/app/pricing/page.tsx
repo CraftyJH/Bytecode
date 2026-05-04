@@ -11,12 +11,12 @@ const faqItems = [
   {
     question: "Is there really a free plan?",
     answer:
-      "Yes. Free includes the full Java Beginner track, half of Java Intermediate, all quizzes, one full project, forum access, and unlimited playground usage.",
+      "Yes. Free includes the full Java Beginner and Java Intermediate tracks, all quizzes, one full project, forum access, and preview access to the code playground. Capstone submissions on all tracks are Premium-only.",
   },
   {
     question: "How does billing work on Premium?",
     answer:
-      "Premium is available monthly or yearly. Annual starts with a 7-day trial. You can cancel from settings, and access remains active through the current billing period.",
+      "Premium is available monthly or yearly. There is no trial at the moment. You can cancel from settings, and access remains active through the current billing period.",
   },
   {
     question: "Do you have multiple paid tiers?",
@@ -76,12 +76,13 @@ export default function PricingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button as="a" href="/signup?plan=premium" variant="primary" size="md">
-                Start Premium Trial
+                Go Premium
               </Button>
               <Button as="a" href="/curriculum" variant="secondary" size="md">
                 Explore curriculum
               </Button>
             </div>
+            <p className="mt-3 text-xs text-prose-faint">You need an account to access the curriculum.</p>
           </div>
         </section>
       </main>
