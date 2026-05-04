@@ -36,7 +36,7 @@ class SessionStore(context: Context) {
     }
 
     fun toAuthSession(session: PersistedSession): AuthSession {
-        val remainingSeconds = ((session.expiresAtEpochMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0L)
+        val remainingSeconds = ((session.expiresAtEpochMs - nowEpochMs()) / 1000).coerceAtLeast(0L)
         return AuthSession(
             accessToken = session.accessToken,
             refreshToken = session.refreshToken,
@@ -52,6 +52,8 @@ class SessionStore(context: Context) {
     fun clear() {
         prefs.edit { clear() }
     }
+
+    fun nowEpochMs(): Long = System.currentTimeMillis()
 
     companion object {
         private const val PREF_NAME = "bytecode_session"

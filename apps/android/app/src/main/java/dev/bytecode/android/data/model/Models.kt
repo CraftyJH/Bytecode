@@ -45,6 +45,7 @@ data class PersistedSession(
 
 @Serializable
 data class BackendUserState(
+    val email: String? = null,
     val role: String = "user",
     @SerialName("premiumUntil")
     val premiumUntil: String? = null,
@@ -81,4 +82,69 @@ data class BillingState(
     @SerialName("premiumUntil")
     val premiumUntil: String? = null,
     val subscription: BillingSubscriptionState? = null,
+)
+
+@Serializable
+data class MobileLessonSummary(
+    val slug: String,
+    val title: String,
+    val order: Int,
+    val duration: Int,
+    val isPremium: Boolean,
+    val isLocked: Boolean,
+)
+
+@Serializable
+data class MobileModuleSummary(
+    val slug: String,
+    val title: String,
+    val order: Int,
+    val isPremium: Boolean,
+    val isLocked: Boolean,
+    val lessons: List<MobileLessonSummary> = emptyList(),
+)
+
+@Serializable
+data class MobileTrackSummary(
+    val slug: String,
+    val title: String,
+    val order: Int,
+    val tagline: String,
+    val isPremium: Boolean,
+    val isLocked: Boolean,
+    val modules: List<MobileModuleSummary> = emptyList(),
+)
+
+@Serializable
+data class MobileCurriculumState(
+    val isPremiumUser: Boolean = false,
+    val tracks: List<MobileTrackSummary> = emptyList(),
+)
+
+@Serializable
+data class MobileLessonTrackRef(
+    val slug: String,
+    val title: String,
+)
+
+@Serializable
+data class MobileLessonModuleRef(
+    val slug: String,
+    val title: String,
+)
+
+@Serializable
+data class MobileLessonMeta(
+    val slug: String,
+    val title: String,
+    val duration: Int,
+    val isPremium: Boolean,
+)
+
+@Serializable
+data class MobileLessonContent(
+    val track: MobileLessonTrackRef,
+    val module: MobileLessonModuleRef,
+    val lesson: MobileLessonMeta,
+    val content: String,
 )
