@@ -86,7 +86,7 @@ export async function syncFromInvoicePaymentFailed(
       ? invoice.customer
       : invoice.customer?.id ?? null;
   const subscriptionId = readInvoiceSubscriptionId(invoice);
-  const priceId = invoice.lines.data[0]?.pricing?.price_details?.price ?? null;
+  const priceId = readInvoicePriceId(invoice);
   const mappedPlan = resolvePlanByPriceId(priceId)?.slug ?? null;
   const subscriptionSnapshot = await fetchSubscriptionSnapshot(subscriptionId);
   const userIdFromSubscription = subscriptionSnapshot
@@ -133,7 +133,7 @@ export async function syncFromInvoicePaid(
       ? invoice.customer
       : invoice.customer?.id ?? null;
   const subscriptionId = readInvoiceSubscriptionId(invoice);
-  const priceId = invoice.lines.data[0]?.pricing?.price_details?.price ?? null;
+  const priceId = readInvoicePriceId(invoice);
   const subscriptionSnapshot = await fetchSubscriptionSnapshot(subscriptionId);
   const userIdFromSubscription = subscriptionSnapshot
     ? readMetadataUserId(subscriptionSnapshot.metadata)
@@ -242,6 +242,29 @@ function readInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
 
   // Backward compatibility for older API responses carrying `invoice.subscription`.
   const legacy = (invoice as unknown as { subscription?: unknown }).subscription;
+  if (typeof legacy === "string") return legacy;
+  if (legacy && typeof legacy === "object") {
+    const id = (legacy as { id?: unknown }).id;
+    if (typeof id === "string") return id;
+  }
+
+  return null;
+}
+
+function readInvoicePriceId(invoice: Stripe.Invoice): string | null {
+  const fromPricing = (
+    invoice as unknown as { lines?: { data?: Array<{ pricing?: { price_details?: { price?: unknown } } }> } }
+  ).lines?.data?.[0]?.pricing?.price_details?.price;
+  if (typeof fromPricing === "string") return fromPricing;
+  if (fromPricing && typeof fromPricing === "object") {
+    const id = (fromPricing as { id?: unknown }).id;
+    if (typeof id === "string") return id;
+  }
+
+  // Backward compatibility for older invoice line shapes.
+  const legacy = (
+    invoice as unknown as { lines?: { data?: Array<{ price?: unknown }> } }
+  ).lines?.data?.[0]?.price;
   if (typeof legacy === "string") return legacy;
   if (legacy && typeof legacy === "object") {
     const id = (legacy as { id?: unknown }).id;
