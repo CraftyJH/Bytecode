@@ -53,6 +53,7 @@ export async function syncFromSubscriptionEvent(
     readMetadataUserId(subscription.metadata) ??
     (await resolveUserIdFromStripe(customerId, subscription.id));
   const isActiveLike = ["active", "trialing", "past_due"].includes(subscription.status);
+  const subscriptionPeriodEndSec = readSubscriptionPeriodEnd(subscription);
 
   const payload: MinimalSyncPayload = {
     userId,
@@ -61,8 +62,8 @@ export async function syncFromSubscriptionEvent(
     stripePriceId: priceId,
     status: subscription.status,
     plan: mappedPlan,
-    currentPeriodEnd: toIsoOrNull(subscription.current_period_end),
-    premiumUntil: isActiveLike ? toIsoOrNull(subscription.current_period_end) : null,
+    currentPeriodEnd: toIsoOrNull(subscriptionPeriodEndSec),
+    premiumUntil: isActiveLike ? toIsoOrNull(subscriptionPeriodEndSec) : null,
     graceExpiresAt: null,
     lastPaymentFailedAt: null,
     canceledAt: subscription.canceled_at ? toIsoOrNull(subscription.canceled_at) : null,
@@ -139,7 +140,7 @@ export async function syncFromInvoicePaid(
     : null;
   const effectivePriceId = priceId ?? subscriptionSnapshot?.items.data[0]?.price?.id ?? null;
   const mappedPlan = resolvePlanByPriceId(effectivePriceId)?.slug ?? null;
-  const periodEndSec = invoice.lines.data[0]?.period?.end ?? subscriptionSnapshot?.current_period_end ?? null;
+  const periodEndSec = invoice.lines.data[0]?.period?.end ?? readSubscriptionPeriodEnd(subscriptionSnapshot) ?? null;
 
   await syncToInternalApi({
     userId: userIdFromSubscription,
@@ -246,6 +247,15 @@ function readInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
     const id = (legacy as { id?: unknown }).id;
     if (typeof id === "string") return id;
   }
+
+  return null;
+}
+
+function readSubscriptionPeriodEnd(subscription: Stripe.Subscription | null): number | null {
+  if (!subscription) return null;
+
+  const raw = (subscription as unknown as { current_period_end?: unknown }).current_period_end;
+  if (typeof raw === "number") return raw;
 
   return null;
 }
