@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,13 +32,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.10.2
 
       - name: Inject Android app env
         env:
@@ -54,14 +55,35 @@ jobs:
             echo "WEB_BASE_URL=${WEB_BASE_URL:-https://bytecode-web.craftyjhs-projects.vercel.app}"
           } >> "${GITHUB_ENV}"
 
-      - name: Validate Gradle wrapper
-        uses: gradle/wrapper-validation-action@v2
+      - name: Prepare optional release keystore
+        if: ${{ secrets.ANDROID_SIGNING_STORE_BASE64 != '' }}
+        env:
+          ANDROID_SIGNING_STORE_BASE64: ${{ secrets.ANDROID_SIGNING_STORE_BASE64 }}
+          ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        run: |
+          mkdir -p app/keystore
+          echo "${ANDROID_SIGNING_STORE_BASE64}" | base64 --decode > app/keystore/release.jks
+          {
+            echo "ANDROID_SIGNING_STORE_FILE=app/keystore/release.jks"
+            echo "ANDROID_SIGNING_STORE_PASSWORD=${ANDROID_SIGNING_STORE_PASSWORD}"
+            echo "ANDROID_SIGNING_KEY_ALIAS=${ANDROID_SIGNING_KEY_ALIAS}"
+            echo "ANDROID_SIGNING_KEY_PASSWORD=${ANDROID_SIGNING_KEY_PASSWORD}"
+          } >> "${GITHUB_ENV}"
 
-      - name: Build debug APK
-        run: ./gradlew --stacktrace assembleDebug
+      - name: Ensure Gradle wrapper exists
+        run: |
+          if [ ! -f "./gradlew" ] || [ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]; then
+            gradle wrapper --gradle-version 8.10.2
+          fi
+          chmod +x ./gradlew
 
-      - name: Build release APK
-        run: ./gradlew --stacktrace assembleRelease
+      - name: Lint and unit tests
+        run: ./gradlew --stacktrace :app:lintDebug :app:testDebugUnitTest
+
+      - name: Build debug and release APKs
+        run: ./gradlew --stacktrace :app:assembleDebug :app:assembleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
