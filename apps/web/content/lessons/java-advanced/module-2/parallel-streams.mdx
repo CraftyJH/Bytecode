@@ -167,6 +167,39 @@ long count = IntStream.rangeClosed(1, 1_000_000)
 | `.sorted()` / `.distinct()` | Usually no — coordination overhead |
 | Shared mutable state | Never |
 
+<Exercise>
+Compare sequential and parallel sum of `LongStream.rangeClosed(1, 10_000_000)` using `System.nanoTime()`. Print both sums and both elapsed times in milliseconds.
+
+```java
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        long start, seqTime, parTime;
+
+        // Sequential
+        start = System.nanoTime();
+        long seqSum = LongStream.rangeClosed(1, 10_000_000).sum();
+        seqTime = System.nanoTime() - start;
+
+        // TODO: parallel — use .parallel() on the same range
+        start = System.nanoTime();
+        long parSum = 0; // replace with parallel sum
+        parTime = System.nanoTime() - start;
+
+        System.out.println("seq sum:  " + seqSum  + " in " + seqTime / 1_000_000 + " ms");
+        System.out.println("par sum:  " + parSum  + " in " + parTime / 1_000_000 + " ms");
+    }
+}
+```
+
+**What to verify:**
+- Both `seqSum` and `parSum` equal `50000005000000`
+- Times are printed in milliseconds (exact values vary by machine)
+
+<Note>Hint: `LongStream.rangeClosed(1, 10_000_000).parallel().sum()`.</Note>
+</Exercise>
+
 ## Try it
 
 Measure the difference between sequential and parallel sum on a large range:
@@ -193,6 +226,41 @@ public class Main {
 ```
 
 The results vary by machine and JVM warmup. On a multi-core box with 10 million elements, the parallel version is often 2-4x faster for this pure arithmetic task.
+
+<Exercise>
+First demonstrate the shared-state bug: accumulate a parallel stream into a plain `ArrayList` (unsafe). Then fix it by using `collect(Collectors.toList())` and verify the count is always correct.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // BUG: shared mutable state — result count is non-deterministic
+        List<Integer> unsafe = new ArrayList<>();
+        IntStream.rangeClosed(1, 1000)
+            .parallel()
+            .forEach(unsafe::add); // data corruption!
+        System.out.println("unsafe size (may be < 1000): " + unsafe.size());
+
+        // TODO: fix — use collect instead of forEach to accumulate safely
+        List<Integer> safe = IntStream.rangeClosed(1, 1000)
+            .parallel()
+            // .boxed().collect(...)
+            .boxed()
+            .collect(Collectors.toList()); // replace the line above
+
+        System.out.println("safe size: " + safe.size()); // always 1000
+    }
+}
+```
+
+**What to verify:**
+- `unsafe.size()` may print a value less than `1000` (race condition)
+- `safe.size()` always prints `1000`
+
+<Note>Hint: `IntStream.rangeClosed(1, 1000).parallel().boxed().collect(Collectors.toList())` is the safe equivalent.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

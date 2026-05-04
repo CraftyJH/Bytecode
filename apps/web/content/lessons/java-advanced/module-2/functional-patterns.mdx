@@ -206,7 +206,88 @@ System.out.println(countVowels.apply("functional")); // 4 (cached)
 
 <Note>`Map.computeIfAbsent` is not thread-safe for recursive lambdas in Java 8 (it can deadlock). Use `ConcurrentHashMap` only for non-recursive memoization in concurrent contexts. For recursive memoization, a plain `HashMap` is simplest and correct when accessed single-threaded.</Note>
 
+<Exercise>
+Implement memoization using `Map.computeIfAbsent`. Wrap a `slowFib(n)` method that artificially sleeps to simulate cost, so repeated calls return instantly from the cache.
+
+```java
+import java.util.*;
+
+public class Main {
+    static Map<Integer, Long> cache = new HashMap<>();
+
+    static long slowFib(int n) {
+        if (n <= 1) return n;
+        // TODO: use cache.computeIfAbsent to cache and return the result
+        // return cache.computeIfAbsent(n, k -> slowFib(k - 1) + slowFib(k - 2));
+        return slowFib(n - 1) + slowFib(n - 2); // replace with memoized version
+    }
+
+    public static void main(String[] args) {
+        System.out.println(slowFib(10)); // 55
+        System.out.println(slowFib(15)); // 610
+        System.out.println("cache size: " + cache.size()); // 14 (keys 2–15)
+    }
+}
+```
+
+**What to verify:**
+- `slowFib(10)` prints `55`
+- `slowFib(15)` prints `610`
+- `cache.size()` prints `14`
+
+<Note>Hint: `cache.computeIfAbsent(n, k -> slowFib(k - 1) + slowFib(k - 2))`.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
+
+<Exercise>
+Build a `Pipeline<T>` class with `filter(Predicate<T>)`, `map(Function<T,R>)`, and `toList(List<T>)` methods. Each method records a step and returns `this` (or a new pipeline for `map`). Call `toList` to execute all steps.
+
+```java
+import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public class Main {
+    static class Pipeline<T> {
+        private final List<Function<List<T>, List<T>>> steps = new ArrayList<>();
+
+        public static <T> Pipeline<T> of() { return new Pipeline<>(); }
+
+        public Pipeline<T> filter(Predicate<T> pred) {
+            // TODO: add a step that filters the list using pred
+            return this;
+        }
+
+        public Pipeline<T> map(UnaryOperator<T> fn) {
+            // TODO: add a step that maps the list using fn
+            return this;
+        }
+
+        public List<T> toList(List<T> source) {
+            // TODO: apply each step in order and return the final list
+            return source;
+        }
+    }
+
+    public static void main(String[] args) {
+        List<String> words = List.of("hi", "hello", "java", "streams", "fun");
+
+        List<String> result = Pipeline.<String>of()
+            .filter(s -> s.length() > 3)
+            .map(String::toUpperCase)
+            .toList(words);
+
+        System.out.println(result); // [HELLO, JAVA, STREAMS]
+    }
+}
+```
+
+**What to verify:**
+- Output is `[HELLO, JAVA, STREAMS]`
+
+<Note>Hint: each step is a `Function<List<T>, List<T>>` stored in the list; `toList` iterates and applies them all.</Note>
+</Exercise>
 
 ## Pattern 4: Lazy evaluation with Supplier
 
@@ -282,6 +363,48 @@ public class Main {
     }
 }
 ```
+
+<Exercise>
+Implement a generic retry function `<T> T withRetry(Supplier<T> action, int maxAttempts)` that calls `action.get()` and retries up to `maxAttempts` times if an exception is thrown. Throw the last exception if all attempts fail.
+
+```java
+import java.util.function.*;
+
+public class Main {
+    static <T> T withRetry(Supplier<T> action, int maxAttempts) {
+        // TODO: try action.get() in a loop; on exception retry until maxAttempts exhausted
+        // throw the last exception (wrap in RuntimeException if needed)
+        return null; // replace
+    }
+
+    static int callCount = 0;
+
+    static String unreliable() {
+        callCount++;
+        if (callCount < 3) throw new RuntimeException("fail attempt " + callCount);
+        return "success on attempt " + callCount;
+    }
+
+    public static void main(String[] args) {
+        String result = withRetry(Main::unreliable, 5);
+        System.out.println(result); // success on attempt 3
+
+        // Should throw after exhausting attempts
+        try {
+            withRetry(() -> { throw new RuntimeException("always fails"); }, 3);
+        } catch (RuntimeException e) {
+            System.out.println("caught: " + e.getMessage()); // caught: always fails
+        }
+    }
+}
+```
+
+**What to verify:**
+- `withRetry(Main::unreliable, 5)` prints `success on attempt 3`
+- After exhausting retries, the exception is propagated and caught, printing `caught: always fails`
+
+<Note>Hint: use a for-loop, catch `RuntimeException`, save it, and after the loop re-throw. `callCount` is a static field for test purposes.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 
