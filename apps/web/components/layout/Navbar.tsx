@@ -1,13 +1,41 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/Button";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { createClient } from "@/lib/supabase/client";
 
 interface NavbarProps {
   user?: User | null;
 }
 
 export function Navbar({ user }: NavbarProps) {
+  const [authUser, setAuthUser] = useState<User | null>(user ?? null);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (active) setAuthUser(data.user ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const effectiveUser = useMemo(() => authUser ?? null, [authUser]);
+
   return (
     <header
       className="sticky top-0 z-50 border-b"
@@ -23,7 +51,7 @@ export function Navbar({ user }: NavbarProps) {
       >
         {/* Wordmark */}
         <a
-          href={user ? "/dashboard" : "/"}
+          href="/"
           className="text-prose font-semibold tracking-tight text-lg hover:text-accent transition-colors duration-100"
           style={{ fontFamily: "var(--font-display)" }}
           aria-label="Bytecode home"
@@ -54,8 +82,8 @@ export function Navbar({ user }: NavbarProps) {
         {/* Right side */}
         <div className="flex items-center gap-3">
           {/* Auth actions — hidden on mobile (handled by MobileNav drawer) */}
-          {user ? (
-            <UserMenu user={user} />
+          {effectiveUser ? (
+            <UserMenu user={effectiveUser} />
           ) : (
             <div className="hidden md:flex items-center gap-3">
               <Button as="a" href="/signin" variant="ghost" size="sm">
@@ -68,7 +96,7 @@ export function Navbar({ user }: NavbarProps) {
           )}
 
           {/* Mobile hamburger */}
-          <MobileNav user={user} />
+          <MobileNav user={effectiveUser} />
         </div>
       </nav>
     </header>
