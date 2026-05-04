@@ -81,6 +81,43 @@ class Person(val name: String) {
 
 Prefer **named factory functions** (`fun Person.adult(...)`) when readability wins.
 
+## Design notes for Java developers
+
+A Kotlin primary constructor often replaces three Java artifacts at once:
+
+- field declaration,
+- constructor assignment,
+- and boilerplate getter methods.
+
+That is a readability gain, but the underlying JVM model still matters. You should still think in terms of:
+
+- construction invariants (what must always be true),
+- visibility (`private` constructor for factory-only creation),
+- and side effects during initialization (`init` should stay lean).
+
+If validation can fail, prefer failing immediately in `init` with clear messages (`require(...)`). This keeps invalid state from leaking into later logic.
+
+## Java ↔ Kotlin mapping
+
+```java
+// Java
+public final class User {
+  private final String name;
+  private final int id;
+  public User(String name, int id) {
+    this.name = name;
+    this.id = id;
+  }
+}
+```
+
+```kotlin
+// Kotlin
+class User(val name: String, val id: Int)
+```
+
+Same domain model, significantly less ceremony.
+
 <Quiz data={quizzes.midQ} label="Constructors" />
 
 ## Recap

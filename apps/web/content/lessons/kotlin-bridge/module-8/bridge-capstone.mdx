@@ -63,6 +63,29 @@ You will combine **data classes**, **extensions**, and **stdlib aggregation** to
 - **`totalUnits`** sums **`qty`** across all lines.
 - **`main`** prints the aggregate for the sample cart (`A×2`, `B×3` → **`5`**).
 
+## Why this capstone matters
+
+This exercise intentionally looks simple, but it mirrors real migration work:
+
+- You model data clearly (data class),
+- extract behavior into reusable logic (extension/function),
+- and keep orchestration code in `main` thin and readable.
+
+That separation is the same structure used in larger JVM systems:
+
+- domain model
+- pure transformation layer
+- delivery layer (CLI / HTTP / batch)
+
+If this shape feels natural, you are already thinking beyond syntax translation and into maintainable Kotlin design.
+
+## Suggested implementation steps
+
+1. Write a passing baseline implementation for `totalUnits`.
+2. Add one edge case mentally: empty list should return `0`.
+3. Refactor for readability if needed (`sumOf` usually wins).
+4. Keep `main` as a tiny verification harness.
+
 ## Stretch goals (offline)
 
 - Filter lines by SKU prefix.

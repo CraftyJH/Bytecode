@@ -75,7 +75,7 @@ export default async function TrackPage({ params }: TrackPageProps) {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span
-                        className="text-xs text-prose-faint"
+                        className="text-xs text-accent font-semibold tabular-nums"
                         style={{ fontFamily: "var(--font-mono)" }}
                       >
                         {String(mod.order).padStart(2, "0")}
@@ -122,7 +122,10 @@ export default async function TrackPage({ params }: TrackPageProps) {
                           style={{ fontFamily: "var(--font-mono)" }}
                           title={lesson.title}
                         >
-                          {String(lesson.order).padStart(2, "0")} {lesson.title}
+                          <span className="text-accent font-semibold tabular-nums">
+                            {String(lesson.order).padStart(2, "0")}
+                          </span>{" "}
+                          {lesson.title}
                         </a>
                       ))}
                     </div>

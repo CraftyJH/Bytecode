@@ -57,6 +57,30 @@ Chaining:
 user?.address?.zipCode
 ```
 
+## Nullability strategy (production mindset)
+
+Kotlin null safety is strongest when you treat nullable values as **boundary concerns**:
+
+- DTO parsing
+- database rows with optional columns
+- Java/platform APIs with unclear contracts
+
+Then convert to non-null domain types as early as possible. In practice:
+
+1. Validate incoming nullable values at the edge.
+2. Map to a non-null internal model where possible.
+3. Keep `?` localized instead of spreading through every function.
+
+This approach is equivalent to robust Java code that validates `@Nullable` inputs, but Kotlin makes the contract explicit in types and compiler checks.
+
+## Avoid `!!` by default
+
+`!!` is effectively "throw if null right now." It is occasionally acceptable when an invariant is truly guaranteed externally, but overuse recreates Java-style runtime null failures. Prefer:
+
+- `?:` for defaults
+- `requireNotNull` with a useful message
+- early returns when data is missing
+
 <Quiz data={quizzes.midQ} label="Null safety" />
 
 ## Compared to Java

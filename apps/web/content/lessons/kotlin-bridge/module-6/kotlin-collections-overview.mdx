@@ -61,6 +61,31 @@ items += "a"
 
 When interoping with Java, a `List` might be backed by an **ArrayList** — still treat it as read-only in Kotlin to avoid surprise mutation.
 
+## Read-only is an API promise, not deep immutability
+
+This is the most common confusion for Java teams moving to Kotlin.
+
+- `List<T>` means "this reference exposes read operations."
+- It does **not** guarantee that no one else can mutate the underlying object.
+
+If your architecture needs true immutability boundaries (e.g. concurrent pipelines, caching snapshots), copy at edges (`toList()`) or use persistent collections in dedicated libraries.
+
+## Java comparison
+
+Java typically communicates intent with wrappers:
+
+```java
+List<String> safe = Collections.unmodifiableList(source);
+```
+
+Kotlin communicates intent at the type level first:
+
+```kotlin
+fun listUsers(): List<User> = repository.fetchUsers()
+```
+
+Both can still alias mutable storage if you are not careful, so pair type intent with ownership discipline.
+
 <Quiz data={quizzes.midQ} label="Collections" />
 
 ## Recap

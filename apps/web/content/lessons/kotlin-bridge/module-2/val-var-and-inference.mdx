@@ -70,6 +70,35 @@ Add types when it helps readers or the compiler:
 val ids: List<Long> = emptyList()
 ```
 
+## Practical migration guidance
+
+When porting Java code, start by converting obvious immutable locals to `val`. This does two things:
+
+- Documents intent ("this should not change")
+- Gives the compiler more opportunities for smart reasoning and safer refactors
+
+For state that truly changes over time (counters, state machines, mutable caches), keep `var`, but keep mutation scope tight. A useful heuristic from production code: **`var` at object boundaries, `val` in core business flow**.
+
+In Java, teams often reach for mutable objects because they need to change one field later. In Kotlin, prefer creating updated copies (especially with data classes) rather than mutating shared references in-place. That pays off when debugging concurrency and unexpected side effects.
+
+## Java vs Kotlin examples
+
+```java
+// Java
+final var taxRate = 0.10;
+var total = subtotal + shipping;
+total = total + total * taxRate;
+```
+
+```kotlin
+// Kotlin
+val taxRate = 0.10
+var total = subtotal + shipping
+total += total * taxRate
+```
+
+Both are valid. The Kotlin habit is to aggressively lock values with `val` unless a future line requires reassignment.
+
 <Quiz data={quizzes.midQ} label="val vs var" />
 
 ## Common mistakes

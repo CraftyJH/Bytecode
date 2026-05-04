@@ -962,7 +962,11 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
             className="text-xs text-prose-faint"
             style={{ fontFamily: "var(--font-mono)" }}
           >
-            module {String(mod.order).padStart(2, "0")} complete
+            module{" "}
+            <span className="text-accent font-semibold tabular-nums">
+              {String(mod.order).padStart(2, "0")}
+            </span>{" "}
+            complete
           </span>
         </div>
         <h1 className="text-3xl font-semibold text-prose tracking-tight mb-4">
@@ -1016,7 +1020,7 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
             >
               <div className="flex items-center gap-3">
                 <span
-                  className="text-xs text-prose-faint w-5 shrink-0"
+                  className="text-xs text-accent font-semibold tabular-nums w-5 shrink-0"
                   style={{ fontFamily: "var(--font-mono)" }}
                 >
                   {String(lesson.order).padStart(2, "0")}

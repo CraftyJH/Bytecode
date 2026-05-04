@@ -98,6 +98,27 @@ This track (**Kotlin Bridge**) assumes you are comfortable with Java basics thro
 - **Expression-oriented control flow**: `if` and `when` can be expressions, which pairs well with `val` and single-assignment style.
 - **Extension functions**: You can add namespaced helpers without subclassing (with different dispatch rules than Java instance methods — we cover that later).
 
+## Migration expectations (realistic)
+
+Kotlin is not magic and does not remove architectural complexity by itself. You still need:
+
+- clear module boundaries,
+- explicit domain models,
+- and disciplined tests.
+
+What Kotlin does improve is the signal-to-noise ratio. Teams usually see faster reviews because intent is clearer:
+
+- nullability is explicit,
+- mutability is explicit,
+- and boilerplate does not hide business rules.
+
+A practical migration pattern is **strangler-style adoption**:
+
+1. Keep existing Java modules stable.
+2. Add new features in Kotlin where possible.
+3. Convert high-churn Java classes opportunistically.
+4. Leave low-risk legacy code until there is business value to touch it.
+
 What we **defer** to **Kotlin Advanced**: coroutines, multiplatform, compiler plugins, and deep reflection. You will see pointers so you know where to go next.
 
 <Quiz data={quizzes.midQ} label="Check-in" />

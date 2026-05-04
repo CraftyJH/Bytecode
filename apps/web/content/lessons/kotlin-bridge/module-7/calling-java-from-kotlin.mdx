@@ -55,6 +55,32 @@ Kotlin **consumes** Java libraries transparently:
 
 **Checked exceptions** do not propagate as checked in Kotlin — still **throw** at runtime.
 
+## Interop checklist for stable teams
+
+When Kotlin calls Java in production code, evaluate three risks explicitly:
+
+1. **Nullability ambiguity**  
+   Unannotated Java APIs become platform types. Decide quickly whether to trust or wrap.
+
+2. **Exception discipline**  
+   Kotlin won’t force catches for Java checked exceptions. Agree on team policy: catch near boundary or bubble with documentation.
+
+3. **Mutability leakage**  
+   Java collections are frequently mutable; avoid exposing them directly in Kotlin-facing APIs without copying or read-only adaptation.
+
+## Boundary wrapper pattern
+
+Instead of scattering interop assumptions everywhere, create a small adapter:
+
+```kotlin
+class LegacyProps(private val p: Properties) {
+    fun required(key: String): String =
+        requireNotNull(p.getProperty(key)) { "Missing property: $key" }
+}
+```
+
+This keeps Kotlin codebase semantics clean while still leveraging Java libraries.
+
 <Quiz data={quizzes.midQ} label="Java → Kotlin" />
 
 ## Recap

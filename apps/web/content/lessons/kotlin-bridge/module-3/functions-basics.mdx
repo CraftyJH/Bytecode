@@ -71,6 +71,32 @@ fun double(x: Int) = x * 2
 
 If you omit a return type and use block body without `return`, Kotlin infers **`Unit`**.
 
+## Why this matters in real code
+
+Function signatures are where API quality starts. Java developers often add overloads for convenience:
+
+- `fetch()`
+- `fetch(timeout)`
+- `fetch(timeout, retries)`
+
+Kotlin defaults collapse these into one declaration while keeping call sites explicit with named arguments. This tends to reduce accidental parameter swaps (`host, port` style bugs) and makes code reviews easier because intent is visible at the call site.
+
+```kotlin
+fun fetch(host: String = "localhost", port: Int = 8080, retries: Int = 2) { ... }
+
+fetch(port = 9090)          // clear intent
+fetch(retries = 0)          // no hidden meaning
+```
+
+## Java interop caution
+
+Defaults are Kotlin language features, not JVM bytecode features. Java callers do not see default arguments automatically. If a function is called from Java, plan for either:
+
+- explicit overloads, or
+- `@JvmOverloads` in the interop module.
+
+Treat this as contract design: Kotlin ergonomic API for Kotlin callers, stable overload surface for Java callers.
+
 <Quiz data={quizzes.midQ} label="Functions" />
 
 ## Common mistakes
