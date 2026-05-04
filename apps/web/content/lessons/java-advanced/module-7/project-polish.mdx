@@ -520,6 +520,73 @@ List<Task> urgent = new TaskQueryBuilder()
     .execute(taskRepo);
 ```
 
+<Exercise>
+Implement a `TaskQueryBuilder` with three chainable methods: `withStatus(TaskStatus)`, `withMinPriority(int)`, and `withTitleContaining(String)`. Each method adds a `Predicate<Task>` via `.and(...)` onto an identity predicate. Add a `build()` method returning the composed predicate. Build a query for high-priority (`>= 4`) in-progress tasks, run it against a list of 6 tasks, and print the matching titles.
+
+```java
+import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+public class Main {
+    enum TaskStatus { TODO, IN_PROGRESS, DONE }
+
+    record Task(String title, TaskStatus status, int priority) {}
+
+    static class TaskQueryBuilder {
+        private Predicate<Task> filter = t -> true;
+
+        TaskQueryBuilder withStatus(TaskStatus status) {
+            // TODO: narrow filter
+            return this;
+        }
+
+        TaskQueryBuilder withMinPriority(int min) {
+            // TODO: narrow filter to tasks with priority >= min
+            return this;
+        }
+
+        TaskQueryBuilder withTitleContaining(String keyword) {
+            // TODO: narrow filter (case-insensitive)
+            return this;
+        }
+
+        Predicate<Task> build() { return filter; }
+
+        List<Task> execute(List<Task> tasks) {
+            return tasks.stream().filter(filter).collect(Collectors.toList());
+        }
+    }
+
+    public static void main(String[] args) {
+        List<Task> tasks = List.of(
+            new Task("Fix login bug",      TaskStatus.IN_PROGRESS, 5),
+            new Task("Write unit tests",   TaskStatus.TODO,        4),
+            new Task("Deploy to staging",  TaskStatus.IN_PROGRESS, 3),
+            new Task("Update docs",        TaskStatus.DONE,        2),
+            new Task("Optimise queries",   TaskStatus.IN_PROGRESS, 4),
+            new Task("Refactor auth",      TaskStatus.TODO,        5)
+        );
+
+        List<Task> results = new TaskQueryBuilder()
+            .withStatus(TaskStatus.IN_PROGRESS)
+            .withMinPriority(4)
+            .execute(tasks);
+
+        System.out.println("Matching tasks: " + results.size());
+        results.forEach(t -> System.out.println("  " + t.title() + " (priority=" + t.priority() + ")"));
+    }
+}
+```
+
+**What to verify:**
+- `Matching tasks: 2` is printed
+- `Fix login bug (priority=5)` and `Optimise queries (priority=4)` are listed
+- `Deploy to staging` (priority 3) is excluded despite being IN_PROGRESS
+
+<Note>Hint: chain each new predicate with `filter = filter.and(newPredicate)`. For `withTitleContaining`, use `t.title().toLowerCase().contains(keyword.toLowerCase())`.</Note>
+</Exercise>
+
 ## Javadoc — making the API self-documenting
 
 Production-quality code documents its public API. Key rules:
