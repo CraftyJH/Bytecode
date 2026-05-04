@@ -1,0 +1,83 @@
+export const meta = {
+  title: "Capstone: Cart Report",
+  duration: 20,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m8-cap-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "This capstone ties together which Bridge themes?",
+    options: [
+      { text: "Only JVM garbage collection tuning", correct: false, feedback: "Not here." },
+      {
+        text: "Data classes, collection extensions, and sum aggregation",
+        correct: true,
+        feedback: "Mirrors a tiny slice of e-commerce reporting in idiomatic Kotlin.",
+      },
+      { text: "Android XML layouts", correct: false, feedback: "Out of scope for this JVM playground capstone." },
+      { text: "Kotlin/Native interop", correct: false, feedback: "Wrong platform." },
+    ],
+    explanation: "You practice composing small, testable pieces — the same skill as Java service layers.",
+  },
+  endQ1: {
+    id: "kb-m8-cap-end1",
+    type: "order_the_steps",
+    difficulty: "easy",
+    prompt: "Order the steps to compute total units from a list of order lines:",
+    items: [
+      { id: "model", text: "Model each row as a data class with sku + qty." },
+      { id: "sum", text: "Provide an extension or function that sums qty across lines." },
+      { id: "print", text: "Print the aggregate for verification." },
+    ],
+    correctOrder: ["model", "sum", "print"],
+    explanation: "Model → aggregate → output mirrors typical layered designs.",
+  },
+  endQ2: {
+    id: "kb-m8-cap-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Where would you add VAT or discounts next in a real service?",
+    options: [
+      { text: "Inside `println` only", correct: false, feedback: "Business rules belong in testable pure functions or domain services." },
+      {
+        text: "Separate pricing functions that take cart lines + policy inputs",
+        correct: true,
+        feedback: "Keeps aggregation reusable across CLI, HTTP, and batch jobs.",
+      },
+      { text: "Hard-code in SQL only", correct: false, feedback: "Sometimes — but domain logic often spans layers." },
+      { text: "Random number generator", correct: false, feedback: "Please no." },
+    ],
+    explanation: "Capstone stays small — production expands along clear seams.",
+  },
+};
+
+You will combine **data classes**, **extensions**, and **stdlib aggregation** to total quantities in a toy shopping cart — the kind of logic that sits inside domain services in Java, expressed with less ceremony in Kotlin.
+
+## Specification
+
+- **`Line`** carries **`sku`** and **`qty`**.
+- **`totalUnits`** sums **`qty`** across all lines.
+- **`main`** prints the aggregate for the sample cart (`A×2`, `B×3` → **`5`**).
+
+## Stretch goals (offline)
+
+- Filter lines by SKU prefix.
+- Group totals by SKU using `groupingBy`.
+- Parse lines from `stdin` instead of literals.
+
+<Quiz data={quizzes.midQ} label="Capstone" />
+
+## Recap
+
+- Bridge lessons converge on **expressive, safe defaults** without abandoning JVM fundamentals.
+- Next stop: **Kotlin Advanced** for coroutines, DSLs, and deeper runtime topics when you are ready.
+
+<Exercise>
+
+Implement **`totalUnits`** so the sample cart prints **`5`**.
+
+</Exercise>

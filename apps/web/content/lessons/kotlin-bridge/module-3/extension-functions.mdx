@@ -1,0 +1,95 @@
+export const meta = {
+  title: "Extension Functions",
+  duration: 16,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m3-ext-mid",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "How is an extension function resolved at runtime on the JVM?",
+    options: [
+      {
+        text: "Virtual dispatch like Java instance methods on the receiver type",
+        correct: false,
+        feedback: "Extensions are static helpers; dispatch uses the static type unless combined with polymorphic receivers.",
+      },
+      {
+        text: "As a static method taking the receiver as the first parameter (conceptually)",
+        correct: true,
+        feedback: "That is why they do not override superclass methods like Java `virtual` calls.",
+      },
+      { text: "They only work on primitives", correct: false, feedback: "They work on any receiver type you declare." },
+      { text: "They modify original classes at runtime", correct: false, feedback: "No bytecode rewrite of the original class — sugar + static linkage." },
+    ],
+    explanation:
+      "If you need polymorphism, use ordinary class methods or combine extensions with care — do not fake inheritance.",
+  },
+  endQ1: {
+    id: "kb-m3-ext-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun Int.twice() = this * 2
+
+fun main() {
+    println(21.twice())
+}`,
+    expectedOutput: "42",
+    explanation: "`this` is the Int receiver inside the extension.",
+  },
+  endQ2: {
+    id: "kb-m3-ext-end2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `open class Base
+class Derived : Base()
+
+fun Base.name() = "base"
+fun Derived.name() = "derived"
+
+fun main() {
+    val x: Base = Derived()
+    println(x.name())
+}`,
+    buggyLine: 9,
+    issue: "Static dispatch on extensions — prints base",
+    explanation:
+      "Extensions dispatch on the **declared** static type (`Base`), not the runtime `Derived`, unlike overriding instance methods.",
+  },
+};
+
+Extensions add **namespaced functions** without subclassing:
+
+```kotlin
+fun String.isDigitOnly(): Boolean = all { it.isDigit() }
+```
+
+Inside, **`this`** refers to the receiver.
+
+## Scope and imports
+
+Extensions live in packages — import them like top-level functions:
+
+```kotlin
+import com.example.utils.wordCount
+```
+
+## Extensions vs inheritance
+
+They **do not override** Java methods on the receiver’s class hierarchy. Accidentally creating two extensions with the same name on `Base` vs `Derived` trips people migrating from Java polymorphism.
+
+<Quiz data={quizzes.midQ} label="Extensions" />
+
+## Recap
+
+- Syntax sugar with **receiver type** as first parameter under the hood.
+- **Dispatch rules differ** from Java `virtual` methods — design APIs deliberately.
+
+<Exercise>
+
+Implement **`wordCount`** to count whitespace-separated words in a trimmed string (expect **`3`** for `"one two three"`).
+
+</Exercise>

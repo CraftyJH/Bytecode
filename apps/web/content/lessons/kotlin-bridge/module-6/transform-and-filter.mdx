@@ -1,0 +1,62 @@
+export const meta = {
+  title: "map, filter, and flatMap",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m6-tf-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "`flatMap` in the collections API is closest in spirit to Java Streams’",
+    options: [
+      { text: "map", correct: false, feedback: "flatMap flattens nested structures." },
+      { text: "map + flatMap to single stream (one-to-many transform)", correct: true, feedback: "Transforms each element to a collection, then concatenates." },
+      { text: "filter", correct: false, feedback: "Removes elements, no flattening." },
+      { text: "reduce", correct: false, feedback: "Folds to one value — different use." },
+    ],
+    explanation: "Think of graph walks: neighbors per node → single list of edges.",
+  },
+  endQ1: {
+    id: "kb-m6-tf-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    println(listOf("a", "bb", "ccc").map { it.length }.maxOrNull())
+}`,
+    expectedOutput: "3",
+    explanation: "Lengths 1,2,3 — max is 3.",
+  },
+  endQ2: {
+    id: "kb-m6-tf-end2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "To keep only even numbers in a list, use the higher-order function",
+    code: "vals.filter { it % 2 == ___ }",
+    correctAnswers: ["0"],
+    caseSensitive: true,
+    explanation: "Modulo 2 comparison — same idiom as Java streams.",
+  },
+};
+
+Collection operations parallel Java **Stream** API but are **stdlib defaults** for Kotlin:
+
+```kotlin
+val evens = nums.filter { it % 2 == 0 }
+val squares = nums.map { it * it }
+val pairs: List<Char> = words.flatMap { it.toList() }
+```
+
+<Quiz data={quizzes.midQ} label="Transform" />
+
+## Recap
+
+- **`map` / `filter` / `flatMap`** are eager on lists — use **sequences** when pipelines get huge (next lesson set).
+
+<Exercise>
+
+Print the **maximum** string length using **`maxOf`** (`3` for `"a"`, `"bb"`, `"ccc"`).
+
+</Exercise>

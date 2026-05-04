@@ -1,0 +1,104 @@
+export const meta = {
+  title: "Basic Types and String Templates",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m2-str-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which embeds the value of `name` inside a Kotlin string literal?",
+    options: [
+      { text: `"Hello, #name"`, correct: false, feedback: "Hashtag is not Kotlin template syntax." },
+      { text: `"Hello, $name"`, correct: true, feedback: "Simple identifiers use `$name` inside double quotes." },
+      { text: `'Hello, $name'`, correct: false, feedback: "Single quotes mean `Char` — not full string templates." },
+      { text: `"Hello, {name}"`, correct: false, feedback: "Use `$name` or `${'{'}name}` for expressions." },
+    ],
+    explanation: "Use `$ident` or `${expression}` inside double-quoted strings.",
+  },
+  endQ1: {
+    id: "kb-m2-str-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val n = 7
+    println("n=" + (n * n))
+}`,
+    expectedOutput: "n=49",
+    explanation: "Arithmetic inside parentheses; concatenation builds the same readable output.",
+  },
+  endQ2: {
+    id: "kb-m2-str-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question:
+      "Why might you choose triple-quoted raw strings (`\"\"\"`) when embedding JSON or file paths on Windows?",
+    options: [
+      { text: "They disable string templates entirely.", correct: false, feedback: "Raw strings still support templates unless you avoid `$`." },
+      {
+        text: "They reduce escaping noise for backslashes and quotes.",
+        correct: true,
+        feedback: "Readable literals with fewer doubled escapes.",
+      },
+      { text: "They are faster at runtime.", correct: false, feedback: "Performance is not the primary reason." },
+      { text: "They are required for Kotlin 2.x.", correct: false, feedback: "Optional feature for ergonomics." },
+    ],
+    explanation: "Raw strings shine when literals contain many `\"` or `\\`, similar to Java text blocks.",
+  },
+};
+
+Kotlin maps Java primitives to types such as `Int`, `Long`, `Double`, `Boolean`, and `Char`. Under the hood they compile to JVM primitives when possible (`Int` → `int`) but behave like types with methods (`10.inc()`).
+
+## String templates
+
+Instead of:
+
+```java
+System.out.println("Hello, " + name + ", count=" + count);
+```
+
+Kotlin allows:
+
+```kotlin
+println("Hello, $name, count=$count")
+```
+
+Expressions need braces:
+
+```kotlin
+println("square=${n * n}")
+```
+
+## Raw / multiline strings
+
+Triple quotes preserve newlines — handy for SQL snippets or JSON embedded in tests:
+
+```kotlin
+val sql = """
+    SELECT id, title
+    FROM posts
+    WHERE owner_id = ?
+""".trimIndent()
+```
+
+<Quiz data={quizzes.midQ} label="Templates" />
+
+## Common mistakes
+
+- Forgetting braces around **`${expr}`** when `expr` contains operators — Kotlin may parse `${` incorrectly without closing braces.
+- Mixing Java `char` thinking with Kotlin **`Char`** vs **`String`** — `'a'` is `Char`, `"a"` is `String`.
+
+## Recap
+
+- Numeric types are explicit (`Int`, `Double`, …) with inference at locals.
+- **Templates** replace most `String.format` noise for simple joins.
+- **Raw strings** reduce escaping for literals with quotes or windows paths.
+
+<Exercise>
+
+Print **`Bytecode:42`** using `label` and `code` variables and a **single string template**.
+
+</Exercise>

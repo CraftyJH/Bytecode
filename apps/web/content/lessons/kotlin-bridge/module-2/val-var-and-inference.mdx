@@ -1,0 +1,89 @@
+export const meta = {
+  title: "val, var, and Type Inference",
+  duration: 14,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m2-val-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does `val` declare in Kotlin?",
+    options: [
+      { text: "A mutable variable", correct: false, feedback: "Use `var` for reassignment." },
+      { text: "An immutable reference (read-only binding)", correct: true, feedback: "The reference cannot be reassigned; the object might still mutate if mutable." },
+      { text: "A compile-time constant on all types", correct: false, feedback: "Runtime constants use `const val` with restrictions (compile-time literals on primitives/strings)." },
+      { text: "A nullable type", correct: false, feedback: "Nullability uses `?` on the type, not `val` vs `var`." },
+    ],
+    explanation: "`val` is like a Java `final` local: the name cannot be rebound; `var` can.",
+  },
+  endQ1: {
+    id: "kb-m2-val-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val x = 2
+    val y = 3
+    println(x * y)
+}`,
+    expectedOutput: "6",
+    explanation: "Type inference picks `Int`; product is 6.",
+  },
+  endQ2: {
+    id: "kb-m2-val-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When must you write an explicit type in Kotlin even though inference usually works?",
+    options: [
+      { text: "Never — Kotlin always infers everything.", correct: false, feedback: "You often need types for public APIs, empty collections, or controlling overload resolution." },
+      { text: "When the compiler cannot find a single best type (e.g., empty `listOf()` without context)", correct: true, feedback: "Provide `listOf<String>()` or annotate the binding." },
+      { text: "Only when using `var`", correct: false, feedback: "`val` and `var` both participate in inference." },
+      { text: "Only on Android", correct: false, feedback: "The rule is general." },
+    ],
+    explanation: "Inference is powerful but not magic — annotate when it keeps APIs clear or disambiguates.",
+  },
+};
+
+`val` and `var` split **reassignment**, not deep immutability. A `val` list can still be a `mutableListOf` under the hood (the **reference** is fixed, the list content may change). Prefer **read-only interfaces** in public APIs: expose `List<T>` and keep `MutableList` private.
+
+<Note>Track baseline: Kotlin 2.x on the **JVM** with **Java 21**-aligned targets where we mention versions.</Note>
+
+## Compared to Java
+
+- Java: `final String name = "Ada";` → Kotlin: `val name = "Ada"`.
+- Java: `String name = "Ada"; name = "Bob";` → Kotlin: `var name = "Ada"; name = "Bob"`.
+
+## Type inference
+
+Kotlin infers from the right-hand side:
+
+```kotlin
+val count = 10        // Int
+val title = "Kotlin"  // String
+```
+
+Add types when it helps readers or the compiler:
+
+```kotlin
+val ids: List<Long> = emptyList()
+```
+
+<Quiz data={quizzes.midQ} label="val vs var" />
+
+## Common mistakes
+
+- Using `var` everywhere out of Java habit — default to `val` until you need mutation.
+- Confusing **read-only view** (`List`) with **immutable data** — Kotlin’s `listOf` returns a read-only list, not a mathematically immutable structure.
+
+## Recap
+
+- **`val`**: immutable reference; **`var`**: reassignable.
+- **Inference** reduces noise; annotate public contracts and ambiguous sites.
+
+<Exercise>
+
+Compute integer **area** as `pi * r * r` with `r = 3` and `pi = 3`, then print the result (`27`).
+
+</Exercise>

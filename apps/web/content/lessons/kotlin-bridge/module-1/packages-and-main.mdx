@@ -1,0 +1,140 @@
+export const meta = {
+  title: "Packages and the Entry Point",
+  duration: 12,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m1-pkg-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "In idiomatic Kotlin on the JVM, where does `fun main()` usually live?",
+    options: [
+      {
+        text: "Inside a class named Main with static modifier",
+        correct: false,
+        feedback: "Java uses `public static void main` inside a class; Kotlin commonly uses a top-level `main`.",
+      },
+      {
+        text: "At the top level of a file (possibly under a package declaration)",
+        correct: true,
+        feedback:
+          "Correct — the compiler generates a class for the JVM, but you rarely write that ceremony by hand.",
+      },
+      {
+        text: "Only inside companion objects",
+        correct: false,
+        feedback: "You *can* put `@JvmStatic fun main` in a companion for Java callers, but it is not required.",
+      },
+      {
+        text: "Inside an interface",
+        correct: false,
+        feedback: "Interfaces cannot host a JVM entry point in the usual sense.",
+      },
+    ],
+    explanation:
+      "Top-level `main` is the default story; the Kotlin compiler synthesizes a class file entry Java can still launch when packaged correctly.",
+  },
+  endQ1: {
+    id: "kb-m1-pkg-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `package demo
+
+fun main() {
+    println("go")
+}`,
+    expectedOutput: "go",
+    explanation: "Package does not change runtime output here; `println` writes `go` with a newline.",
+  },
+  endQ2: {
+    id: "kb-m1-pkg-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question:
+      "Why might you still see `@file:JvmName(\"FooKt\")` or companion `@JvmStatic fun main` in real projects?",
+    options: [
+      {
+        text: "Kotlin forbids top-level main without those annotations.",
+        correct: false,
+        feedback: "Top-level main works without extra annotations for normal Kotlin entrypoints.",
+      },
+      {
+        text: "Java tooling or launchers expect a specific class name or static method surface.",
+        correct: true,
+        feedback:
+          "Interop and launcher scripts sometimes require predictable JVM names — annotations adapt Kotlin’s defaults.",
+      },
+      {
+        text: "Because Kotlin cannot generate bytecode without them.",
+        correct: false,
+        feedback: "The compiler generates bytecode either way; annotations tune names and overload visibility.",
+      },
+      {
+        text: "Only Android apps need JvmName.",
+        correct: false,
+        feedback: "Android uses them often, but plain JVM services do too when Java calls Kotlin.",
+      },
+    ],
+    explanation:
+      "Interop lessons later unpack `@JvmName`, `@JvmStatic`, and default arguments — all ways Kotlin shapes the JVM view of your code.",
+  },
+};
+
+In Java, `public static void main(String[] args)` lives **inside a named class** — conventionally `Main`. Kotlin lets you declare **`fun main()` at file scope**. The compiler still emits class files the JVM can execute; you simply skip writing the hosting class by hand in most learning and service code.
+
+## Packages
+
+Kotlin uses the `package` keyword like Java. Files in `src/main/kotlin/com/example/app/Foo.kt` should declare `package com.example.app` (or a shorter segment matching directory layout, depending on your convention). **Mixed Java/Kotlin modules** share package namespaces — a Kotlin `UserRepository` and a Java `UserService` can sit side by side under `com.example`.
+
+## Entry point shapes
+
+**Default (what we use in exercises):**
+
+```kotlin
+fun main() {
+    println("Hello, Kotlin")
+}
+```
+
+**With command-line args:**
+
+```kotlin
+fun main(args: Array<String>) {
+    println(args.firstOrNull() ?: "no args")
+}
+```
+
+**Java-facing static entry (preview):**
+
+```kotlin
+class Launcher {
+    companion object {
+        @JvmStatic
+        fun main(args: Array<String>) {
+            println("Called from Java-style tooling")
+        }
+    }
+}
+```
+
+<Quiz data={quizzes.midQ} label="Entry point" />
+
+## Common mistakes
+
+- Copy-pasting Java `public class Main` into `.kt` files when learning — valid Java interop exists, but it hides Kotlin’s default ergonomics.
+- Misaligning **directory layout** and `package` declarations, which breaks tooling (IDE red code) even if a toy snippet compiles in the playground.
+
+## Recap
+
+- **`fun main()`** at top level is idiomatic Kotlin on the JVM.
+- **Packages** mirror Java’s namespacing; mixed modules share packages naturally.
+- **Annotations** adjust JVM names when Java callers or scripts need a specific shape — covered again in the interop module.
+
+<Exercise>
+
+Print **`Hello, Kotlin`** from `main` to pass the automated check.
+
+</Exercise>

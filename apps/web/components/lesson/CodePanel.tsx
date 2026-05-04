@@ -23,6 +23,7 @@ interface CodePanelProps {
   moduleSlug: string;
   starterCode: string;
   expectedOutput?: string;
+  language?: "java" | "kotlin";
 }
 
 type RunState = "idle" | "running" | "passed" | "failed" | "error";
@@ -39,7 +40,14 @@ function gradeOutput(stdout: string, expected: string): boolean {
   return got === expected.trim();
 }
 
-export function CodePanel({ lessonSlug, trackSlug, moduleSlug, starterCode, expectedOutput }: CodePanelProps) {
+export function CodePanel({
+  lessonSlug,
+  trackSlug,
+  moduleSlug,
+  starterCode,
+  expectedOutput,
+  language = "java",
+}: CodePanelProps) {
   const [code, setCode] = useState(starterCode);
   const [result, setResult] = useState<RunResult | null>(null);
   const [runState, setRunState] = useState<RunState>("idle");
@@ -72,7 +80,7 @@ export function CodePanel({ lessonSlug, trackSlug, moduleSlug, starterCode, expe
       const res = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, language }),
       });
 
       const data: RunResult & { error?: string } = await res.json();
@@ -157,7 +165,7 @@ export function CodePanel({ lessonSlug, trackSlug, moduleSlug, starterCode, expe
             className="text-xs text-prose-faint px-1.5 py-0.5 rounded-sm bg-subtle"
             style={{ fontFamily: "var(--font-mono)" }}
           >
-            java
+            {language}
           </span>
         </div>
 
@@ -188,7 +196,7 @@ export function CodePanel({ lessonSlug, trackSlug, moduleSlug, starterCode, expe
 
       {/* ── Editor ── */}
       <div className="flex-1 min-h-0 overflow-hidden" style={{ minHeight: 0 }}>
-        <CodeEditor value={code} onChange={setCode} />
+        <CodeEditor value={code} onChange={setCode} language={language} />
       </div>
 
       {/* ── Output panel ── */}

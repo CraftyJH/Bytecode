@@ -1,0 +1,77 @@
+export const meta = {
+  title: "Java Collections in Kotlin",
+  duration: 14,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m6-jvm-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "When you pass a Java `ArrayList` into Kotlin as a `MutableList`,",
+    options: [
+      { text: "Kotlin always copies into a new structure", correct: false, feedback: "Often it wraps — mutations visible both ways." },
+      {
+        text: "The underlying list may still be mutated through Java or mutable Kotlin references",
+        correct: true,
+        feedback: "Interop shares instances unless you copy.",
+      },
+      { text: "Java cannot change Kotlin lists", correct: false, feedback: "Shared references break illusions of immutability." },
+      { text: "Generics erase differently", correct: false, feedback: "Erasure rules match JVM — still interop carefully." },
+    ],
+    explanation: "Wrap or **`toList()`** when you need a snapshot.",
+  },
+  endQ1: {
+    id: "kb-m6-jvm-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.ArrayList
+
+fun main() {
+    val j = ArrayList<Int>()
+    j.add(1)
+    j.add(2)
+    val k: List<Int> = j
+    println(k.size)
+}`,
+    expectedOutput: "2",
+    explanation: "Kotlin read-only `List` view — size reflects underlying Java list.",
+  },
+  endQ2: {
+    id: "kb-m6-jvm-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "`collection.toList()` on a Kotlin `List` backed by Java typically",
+    options: [
+      { text: "Creates a new list copying elements (stdlib overload)", correct: true, feedback: "Snapshot immutability from accidental mutation." },
+      { text: "Returns the same instance always", correct: false, feedback: "Usually copies — check docs for immutable collections library variants." },
+      { text: "Fails on Java lists", correct: false, feedback: "Works — Kotlin sees Iterator." },
+      { text: "Sorts elements", correct: false, feedback: "No implicit sort." },
+    ],
+    explanation: "Know whether you need **shallow copy** or **persistent collections** for concurrency.",
+  },
+};
+
+Kotlin **maps Java collections** to Kotlin interfaces with lightweight adapters.
+
+```kotlin
+val javaList: java.util.List<String> = ArrayList()
+val kotlinList: MutableList<String> = javaList
+```
+
+Read-only views (`List`) still alias mutable backing stores unless you copy.
+
+<Quiz data={quizzes.midQ} label="Interop" />
+
+## Recap
+
+- Treat Java-returned lists as **potentially mutable** unless documented otherwise.
+- **`toList()`** snapshots when you need independence.
+
+<Exercise>
+
+Create **`ArrayList`**, add **`1`** and **`2`**, assign to **`List<Int>`**, print **`size`** (`2`).
+
+</Exercise>

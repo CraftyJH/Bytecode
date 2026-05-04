@@ -1,0 +1,80 @@
+export const meta = {
+  title: "lateinit and lazy",
+  duration: 13,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m5-late-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "`lateinit var` is appropriate when",
+    options: [
+      { text: "You never assign the property", correct: false, feedback: "That triggers `UninitializedPropertyAccessException`." },
+      {
+        text: "A non-null reference will be assigned before any read in your lifecycle, but not at construction",
+        correct: true,
+        feedback: "Common in Android/Spring wiring — still risky if lifecycle rules change.",
+      },
+      { text: "You want primitives", correct: false, feedback: "`lateinit` cannot be `Int`/`Boolean` — use nullable or delegates." },
+      { text: "You need compile-time constants", correct: false, feedback: "Use `const val` for string/primitive compile-time constants." },
+    ],
+    explanation: "Prefer **delegates** or factory patterns when possible — `lateinit` trades safety for ergonomics.",
+  },
+  endQ1: {
+    id: "kb-m5-late-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `val heavy: String by lazy {
+    println("init")
+    "done"
+}
+
+fun main() {
+    println(heavy)
+    println(heavy)
+}`,
+    expectedOutput: "init\ndone\ndone",
+    explanation: "`lazy` runs initializer once; second access skips init block.",
+  },
+  endQ2: {
+    id: "kb-m5-late-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "How do you test whether a `lateinit` property was assigned?",
+    options: [
+      { text: "`::prop.isInitialized` (receiver-aware)", correct: true, feedback: "Reflection-backed check — use sparingly in tests." },
+      { text: "`prop == null`", correct: false, feedback: "`lateinit` is non-null at type level." },
+      { text: "`prop != null`", correct: false, feedback: "Same issue — not nullable." },
+      { text: "You cannot test", correct: false, feedback: "Kotlin exposes initialization checks for lateinit properties." },
+    ],
+    explanation: "Usually fix lifecycle so uninitialized reads cannot happen — checks are a safety net.",
+  },
+};
+
+**`lateinit`** delays assignment for non-null **reference** types:
+
+```kotlin
+lateinit var service: PaymentService
+```
+
+**`lazy`** delegates compute a value on first access:
+
+```kotlin
+private val schema: JsonSchema by lazy { loadSchema() }
+```
+
+<Quiz data={quizzes.midQ} label="lateinit" />
+
+## Recap
+
+- **`lateinit`**: promise you will assign before read — errors at runtime if broken.
+- **`lazy`**: thread-safe (by default) memoization for `val`.
+
+<Exercise>
+
+Wire **`Host.name`** through **`lateinit`** and print **`up`** after **`ready()`**.
+
+</Exercise>

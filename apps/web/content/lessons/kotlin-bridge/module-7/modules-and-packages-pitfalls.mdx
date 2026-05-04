@@ -1,0 +1,68 @@
+export const meta = {
+  title: "Visibility: internal and Java",
+  duration: 13,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m7-vis-mid",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "`internal` in Kotlin means",
+    options: [
+      { text: "private to a file", correct: false, feedback: "That is `private` at top level or in class." },
+      { text: "visible within the same module (Gradle module / Maven module)", correct: true, feedback: "Not the same as Java package-private." },
+      { text: "visible to Java automatically", correct: false, feedback: "Java in another module cannot access Kotlin `internal` APIs." },
+      { text: "deprecated", correct: false, feedback: "Actively used for module boundaries." },
+    ],
+    explanation: "Great for hiding implementation details inside a library artifact.",
+  },
+  endQ1: {
+    id: "kb-m7-vis-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `internal data class Token(val id: Int)
+
+fun main() {
+    println(Token(5).id)
+}`,
+    expectedOutput: "5",
+    explanation: "`internal` still accessible inside same module — typical lesson layout single module.",
+  },
+  endQ2: {
+    id: "kb-m7-vis-end2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Java **package-private** (`no modifier`) maps **closest** to Kotlin",
+    options: [
+      { text: "`private`", correct: false, feedback: "Too strict — file or class private." },
+      { text: "`internal` or explicit `public` API + hide packages", correct: true, feedback: "No exact match — design module boundaries instead." },
+      { text: "`protected`", correct: false, feedback: "Subclass visibility — different." },
+      { text: "`open`", correct: false, feedback: "Inheritance modifier." },
+    ],
+    explanation: "Use **`internal`** plus Gradle modules to emulate JPMS-like boundaries on older stacks.",
+  },
+};
+
+**`public`** is the default in Kotlin (watch Java habits — package privacy does not exist the same way).
+
+**`internal`** shrinks API surface to a **module**.
+
+**`private`** at file top-level hides helpers inside that file.
+
+When mixing Java and Kotlin in one Gradle module, **`internal`** still protects against Java in **other** modules — within same module, Java can access Kotlin `internal` via synthetic accessors (compiler-dependent rules) — treat **`internal`** as team-wide for a module.
+
+<Quiz data={quizzes.midQ} label="Visibility" />
+
+## Recap
+
+- **`internal`** expresses artifact boundaries — not Java package boundaries.
+- Plan library APIs deliberately — Java consumers see **`public`** Kotlin members most clearly.
+
+<Exercise>
+
+Print **`id`** from an **`internal`** **`Token`** (`5`).
+
+</Exercise>

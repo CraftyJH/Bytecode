@@ -1,0 +1,74 @@
+export const meta = {
+  title: "Sequences: Lazy Pipelines",
+  duration: 14,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m6-seq-mid",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When are Kotlin Sequences preferable to Lists for intermediate pipeline steps?",
+    options: [
+      {
+        text: "When you chain map/filter on large sources and can avoid materializing every intermediate list",
+        correct: true,
+        feedback: "Lazy evaluation can short-circuit (`take`, `firstOrNull`).",
+      },
+      { text: "Always — sequences are always faster", correct: false, feedback: "Small collections may be faster eagerly." },
+      { text: "Never — use only Streams from Java", correct: false, feedback: "Kotlin sequences are first-class." },
+      { text: "Only on Android", correct: false, feedback: "General JVM concern." },
+    ],
+    explanation: "Profile — laziness helps most when pipelines are deep or infinite sources are conceptual.",
+  },
+  endQ1: {
+    id: "kb-m6-seq-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val x = (1..1000).asSequence()
+        .filter { it % 2 == 0 }
+        .take(3)
+        .sum()
+    println(x)
+}`,
+    expectedOutput: "12",
+    explanation: "First three evens 2,4,6 sum to 12.",
+  },
+  endQ2: {
+    id: "kb-m6-seq-end2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What operation forces a Sequence to execute?",
+    options: [
+      { text: "Intermediate calls like `map`", correct: false, feedback: "They stay lazy." },
+      { text: "Terminal operations like `toList`, `sum`, `first`", correct: true, feedback: "Triggers iteration." },
+      { text: "`println` on the sequence object itself", correct: false, feedback: "Does not walk elements." },
+      { text: "Declaring `val`", correct: false, feedback: "No." },
+    ],
+    explanation: "Same intuition as Java Streams — **terminals** matter.",
+  },
+};
+
+**`Sequence<T>`** is lazy. Intermediate ops build a recipe; **terminal** ops run it.
+
+```kotlin
+val firstBig = items.asSequence()
+    .map { expensive(it) }
+    .first { it.score > 0.9 }
+```
+
+<Quiz data={quizzes.midQ} label="Sequences" />
+
+## Recap
+
+- Use **`asSequence()`** when chaining many passes over large data or when **`take`** early-stops work.
+- Remember **single-pass** behavior — cannot iterate the same sequence twice without rebuilding.
+
+<Exercise>
+
+Sum the **first three even** numbers from `1..1000` using **`asSequence`**, **`filter`**, **`take`**, **`sum`** (`12`).
+
+</Exercise>

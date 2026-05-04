@@ -1,0 +1,101 @@
+export const meta = {
+  title: "if and when as Expressions",
+  duration: 15,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m2-when-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "In Kotlin, `if` can be used as an expression. What does that mean?",
+    options: [
+      { text: "It always returns `Unit`", correct: false, feedback: "Expression `if` produces a value when branches align on types." },
+      { text: "It can return a value without a separate `return` in each branch (when used as an expression)", correct: true, feedback: "Both branches must cover all cases the type checker needs." },
+      { text: "It cannot contain `else`", correct: false, feedback: "The `else` is required when the expression form needs exhaustiveness for `if`." },
+      { text: "It is identical to Java ternary", correct: false, feedback: "Ternary is `cond ? a : b` in Java; Kotlin uses `if (c) a else b` for the same job." },
+    ],
+    explanation: "Expression `if` replaces many ternaries; `when` often replaces `switch` with smarter exhaustiveness for sealed types and enums later.",
+  },
+  endQ1: {
+    id: "kb-m2-when-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val x = 2
+    val s = if (x > 1) "a" else "b"
+    println(s)
+}`,
+    expectedOutput: "a",
+    explanation: "Condition true → first branch, prints `a`.",
+  },
+  endQ2: {
+    id: "kb-m2-when-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is a common Kotlin replacement for Java `switch (day)` on enums?",
+    options: [
+      { text: "Only chained `if` statements", correct: false, feedback: "`when` is idiomatic." },
+      { text: "`when (day) { ... }` with branches per enum constant", correct: true, feedback: "Exhaustiveness can be checked when the subject is sealed or enum-like." },
+      { text: "`match` keyword", correct: false, feedback: "Kotlin does not use `match`." },
+      { text: "`goto`", correct: false, feedback: "Not available." },
+    ],
+    explanation: "`when` supports subjects, guards, and expression forms — more flexible than Java `switch`.",
+  },
+};
+
+Java’s ternary operator has one Kotlin counterpart in **`if` expressions**:
+
+```kotlin
+val label = if (score >= 90) "A" else "B"
+```
+
+Multi-branch logic uses **`when`**. Unlike Java `switch`, `when` can be **expression-valued** and supports guards:
+
+```kotlin
+val grade = when {
+    score >= 90 -> "A"
+    score >= 80 -> "B"
+    else -> "C"
+}
+```
+
+## Subject vs subject-less `when`
+
+```kotlin
+when (x) {
+    0 -> println("zero")
+    in 1..9 -> println("digit")
+    else -> println("other")
+}
+```
+
+vs.
+
+```kotlin
+when {
+    x == 0 -> ...
+    x in 1..9 -> ...
+    else -> ...
+}
+```
+
+<Quiz data={quizzes.midQ} label="Expressions" />
+
+## Common mistakes
+
+- Mixing **statement** `if` (with side effects only) and **expression** `if` — compiler errors when branch types mismatch.
+- Forgetting **`else`** in expression `when` when the compiler cannot prove exhaustiveness.
+
+## Recap
+
+- **`if` as expression** replaces most Java ternaries cleanly with readable branching.
+- **`when`** generalizes `switch` with richer matching — sealed hierarchies later unlock compiler-checked completeness.
+
+<Exercise>
+
+Given `score = 85`, print **`B`** using the `when` expression pattern shown in the starter (ranges already wired).
+
+</Exercise>

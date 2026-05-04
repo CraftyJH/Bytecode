@@ -1,0 +1,95 @@
+export const meta = {
+  title: "Classes and Constructors",
+  duration: 15,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m4-cls-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "In Kotlin, the concise `class User(val name: String)` constructor is called the",
+    options: [
+      { text: "secondary constructor", correct: false, feedback: "Additional constructors use `constructor` keyword." },
+      { text: "primary constructor (part of the class header)", correct: true, feedback: "Properties can be declared in the parameter list." },
+      { text: "static constructor", correct: false, feedback: "Not a Kotlin term." },
+      { text: "default constructor only for data classes", correct: false, feedback: "All classes can use this form." },
+    ],
+    explanation: "The primary constructor parameters can declare `val`/`var` properties directly.",
+  },
+  endQ1: {
+    id: "kb-m4-cls-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `class Box(val value: Int)
+
+fun main() {
+    println(Box(7).value)
+}`,
+    expectedOutput: "7",
+    explanation: "Property `value` exposed by primary ctor parameter with `val`.",
+  },
+  endQ2: {
+    id: "kb-m4-cls-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Where does initialization code that must run after primary ctor parameters belong?",
+    options: [
+      { text: "`init` blocks (possibly multiple)", correct: true, feedback: "Executed when an instance is constructed." },
+      { text: "Only inside companion objects", correct: false, feedback: "Companion is separate from instance init." },
+      { text: "Inside interfaces", correct: false, feedback: "Interfaces cannot hold instance state like `init` blocks." },
+      { text: "Inside package declarations", correct: false, feedback: "Packages do not execute code." },
+    ],
+    explanation: "`init` blocks pair with property initializers in construction order rules.",
+  },
+};
+
+Kotlin collapses Java’s constructor boilerplate:
+
+```kotlin
+class User(val name: String, val id: Long)
+```
+
+This declares **properties** and assigns them from parameters automatically.
+
+## `init` blocks
+
+Use **`init { ... }`** for validation or derived setup:
+
+```kotlin
+class Email(raw: String) {
+    val normalized: String
+
+    init {
+        require(raw.contains("@")) { "not an email" }
+        normalized = raw.trim().lowercase()
+    }
+}
+```
+
+## Secondary constructors
+
+Rare when defaults + factory helpers cover cases:
+
+```kotlin
+class Person(val name: String) {
+    constructor(full: String, age: Int) : this("$full ($age)") { ... }
+}
+```
+
+Prefer **named factory functions** (`fun Person.adult(...)`) when readability wins.
+
+<Quiz data={quizzes.midQ} label="Constructors" />
+
+## Recap
+
+- **Primary constructor** parameters can declare `val`/`var` properties.
+- **`init`** covers extra instance initialization logic.
+
+<Exercise>
+
+Use the **`User`** class so the program prints **`Ann:1`** (name, colon, id) from the values in the starter.
+
+</Exercise>

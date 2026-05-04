@@ -1,0 +1,76 @@
+export const meta = {
+  title: "object, Singleton, and companion",
+  duration: 15,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m4-obj-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does `object Counter { ... }` declare?",
+    options: [
+      { text: "A class that must be instantiated with `new`", correct: false, feedback: "`object` is a singleton — one instance." },
+      { text: "A singleton instance with optional methods/properties", correct: true, feedback: "Lazy singleton initialization rules apply." },
+      { text: "An interface", correct: false, feedback: "Different keyword." },
+      { text: "A Java package", correct: false, feedback: "Packages use `package`." },
+    ],
+    explanation: "Under the JVM you still get a class, but Kotlin exposes a single instance.",
+  },
+  endQ1: {
+    id: "kb-m4-obj-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `class Host {
+    companion object {
+        fun ping() = "ok"
+    }
+}
+
+fun main() {
+    println(Host.ping())
+}`,
+    expectedOutput: "ok",
+    explanation: "`companion object` holds class-scoped members; call with `Host.ping()` from Kotlin.",
+  },
+  endQ2: {
+    id: "kb-m4-obj-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "How do Java callers typically see `companion object` members?",
+    options: [
+      { text: "Automatically as static methods", correct: false, feedback: "Sometimes — annotate with `@JvmStatic` for cleaner Java calls." },
+      { text: "Via `Companion` unless annotated (`@JvmStatic`, `@JvmField`)", correct: true, feedback: "Interop chapter revisits names." },
+      { text: "They cannot call them", correct: false, feedback: "Interop exists with naming glue." },
+      { text: "Only through reflection", correct: false, feedback: "Normal calls work." },
+    ],
+    explanation: "Kotlin generates nested `Companion` class; annotations polish Java ergonomics.",
+  },
+};
+
+**`object`** declares a singleton — one instance for the whole program (classloader scoped).
+
+**`companion object`** is a singleton tied to an outer class — replaces many Java `static` utilities while still allowing inheritance hooks.
+
+```kotlin
+class Factory {
+    companion object {
+        fun newId(): Long = System.nanoTime()
+    }
+}
+```
+
+<Quiz data={quizzes.midQ} label="object" />
+
+## Recap
+
+- **`object`**: module-level singleton.
+- **`companion object`**: class-scoped singleton for static-ish members.
+
+<Exercise>
+
+Increment **`Hits.count`** twice and print **`2`**.
+
+</Exercise>

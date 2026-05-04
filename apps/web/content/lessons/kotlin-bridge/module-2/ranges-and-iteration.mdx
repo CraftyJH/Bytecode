@@ -1,0 +1,92 @@
+export const meta = {
+  title: "Ranges and Iteration",
+  duration: 14,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m2-rng-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which Kotlin range includes both endpoints `1` and `10`?",
+    options: [
+      { text: "`1 until 10`", correct: false, feedback: "`until` excludes the upper bound." },
+      { text: "`1..10`", correct: true, feedback: "Inclusive on both ends." },
+      { text: "`1...10`", correct: false, feedback: "Triple-dot is not Kotlin range syntax." },
+      { text: "`range(1,10)` without imports", correct: false, feedback: "Use `..` / `until` operators." },
+    ],
+    explanation: "`..` is inclusive; `until` stops before the upper bound.",
+  },
+  endQ1: {
+    id: "kb-m2-rng-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    println((1..3).sum())
+}`,
+    expectedOutput: "6",
+    explanation: "1+2+3 = 6 via `sum()` on `IntProgression`.",
+  },
+  endQ2: {
+    id: "kb-m2-rng-end2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Loop variable `i` over inclusive 1..5 using Kotlin `for` syntax:",
+    code: "for (i ___ 1..5) { }",
+    correctAnswers: ["in"],
+    caseSensitive: true,
+    explanation: "`for (x in range)` is idiomatic — Java uses enhanced `for` over `Iterable` conceptually.",
+  },
+};
+
+Ranges are lightweight **`IntRange`** / **`CharRange`** values — not Java streams unless you convert.
+
+## Core operators
+
+- **`a..b`**: inclusive both ends.
+- **`a until b`**: includes `a`, excludes `b`.
+- **`step`**: adjust stride (`1..10 step 2`).
+
+## Iteration
+
+```kotlin
+for (i in 1..5) {
+    println(i)
+}
+```
+
+Indices over arrays/lists:
+
+```kotlin
+for (i in arr.indices) {
+    println("${i}: ${arr[i]}")
+}
+```
+
+Or values with index via `withIndex()`:
+
+```kotlin
+for ((idx, value) in arr.withIndex()) {
+    println("$idx -> $value")
+}
+```
+
+<Quiz data={quizzes.midQ} label="Ranges" />
+
+## Common mistakes
+
+- Using **`until`** when you meant inclusive upper bound — off-by-one bugs migrating from Java `for (i=0;i<n;i++)`.
+- Confusing **`downTo`** / **`reversed()`** — descending loops need explicit intent.
+
+## Recap
+
+- **`..` vs `until`** control inclusivity.
+- **`for (x in …)`** replaces many indexed Java loops when you only need elements.
+
+<Exercise>
+
+Sum integers **1 through 5** inclusive using a `for` loop and `range`, printing **`15`**.
+
+</Exercise>

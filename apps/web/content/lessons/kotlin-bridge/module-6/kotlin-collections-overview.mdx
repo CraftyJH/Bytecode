@@ -1,0 +1,75 @@
+export const meta = {
+  title: "Kotlin Collections: Read-Only vs Mutable",
+  duration: 14,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m6-col-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does `listOf(1, 2, 3)` return?",
+    options: [
+      { text: "MutableList<Int>", correct: false, feedback: "Use `mutableListOf` for mutability." },
+      { text: "List<Int> backed by an immutable implementation", correct: true, feedback: "Read-only interface — do not cast to mutable." },
+      { text: "Java ArrayList", correct: false, feedback: "Implementation detail hidden behind Kotlin interfaces." },
+      { text: "Array<Int>", correct: false, feedback: "Lists vs arrays differ." },
+    ],
+    explanation: "Expose `List`/`Set`/`Map` from APIs; keep mutable cousins internal.",
+  },
+  endQ1: {
+    id: "kb-m6-col-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val a = mutableListOf(1, 2)
+    a += 3
+    println(a.sum())
+}`,
+    expectedOutput: "6",
+    explanation: "`+=` overload mutates `MutableList`.",
+  },
+  endQ2: {
+    id: "kb-m6-col-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why avoid returning `MutableList` from public Kotlin APIs?",
+    options: [
+      {
+        text: "Callers can change your internal state unless you defensively copy",
+        correct: true,
+        feedback: "Return read-only `List` views and copy on write at boundaries if needed.",
+      },
+      { text: "MutableList is slower", correct: false, feedback: "Not the main reason — encapsulation is." },
+      { text: "It does not exist on the JVM", correct: false, feedback: "It does." },
+      { text: "Java cannot see it", correct: false, feedback: "Java sees raw types; design for safe contracts anyway." },
+    ],
+    explanation: "Same spirit as Java returning `Collections.unmodifiableList` — but Kotlin types express intent earlier.",
+  },
+};
+
+**`listOf` / `setOf` / `mapOf`**: read-only **interfaces**.
+
+**`mutableListOf` / `mutableSetOf` / `mutableMapOf`**: live mutating structures.
+
+```kotlin
+val items = mutableListOf<String>()
+items += "a"
+```
+
+When interoping with Java, a `List` might be backed by an **ArrayList** — still treat it as read-only in Kotlin to avoid surprise mutation.
+
+<Quiz data={quizzes.midQ} label="Collections" />
+
+## Recap
+
+- Prefer **read-only** types in signatures.
+- **Copy** defensively when you must guarantee immutability across module boundaries.
+
+<Exercise>
+
+Add **`3`** to a **mutable** list starting `[1,2]` and print the **sum** (`6`).
+
+</Exercise>

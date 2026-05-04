@@ -105,8 +105,14 @@ export default async function LessonPage({ params }: LessonPageProps) {
             lessonSlug={lessonSlug}
             trackSlug={trackSlug}
             moduleSlug={moduleSlug}
-            starterCode={lesson.starterCode ?? "public class Main {\n    public static void main(String[] args) {\n        // write your code here\n    }\n}"}
+            starterCode={
+              lesson.starterCode ??
+              (lesson.language === "kotlin"
+                ? "fun main() {\n    // write your code here\n}\n"
+                : "public class Main {\n    public static void main(String[] args) {\n        // write your code here\n    }\n}")
+            }
             expectedOutput={lesson.expectedOutput}
+            language={lesson.language ?? "java"}
           />
         }
       >

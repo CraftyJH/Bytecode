@@ -1,0 +1,90 @@
+export const meta = {
+  title: "Functions: Defaults, Named Arguments, Unit",
+  duration: 14,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m3-fn-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is Kotlin's name for “no meaningful return value” at the type level?",
+    options: [
+      { text: "void", correct: false, feedback: "Java keyword; Kotlin uses `Unit`." },
+      { text: "Unit", correct: true, feedback: "A singleton type; functions without a declared return default to `Unit`." },
+      { text: "Nothing", correct: false, feedback: "`Nothing` is the bottom type for functions that never return normally." },
+      { text: "Any", correct: false, feedback: "`Any` is the top of the type hierarchy, not void." },
+    ],
+    explanation: "`Unit` corresponds to `void` in spirit but is a real type you can name explicitly.",
+  },
+  endQ1: {
+    id: "kb-m3-fn-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun line(prefix: String = "> ") = prefix + "go"
+
+fun main() {
+    println(line())
+    println(line(prefix = ":: "))
+}`,
+    expectedOutput: "> go\n:: go",
+    explanation: "Default parameter used first; named argument overrides `prefix`.",
+  },
+  endQ2: {
+    id: "kb-m3-fn-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why do default parameters matter for Java interop (`@JvmOverloads` coming later)?",
+    options: [
+      { text: "Java has no way to call Kotlin default parameters without overloads or annotations", correct: true, feedback: "The JVM sees overloads you generate or annotations that synthesize them." },
+      { text: "Java ignores Kotlin entirely", correct: false, feedback: "Interop is supported with naming hooks." },
+      { text: "Defaults work automatically for every Java caller", correct: false, feedback: "Not without compiler help." },
+      { text: "Defaults only apply on Android", correct: false, feedback: "General JVM issue." },
+    ],
+    explanation: "Java callers need explicit overloads or `@JvmOverloads` — covered in the interop module.",
+  },
+};
+
+Top-level **`fun`** replaces many `public static` utility methods in Java. Place helpers in a file without a wrapper class — the compiler still maps names for the JVM.
+
+## Default and named arguments
+
+```kotlin
+fun connect(host: String = "localhost", port: Int = 8080) { ... }
+
+connect()                       // both defaults
+connect(port = 9000)            // host default, name the port
+connect(host = "db.internal")   // partial override with clarity at call site
+```
+
+## Single-expression functions
+
+```kotlin
+fun double(x: Int): Int = x * 2
+// or
+fun double(x: Int) = x * 2
+```
+
+## `Unit`
+
+If you omit a return type and use block body without `return`, Kotlin infers **`Unit`**.
+
+<Quiz data={quizzes.midQ} label="Functions" />
+
+## Common mistakes
+
+- Expecting Java callers to see default parameters without **`@JvmOverloads`** or explicit overloads.
+- Returning **`Unit`** accidentally from branchy lambdas when you meant a value — watch last-expression rules.
+
+## Recap
+
+- **Defaults + named args** cut overload explosion compared to Java.
+- **`Unit`** is Kotlin’s “no value” for typing purposes.
+
+<Exercise>
+
+Implement **`greet`** so `greet()` prints **`Hello, World`** and `greet("Kotlin")` prints **`Hello, Kotlin`**.
+
+</Exercise>

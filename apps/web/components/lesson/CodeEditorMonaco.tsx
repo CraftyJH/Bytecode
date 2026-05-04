@@ -44,12 +44,13 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  language?: "java" | "kotlin";
 }
 
-export function CodeEditor({ value, onChange, readOnly = false }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, readOnly = false, language = "java" }: CodeEditorProps) {
   return (
     <Editor
-      language="java"
+      language={language === "kotlin" ? "kotlin" : "java"}
       value={value}
       theme={BYTECODE_THEME}
       onChange={(v) => onChange(v ?? "")}

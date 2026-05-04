@@ -1,0 +1,87 @@
+export const meta = {
+  title: "Properties and Custom Accessors",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m4-prop-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Inside a custom getter/setter, how do you reach the backing field?",
+    options: [
+      { text: "`this.field`", correct: false, feedback: "Use Kotlin's `field` identifier." },
+      { text: "`field`", correct: true, feedback: "Only available in accessors for the property — compiler-provided." },
+      { text: "`backing`", correct: false, feedback: "Not a keyword." },
+      { text: "`super.field`", correct: false, feedback: "Wrong mechanism here." },
+    ],
+    explanation: "`field` avoids recursive accessor calls when mutating stored state.",
+  },
+  endQ1: {
+    id: "kb-m4-prop-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `var counter: Int = 0
+    private set
+
+fun bump() { counter++ }
+
+fun main() {
+    bump()
+    bump()
+    println(counter)
+}`,
+    expectedOutput: "2",
+    explanation: "Custom visibility on setter — external code cannot assign directly.",
+  },
+  endQ2: {
+    id: "kb-m4-prop-end2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `var value: Int = 0
+    get() = field + 1
+
+fun main() {
+    value = 5
+    println(value)
+}`,
+    buggyLine: 2,
+    issue: "Custom getter returns `field + 1` — each read adds one, not the stored 5 new users expect",
+    explanation: "Document computed getters; reading `value` runs custom logic — may surprise Java-style expectations.",
+  },
+};
+
+Properties replace many Java **getter/setter** pairs:
+
+```kotlin
+var name: String = ""
+```
+
+Custom accessors:
+
+```kotlin
+var raw: String = ""
+    get() = field.trim()
+    set(v) {
+        field = v.trim()
+    }
+```
+
+## Backing `field`
+
+Use **`field`** only inside accessors for the same property — not arbitrary methods.
+
+<Quiz data={quizzes.midQ} label="Properties" />
+
+## Recap
+
+- **Properties** are first-class; accessors compile to JVM methods (`getX`/`setX`) for Java interop.
+- **`field`** references the stored slot without recursion.
+
+<Exercise>
+
+Run **`Counter`** so **`inc`** increases internal state and **`println(c.value)`** outputs **`2`**.
+
+</Exercise>

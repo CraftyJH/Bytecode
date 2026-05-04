@@ -26,6 +26,7 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  language?: "java" | "kotlin";
 }
 
 export function CodeEditor(props: CodeEditorProps) {
@@ -40,5 +41,5 @@ export function CodeEditor(props: CodeEditorProps) {
   }, []);
 
   if (isDesktop === null) return Spinner;
-  return isDesktop ? <MonacoEditor {...props} /> : <CmEditor {...props} />;
+  return isDesktop ? <MonacoEditor {...props} /> : <CmEditor {...props} language={props.language} />;
 }

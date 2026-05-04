@@ -1,0 +1,66 @@
+export const meta = {
+  title: "groupBy, partition, associate",
+  duration: 15,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m6-grp-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "`partition { predicate }` returns",
+    options: [
+      { text: "A single list", correct: false, feedback: "Two lists: matching vs non-matching." },
+      { text: "Pair<List, List> split by predicate", correct: true, feedback: "Useful for splitting successes/failures." },
+      { text: "A Map", correct: false, feedback: "That is `groupBy`." },
+      { text: "A Set", correct: false, feedback: "Lists preserve order and duplicates." },
+    ],
+    explanation: "`partition` is strict boolean splitting — linear cost.",
+  },
+  endQ1: {
+    id: "kb-m6-grp-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val nums = listOf(1, 2, 3, 4)
+    val g = nums.groupBy { it % 2 }
+    println(g[0]?.size)
+}`,
+    expectedOutput: "2",
+    explanation: "Evens are 2 and 4 → size 2.",
+  },
+  endQ2: {
+    id: "kb-m6-grp-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "`associate { key to value }` is helpful when",
+    options: [
+      { text: "You want duplicates merged by last-wins semantics unless grouped", correct: true, feedback: "Maps require unique keys — know your collision policy." },
+      { text: "You need sorted output", correct: false, feedback: "Sorting is separate (`sortedBy`)." },
+      { text: "You must preserve duplicate keys", correct: false, feedback: "Maps cannot — use `groupBy`." },
+      { text: "You only have primitives", correct: false, feedback: "Works for any types." },
+    ],
+    explanation: "Pick `groupBy` vs `associate` based on key cardinality and duplicates policy.",
+  },
+};
+
+**`groupBy`**: `List<T>` → `Map<K, List<T>>`.
+
+**`partition`**: split into pass/fail buckets.
+
+**`associate` / `associateWith` / `associateBy`**: build maps from collection elements.
+
+<Quiz data={quizzes.midQ} label="groupBy" />
+
+## Recap
+
+- **`groupBy`** answers “give me buckets”.
+- **`partition`** answers “two piles: yes/no”.
+
+<Exercise>
+
+Count **even** numbers using **`groupBy { it % 2 }`** and the list mapped to key **`0`** — print **`3`** for `1..6`.
+
+</Exercise>

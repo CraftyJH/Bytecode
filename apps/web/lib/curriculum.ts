@@ -1,9 +1,13 @@
+import { kotlinBridgeModules } from "./kotlin-bridge-modules";
+
 export interface LessonMeta {
   slug: string;
   title: string;
   order: number;
   duration: number; // minutes
   isPremium: boolean;
+  /** Playground language for Judge0. Defaults to Java when omitted. */
+  language?: "java" | "kotlin";
   starterCode?: string;
   expectedOutput?: string; // used for auto-grading; undefined = no grading
 }
@@ -4180,7 +4184,7 @@ public class Main {
     order: 4,
     isPremium: true,
     tagline: "Java → Kotlin for experienced developers.",
-    modules: [],
+    modules: kotlinBridgeModules,
   },
   {
     slug: "kotlin-advanced",

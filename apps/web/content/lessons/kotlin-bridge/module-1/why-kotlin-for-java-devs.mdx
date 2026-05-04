@@ -1,0 +1,125 @@
+export const meta = {
+  title: "Why Kotlin for Java Developers?",
+  duration: 14,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m1-why-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question:
+      "Which statement best matches Kotlin's usual selling points for teams already on the JVM?",
+    options: [
+      {
+        text: "Kotlin replaces the JVM bytecode model entirely.",
+        correct: false,
+        feedback: "Kotlin on the JVM still compiles to JVM bytecode and runs on the same stack as Java.",
+      },
+      {
+        text: "More concise, safer null handling, and first-class interop with existing Java code.",
+        correct: true,
+        feedback:
+          "Correct — most teams adopt Kotlin where it smooths day-to-day work while reusing Java libraries and skills.",
+      },
+      {
+        text: "Kotlin cannot call Java code without a separate bridge process.",
+        correct: false,
+        feedback: "The same process can load Java and Kotlin classes; interop is a language design focus.",
+      },
+      {
+        text: "Coroutines are required before you can run any Kotlin on the server.",
+        correct: false,
+        feedback: "You can write plain Kotlin on the JVM without coroutines. Concurrency is optional.",
+      },
+    ],
+    explanation:
+      "Kotlin targets pragmatic gains for JVM shops: less boilerplate than Java, built-in null safety, and smooth coexistence with Java sources and libraries.",
+    hint: "Think about what migrating teams keep versus what they gain.",
+  },
+  endQ1: {
+    id: "kb-m1-why-end1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question:
+      "Where do Gradle Kotlin DSL and JetBrains tooling typically fit when learning Kotlin from Java?",
+    options: [
+      {
+        text: "They are unrelated to Kotlin-the-language.",
+        correct: false,
+        feedback: "Build scripts are written in Kotlin DSL — useful context even if you stay shallow.",
+      },
+      {
+        text: "They are practical wrappers around compiling and running Kotlin next to Java.",
+        correct: true,
+        feedback: "You edit Kotlin sources with IDE support and build with the same ecosystem you already use.",
+      },
+      {
+        text: "You must use Maven; Gradle is not supported for Kotlin.",
+        correct: false,
+        feedback: "Both Maven and Gradle support Kotlin; Bytecode leans on Gradle in early lessons for consistency.",
+      },
+      {
+        text: "The Kotlin plugin only works on non-JVM platforms.",
+        correct: false,
+        feedback: "JVM is the primary target for this track.",
+      },
+    ],
+    explanation:
+      "Tooling is part of the story: the language, the compiler, and the build all work together on the JVM you already know.",
+  },
+  endQ2: {
+    id: "kb-m1-why-end2",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val message = "Kotlin"
+    println(message.length)
+}`,
+    expectedOutput: "6",
+    explanation: "`message` is a String; `length` is a property in Kotlin (backed by `length()` for Java interop) and returns 6 for `Kotlin`.",
+  },
+};
+
+If you already ship Java, you are not starting from zero. **Kotlin** is another language for the same runtime: the JVM, the same class files, the same libraries, and the same deployment story. The difference is ergonomic — fewer ceremonies for common tasks — and **null safety** woven into the type system instead of bolted on with annotations alone.
+
+This track (**Kotlin Bridge**) assumes you are comfortable with Java basics through collections and objects. We compare idioms side by side so you can translate mental models, not memorize keywords in isolation.
+
+<Note>
+  **Technical baseline for this track:** Kotlin **2.x** language features where noted, **JVM target** aligned with **Java 21**, and the **Kotlin standard library** before frameworks. Execution in the playground uses Judge0’s Kotlin/JVM runtime — minor version differences may apply; lesson exercises stick to stable syntax.
+</Note>
+
+## What Kotlin adds on top of Java interop
+
+- **Concision**: Data-heavy code often shrinks because getters, `equals`/`hashCode`, and builders collapse into language features like data classes and default arguments.
+- **Nullability in types**: `String` vs `String?` is tracked by the compiler so many null-pointer failures become compile-time errors.
+- **Expression-oriented control flow**: `if` and `when` can be expressions, which pairs well with `val` and single-assignment style.
+- **Extension functions**: You can add namespaced helpers without subclassing (with different dispatch rules than Java instance methods — we cover that later).
+
+What we **defer** to **Kotlin Advanced**: coroutines, multiplatform, compiler plugins, and deep reflection. You will see pointers so you know where to go next.
+
+<Quiz data={quizzes.midQ} label="Check-in" />
+
+## How this track is organized
+
+Each module maps a Java habit to a Kotlin idiom, then gives you a small exercise in the **playground** (Kotlin on the right, like Java lessons). The editor runs on **Kotlin/JVM** — the same conceptual output you would get from a local `main` function.
+
+## Common migration mistakes (preview)
+
+- Treating Kotlin **extension functions** like overridden Java methods (they are not dynamically dispatched the same way).
+- Using `!!` to silence nullability instead of modeling `?` and `let` / early returns.
+- Exposing **mutable** collection types from public APIs when Kotlin’s read-only views would be safer.
+
+## Recap
+
+- Kotlin targets the **JVM** you already use; interop with Java is a first-class design goal.
+- This track is **translation-focused** for experienced Java developers, not a second beginner course.
+- **Coroutines and advanced topics** are out of scope here but pointed to explicitly.
+
+<Exercise>
+
+Complete the **playground** exercise: print the two lines **`Kotlin Bridge`** then **`JVM 21 baseline`** exactly so the grader matches expected output.
+
+</Exercise>

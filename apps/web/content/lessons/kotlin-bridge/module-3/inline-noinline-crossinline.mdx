@@ -1,0 +1,71 @@
+export const meta = {
+  title: "inline, noinline, and crossinline (Essentials)",
+  duration: 13,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m3-inl-mid",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the primary purpose of marking a higher-order function `inline` in Kotlin?",
+    options: [
+      { text: "Make runtime slower", correct: false, feedback: "Inlining removes call overhead in many cases." },
+      { text: "Copy function bytecode into call sites so lambdas need not allocate", correct: true, feedback: "Also enables non-local returns from lambdas with care." },
+      { text: "Disable lambdas entirely", correct: false, feedback: "Lambdas still exist — behavior changes at compile time." },
+      { text: "Force JavaScript compilation", correct: false, feedback: "JVM-focused feature here." },
+    ],
+    explanation: "`inline` is pervasive in the standard library (`let`, `run`, `apply`, collection ops).",
+  },
+  endQ1: {
+    id: "kb-m3-inl-end1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which parameter marker prevents inlining a particular lambda argument?",
+    options: [
+      { text: "`crossinline`", correct: false, feedback: "`crossinline` forbids non-local returns from lambdas passed into other contexts." },
+      { text: "`noinline`", correct: true, feedback: "Keeps the lambda as a real object — needed when storing or passing it onward." },
+      { text: "`external`", correct: false, feedback: "Used for JNI/native declarations." },
+      { text: "`suspend`", correct: false, feedback: "Coroutine marker — different topic." },
+    ],
+    explanation: "`noinline` opts specific lambdas out of inlining.",
+  },
+  endQ2: {
+    id: "kb-m3-inl-end2",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val f: (Int) -> Int = { it * 2 }
+    println(listOf(1, 2, 3).map(f).sum())
+}`,
+    expectedOutput: "12",
+    explanation: "Doubling each element then summing: 2+4+6 = 12.",
+  },
+};
+
+You do not need to author **`inline`** APIs day one — you need to **recognize** them in stdlib signatures and know why stack traces sometimes show duplicated lines.
+
+## Mental model
+
+- **`inline`**: compiler copies the function body at call sites; lambdas become plain bytecode without an extra `Function` object (often).
+- **`noinline`**: opt a lambda out when you must store it or pass it as a value.
+- **`crossinline`**: lambda cannot use non-local `return` because it might execute in another execution context.
+
+## Why it matters for Java devs
+
+Library authors use **inline** to keep higher-order helpers (`with`, `use`, `measureTimeMillis`) cheap. When debugging, read source knowing calls may not appear as separate frames.
+
+<Quiz data={quizzes.midQ} label="inline basics" />
+
+## Recap
+
+- **`inline`** trades bytecode size for speed and enables non-local control flow rules with lambdas.
+- **`noinline` / `crossinline`** fine-tune lambda parameters.
+
+<Exercise>
+
+Use **`map`** with **`doubleIt`** and print the **sum** of doubled values (`12`).
+
+</Exercise>

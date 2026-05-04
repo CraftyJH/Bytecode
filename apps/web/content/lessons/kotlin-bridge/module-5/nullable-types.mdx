@@ -1,0 +1,76 @@
+export const meta = {
+  title: "Nullable Types and Safe Calls",
+  duration: 14,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m5-null-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What type does `s?.length` have when `s` is `String?`?",
+    options: [
+      { text: "Int", correct: false, feedback: "Only if you handle null — safe call returns nullable Int." },
+      { text: "Int?", correct: true, feedback: "If `s` is null, the whole chain short-circuits to null." },
+      { text: "String", correct: false, feedback: "Length is Int-like, not String." },
+      { text: "void", correct: false, feedback: "Expressions have values." },
+    ],
+    explanation: "Safe calls propagate nullability through the type system.",
+  },
+  endQ1: {
+    id: "kb-m5-null-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val s: String? = null
+    println(s?.length ?: -1)
+}`,
+    expectedOutput: "-1",
+    explanation: "Elvis picks `-1` when `s` is null.",
+  },
+  endQ2: {
+    id: "kb-m5-null-end2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `fun main() {
+    var s: String? = "hi"
+    s = null
+    println(s.length)
+}`,
+    buggyLine: 4,
+    issue: "`var` can change — smart cast cannot prove non-null; use `s?.length` or check again",
+    explanation: "Nullable receivers need `?.` or a narrowed binding after an explicit null check in the same flow.",
+  },
+};
+
+Nullable types are **`T?`**. The safe call operator **`?.`** short-circuits to **null** when the receiver is null.
+
+```kotlin
+val len: Int? = name?.length
+```
+
+Chaining:
+
+```kotlin
+user?.address?.zipCode
+```
+
+<Quiz data={quizzes.midQ} label="Null safety" />
+
+## Compared to Java
+
+- Java: `@Nullable String` + manual checks.
+- Kotlin: `String?` and **compiler-checked** flow typing after explicit null tests.
+
+## Recap
+
+- **`?.`** is your default, not `!!`.
+- **Nullability** is part of the function contract — use `?` in APIs that lack guarantees.
+
+<Exercise>
+
+Implement **`len`** to return **0** for `null` and the string’s length otherwise.
+
+</Exercise>

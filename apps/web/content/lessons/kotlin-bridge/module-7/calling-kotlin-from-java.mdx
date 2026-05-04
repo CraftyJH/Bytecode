@@ -1,0 +1,78 @@
+export const meta = {
+  title: "Calling Kotlin from Java",
+  duration: 15,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m7-kj-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Top-level Kotlin functions in file `Util.kt` compile to a JVM class named (by default)",
+    options: [
+      { text: "Util", correct: false, feedback: "File name + `Kt` suffix is the default." },
+      { text: "UtilKt", correct: true, feedback: "Java calls `UtilKt.foo()` unless `@file:JvmName` changes it." },
+      { text: "util_package", correct: false, feedback: "Not a class name." },
+      { text: "Main", correct: false, feedback: "Entrypoints differ — see `@JvmName` lessons." },
+    ],
+    explanation: "Package + file shape Kotlin’s Java-facing names — customize when APIs must stay stable.",
+  },
+  endQ1: {
+    id: "kb-m7-kj-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `class Util {
+    companion object {
+        @JvmStatic
+        fun tag(): String = "Kotlin"
+    }
+}
+
+fun main() {
+    println(Util.tag())
+}`,
+    expectedOutput: "Kotlin",
+    explanation: "`@JvmStatic` exposes static-like accessor for Java interop; Kotlin still calls `Util.tag()`.",
+  },
+  endQ2: {
+    id: "kb-m7-kj-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Default arguments on Kotlin functions for Java callers often need",
+    options: [
+      { text: "`@JvmOverloads` to generate overload methods", correct: true, feedback: "Otherwise Java must pass all parameters or use nullable options." },
+      { text: "Nothing special", correct: false, feedback: "Java does not see Kotlin default parameters without help." },
+      { text: "Renaming the file", correct: false, feedback: "Unrelated." },
+      { text: "`@Throws` only", correct: false, feedback: "That documents exceptions — different concern." },
+    ],
+    explanation: "We keep defaults in Kotlin; Java gets synthetic overloads when requested.",
+  },
+};
+
+Java calls Kotlin via **generated class names**:
+
+```java
+// Kotlin: fun sanitize(input: String): String = ...
+import pkg.FileKt;
+
+String out = FileKt.sanitize(in);
+```
+
+**`@JvmStatic`** puts methods where Java expects **`static`** fields.
+
+**Companion object** members surface under **`Companion`** unless annotated.
+
+<Quiz data={quizzes.midQ} label="Kotlin → Java" />
+
+## Recap
+
+- **`UtilKt`** default for top-levels — tune with **`@file:JvmName`**.
+- **`@JvmStatic` / `@JvmOverloads`** shape Java-friendly surfaces.
+
+<Exercise>
+
+Expose **`tag`** through **`@JvmStatic`** in a **companion** and print **`Kotlin`**.
+
+</Exercise>

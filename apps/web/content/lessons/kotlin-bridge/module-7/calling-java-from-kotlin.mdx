@@ -1,0 +1,69 @@
+export const meta = {
+  title: "Calling Java from Kotlin",
+  duration: 15,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m7-jk-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Kotlin sees JavaBeans-style `getX()` / `setX()` as",
+    options: [
+      { text: "Methods only", correct: false, feedback: "Kotlin also exposes **property** syntax when naming matches Bean rules." },
+      { text: "Properties when accessor naming follows JavaBeans conventions", correct: true, feedback: "`getName()` → `name` property access." },
+      { text: "Deprecated", correct: false, feedback: "Interop is actively supported." },
+      { text: "suspend functions", correct: false, feedback: "Wrong keyword." },
+    ],
+    explanation: "This is why Spring/Jackson-heavy code feels natural from Kotlin.",
+  },
+  endQ1: {
+    id: "kb-m7-jk-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.Properties
+
+fun main() {
+    val p = Properties()
+    p.setProperty("key", "value")
+    println(p.getProperty("key"))
+}`,
+    expectedOutput: "value",
+    explanation: "Classic Java `Properties` — Kotlin callsite uses familiar names.",
+  },
+  endQ2: {
+    id: "kb-m7-jk-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Checked exceptions from Java methods appear in Kotlin as",
+    options: [
+      { text: "checked — Kotlin requires try/catch like Java", correct: false, feedback: "Kotlin has no checked exceptions in the language." },
+      { text: "no enforcement — you may wrap if you want", correct: true, feedback: "Interop trusts you to handle failures meaningfully." },
+      { text: "removed at compile time", correct: false, feedback: "Exceptions still happen at runtime." },
+      { text: "only on Android", correct: false, feedback: "General JVM behavior." },
+    ],
+    explanation: "Document hazardous APIs in wrappers when teams want stricter contracts.",
+  },
+};
+
+Kotlin **consumes** Java libraries transparently:
+
+- Getters/setters become **properties**.
+- Static members live on **`Companion`** or **file facades** when calling Kotlin from Java (reverse direction — next lesson).
+
+**Checked exceptions** do not propagate as checked in Kotlin — still **throw** at runtime.
+
+<Quiz data={quizzes.midQ} label="Java → Kotlin" />
+
+## Recap
+
+- Prefer **wrappers** at trust boundaries for nullability and exceptions.
+- Use **nullable platform types** cautiously when Java lacks annotations.
+
+<Exercise>
+
+Use **`java.util.Properties`** to **`setProperty`** and **`getProperty`** **`value`**.
+
+</Exercise>

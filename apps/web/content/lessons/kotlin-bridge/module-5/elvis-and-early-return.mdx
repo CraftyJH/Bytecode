@@ -1,0 +1,84 @@
+export const meta = {
+  title: "Elvis, Early Return, and Let",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m5-elv-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "The Elvis operator `?:` returns the left side unless it is",
+    options: [
+      { text: "null", correct: true, feedback: "Then the right side is evaluated and returned." },
+      { text: "zero", correct: false, feedback: "0 is a valid value — not special-cased by Elvis." },
+      { text: "empty string", correct: false, feedback: "`\"\"` is not null — Elvis doesn’t trigger." },
+      { text: "false", correct: false, feedback: "Boolean false is not null." },
+    ],
+    explanation: "Elvis is fundamentally about **null** defaults.",
+  },
+  endQ1: {
+    id: "kb-m5-elv-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun nick(name: String?): String = name?.takeIf { it.isNotBlank() } ?: "anon"
+
+fun main() {
+    println(nick(""))
+}`,
+    expectedOutput: "anon",
+    explanation: "Blank fails `takeIf`, Elvis chooses default.",
+  },
+  endQ2: {
+    id: "kb-m5-elv-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When is `x?.let { ... }` preferable to `if (x != null) { ... }`?",
+    options: [
+      {
+        text: "When you want a scoped immutable binding for the non-null value",
+        correct: true,
+        feedback: "`it` or named parameter inside lambda avoids reassignment pitfalls.",
+      },
+      { text: "Never — always use `if`", correct: false, feedback: "`let` composes nicely with chains." },
+      { text: "Only on primitives", correct: false, feedback: "Works for any nullable receiver." },
+      { text: "Only with coroutines", correct: false, feedback: "General-purpose scope function." },
+    ],
+    explanation: "`let` converts nullable context into a block where the value is known non-null.",
+  },
+};
+
+**`?:`** supplies defaults:
+
+```kotlin
+val name = input ?: "unknown"
+```
+
+Combine with safe calls:
+
+```kotlin
+val country = order?.customer?.address?.country ?: "ZZ"
+```
+
+**`let`** executes a block when receiver is non-null:
+
+```kotlin
+user?.let { u ->
+    println(u.name)
+}
+```
+
+<Quiz data={quizzes.midQ} label="Elvis" />
+
+## Recap
+
+- **`?:`** defaults null away — keep defaults cheap (avoid heavy work on RHS unintentionally).
+- **`let`** narrows nullable receivers locally.
+
+<Exercise>
+
+Return **`?`** when input is null or empty string’s first char otherwise — **`firstOrNull`** helps.
+
+</Exercise>

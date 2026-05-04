@@ -1,0 +1,88 @@
+export const meta = {
+  title: "Sealed Classes and Hierarchies",
+  duration: 16,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m4-seal-mid",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why seal a class hierarchy in Kotlin?",
+    options: [
+      { text: "To forbid any subclasses", correct: false, feedback: "Use `final class` for that." },
+      {
+        text: "To restrict known subclasses to one module/file scope so `when` can be exhaustive",
+        correct: true,
+        feedback: "Compiler tracks permitted subtypes.",
+      },
+      { text: "To speed up garbage collection only", correct: false, feedback: "Not the primary typing benefit." },
+      { text: "To generate JSON automatically", correct: false, feedback: "Serialization is orthogonal." },
+    ],
+    explanation: "Sealed types pair with expression `when` for domain modeling without visitor boilerplate.",
+  },
+  endQ1: {
+    id: "kb-m4-seal-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `sealed class Msg
+data class Text(val s: String) : Msg()
+object Ping : Msg()
+
+fun label(m: Msg): String = when (m) {
+    is Text -> m.s
+    Ping -> "ping"
+}
+
+fun main() {
+    println(label(Text("hi")))
+}`,
+    expectedOutput: "hi",
+    explanation: "`when` matches subclasses with smart casts on `Text`.",
+  },
+  endQ2: {
+    id: "kb-m4-seal-end2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Sealed classes are especially helpful when you would have written a Java",
+    options: [
+      { text: "`enum` with no behavior", correct: false, feedback: "Enums cover fixed constants; sealed handles open polymorphic sums." },
+      { text: "Visitor pattern with parallel interface hierarchies", correct: true, feedback: "`when` replaces some visitor indirection." },
+      { text: "`Object` factory", correct: false, feedback: "Too vague." },
+      { text: "`synchronized` block", correct: false, feedback: "Unrelated." },
+    ],
+    explanation: "Algebraic sum types + exhaustive `when` reduce Visitor ceremony.",
+  },
+};
+
+**`sealed class`** closes inheritance: subclasses must appear in the same **module** (with caveats for expected declarations in multiplatform — out of scope here).
+
+```kotlin
+sealed class Result
+data class Ok(val value: Int) : Result()
+data class Err(val message: String) : Result()
+```
+
+Exhaustive **`when`**:
+
+```kotlin
+fun describe(r: Result): String = when (r) {
+    is Ok -> "ok:${r.value}"
+    is Err -> "err:${r.message}"
+}
+```
+
+<Quiz data={quizzes.midQ} label="Sealed" />
+
+## Recap
+
+- **Sealed hierarchies** express closed sums of variants — compiler-assisted completeness checking.
+- Pair with **`when`** for readable domain-specific control flow.
+
+<Exercise>
+
+Implement **`describe`** so **`Ok(7)`** prints **`ok:7`**.
+
+</Exercise>

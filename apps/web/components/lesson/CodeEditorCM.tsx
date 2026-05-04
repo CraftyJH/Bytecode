@@ -72,6 +72,8 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  /** Mobile editor uses Java highlighting for Kotlin too (similar syntax). */
+  language?: "java" | "kotlin";
 }
 
 export function CodeEditor({ value, onChange, readOnly = false }: CodeEditorProps) {

@@ -1,0 +1,106 @@
+export const meta = {
+  title: "Tooling: Gradle and Running Kotlin",
+  duration: 13,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m1-tool-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question:
+      "In a Gradle Kotlin DSL build script for the JVM, which plugin usually applies the Kotlin compiler to your sources?",
+    options: [
+      {
+        text: "java-library without kotlin plugin",
+        correct: false,
+        feedback: "That configures Java only unless you add Kotlin sources separately.",
+      },
+      {
+        text: "`org.jetbrains.kotlin.jvm` (often applied via `kotlin(\"jvm\")` shortcuts)",
+        correct: true,
+        feedback:
+          "Correct — the JVM Kotlin plugin wires compilation tasks alongside Java when configured.",
+      },
+      {
+        text: "android-application — required for every Kotlin project",
+        correct: false,
+        feedback: "Android uses Kotlin heavily, but JVM libraries and CLIs use the JVM plugin.",
+      },
+      {
+        text: "spring-boot — required before Kotlin compiles",
+        correct: false,
+        feedback: "Spring Boot can depend on Kotlin but is not the core compiler plugin.",
+      },
+    ],
+    explanation:
+      "The `org.jetbrains.kotlin.jvm` plugin (or multiplatform targets) is what tells Gradle to compile `.kt` files. You still choose Java compatibility and dependencies as usual.",
+    hint: "Look for the JetBrains Kotlin plugin id, not a framework id.",
+  },
+  endQ1: {
+    id: "kb-m1-tool-end1",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "In Kotlin source, the default top-level entry function is named",
+    code: "fun ___() { ... }",
+    correctAnswers: ["main"],
+    caseSensitive: true,
+    explanation: "`fun main()` is the conventional entry point; the JVM still gets a generated class under the hood.",
+  },
+  endQ2: {
+    id: "kb-m1-tool-end2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        System.out.println("Java style in a .kt file");
+    }
+}`,
+    buggyLine: 1,
+    issue: "A `.kt` file would not use `public class Main` in idiomatic Kotlin — and `public` is the default in Kotlin anyway.",
+    explanation:
+      "You *can* mix styles during migration, but new Kotlin code uses `fun main()` at top level. This snippet is valid Java, not a minimal Kotlin file.",
+  },
+};
+
+You do not need to become a Gradle expert to learn Kotlin, but you should know **where** the language plugs in. In the JVM world, most teams use **Gradle** (Groovy or **Kotlin DSL**) or **Maven** with the Kotlin plugin. The important idea: the **Kotlin compiler** runs as part of the build, emitting JVM bytecode like `javac`.
+
+<Note>
+  In this course, the **playground** compiles a single `main` for you. Locally, you would use your IDE (IntelliJ IDEA, Android Studio, or VS Code with extensions) to run the same `main` and see stack traces. Keep that mental model: playground ≈ one-off script, project ≈ full module path and tests.
+</Note>
+
+## Gradle mental model (high level)
+
+- **Plugin**: `org.jetbrains.kotlin.jvm` (or a preset) turns on Kotlin compilation.
+- **Source sets**: `src/main/kotlin` is conventional next to `src/main/java` when you mix languages in one module.
+- **Toolchain / jvmTarget**: align Kotlin’s JVM target with the Java version you run in production (this track assumes **21** where it matters).
+
+## REPL and scratch files
+
+- **REPL**: Useful for trying expressions (` kotli-jvm` / IDEA scratch files). Great for learning APIs — not where you ship production code.
+- **Scratch files / worksheets**: IntelliJ lets you execute snippets against module classpath — handy when exploring Java libraries from Kotlin.
+
+<Quiz data={quizzes.midQ} label="Gradle basics" />
+
+## Compared to `javac` only
+
+In Java-only projects you compile `.java` → `.class`. With Kotlin you compile `.kt` → `.class` as well, possibly alongside `.java` in the same module. The classpath is shared; Kotlin sees Java declarations (often as **platform types** when nullability is unknown).
+
+## Common mistakes
+
+- Forgetting to align **JVM target** between Kotlin and Java in mixed modules — subtle bytecode mismatches at runtime.
+- Assuming Gradle Kotlin DSL is “another language” — it **is** Kotlin, just with Gradle APIs in scope.
+
+## Recap
+
+- The Kotlin **Gradle plugin** compiles `.kt` sources on the JVM alongside Java when configured.
+- **`fun main()`** is the idiomatic entry point you will use in exercises.
+- Local tooling adds debugging and classpath fidelity beyond the playground.
+
+<Exercise>
+
+Print exactly **`Kotlin Gradle plugin`** from `main` so it matches the automated checker.
+
+</Exercise>

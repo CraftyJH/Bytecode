@@ -1,0 +1,77 @@
+export const meta = {
+  title: "Data Classes",
+  duration: 14,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m4-data-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does the compiler synthesize for a `data class`?",
+    options: [
+      { text: "Only a constructor", correct: false, feedback: "Also `equals`/`hashCode`/`toString`/`copy`/componentN." },
+      { text: "`equals`, `hashCode`, `toString`, `copy`, and component functions", correct: true, feedback: "Value-object semantics out of the box." },
+      { text: "Nothing — it is only documentation", correct: false, feedback: "Real codegen." },
+      { text: "Mutable builders only", correct: false, feedback: "Immutability is idiomatic via `val` + `copy`." },
+    ],
+    explanation: "Compare with Java `record` — similar goals, Kotlin predates records but overlaps conceptually.",
+  },
+  endQ1: {
+    id: "kb-m4-data-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `data class Point(val x: Int, val y: Int)
+
+fun main() {
+    val p = Point(3, 4)
+    println(p.copy(y = 0))
+}`,
+    expectedOutput: "Point(x=3, y=0)",
+    explanation: "`copy` returns a new instance with selective overrides.",
+  },
+  endQ2: {
+    id: "kb-m4-data-end2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "When should you avoid `data class`?",
+    options: [
+      { text: "When identity matters more than value equality (entities with stable ids)", correct: true, feedback: "Entities often need custom equality rules." },
+      { text: "Never — always use data classes", correct: false, feedback: "Domain-driven distinctions matter." },
+      { text: "Whenever using Kotlin", correct: false, feedback: "Too broad." },
+      { text: "Only on Android", correct: false, feedback: "General modeling concern." },
+    ],
+    explanation: "DTO/value objects → data classes shine; aggregate roots may need richer models.",
+  },
+};
+
+```kotlin
+data class Point(val x: Int, val y: Int)
+```
+
+Destructuring:
+
+```kotlin
+val (a, b) = p   // component1/component2
+```
+
+Immutability pattern:
+
+```kotlin
+val p2 = p.copy(y = p.y + 1)
+```
+
+<Quiz data={quizzes.midQ} label="data class" />
+
+## Recap
+
+- **`data class`** generates value-object plumbing — compare to Java **`record`** mentally.
+- **`copy`** supports immutable updates.
+
+<Exercise>
+
+Print **`copy`** that zeroes **`y`** — expected **`Point(x=3, y=0)`**.
+
+</Exercise>

@@ -1,0 +1,68 @@
+export const meta = {
+  title: "Platform Types from Java APIs",
+  duration: 14,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m5-plat-mid",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question:
+      "When Kotlin sees a Java `String` return without nullability annotations, the Kotlin type is often written as",
+    options: [
+      { text: "String!", correct: false, feedback: "That’s not source syntax — think platform type." },
+      { text: "String (platform type with unknown nullability)", correct: true, feedback: "You can assign to `String` or `String?` with relaxed checks — responsibility shifts to you." },
+      { text: "String?", correct: false, feedback: "Could be, but unannotated Java is not automatically nullable." },
+      { text: "Any", correct: false, feedback: "Still String-like." },
+    ],
+    explanation: "Annotate Java sources with `@Nullable`/`@NotNull` (or package-info) to regain precision.",
+  },
+  endQ1: {
+    id: "kb-m5-plat-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `fun main() {
+    val x: String? = null
+    println(x ?: "default")
+}`,
+    expectedOutput: "default",
+    explanation: "Kotlin-side nullable handled with Elvis.",
+  },
+  endQ2: {
+    id: "kb-m5-plat-end2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Best practice when wrapping legacy Java that returns unclear nullability?",
+    options: [
+      { text: "Assume non-null always", correct: false, feedback: "Risky — document and test boundary behavior." },
+      { text: "Add annotations or Kotlin wrappers at the boundary", correct: true, feedback: "Shrink platform-type leakage inward." },
+      { text: "Use `!!` everywhere", correct: false, feedback: "Moves errors to runtime explosively." },
+      { text: "Rewrite Java first", correct: false, feedback: "Nice long-term — short term: boundaries." },
+    ],
+    explanation: "Treat interop surfaces like ports — make contracts explicit in Kotlin types.",
+  },
+};
+
+Java methods without **JSR-305**/**JSpecify**-style nullability show up as **platform types** — flexible at compile time, dangerous if abused.
+
+Strategies:
+
+- Add **nullability annotations** to Java sources or package defaults.
+- Wrap returns at the boundary with **`requireNotNull`** or explicit checks.
+- Prefer **Kotlin libraries** with precise types for new code.
+
+<Quiz data={quizzes.midQ} label="Platform types" />
+
+## Recap
+
+- Platform types relax checking — **you** supply discipline at boundaries.
+- **Gradual migration**: tighten types module by module.
+
+<Exercise>
+
+Print **`default`** when nullable **`pick()`** returns null using **`?:`**.
+
+</Exercise>

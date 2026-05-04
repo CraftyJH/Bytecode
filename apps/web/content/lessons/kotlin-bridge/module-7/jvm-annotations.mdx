@@ -1,0 +1,70 @@
+export const meta = {
+  title: "@JvmName, @JvmOverloads, and Friends",
+  duration: 14,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m7-ann-mid",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "`@file:JvmName(\"Foo\")` changes",
+    options: [
+      { text: "Only Kotlin call sites", correct: false, feedback: "Java-visible facade class name for top-level declarations in that file." },
+      { text: "The JVM class name hosting file-level declarations for Java callers", correct: true, feedback: "Stabilize public API against file renames." },
+      { text: "Package names", correct: false, feedback: "Package still comes from `package`." },
+      { text: "Kotlin property names", correct: false, feedback: "Use `@get:JvmName` for individual properties when needed." },
+    ],
+    explanation: "Use when shipping libraries — file renames should not break Java users.",
+  },
+  endQ1: {
+    id: "kb-m7-ann-end1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `@file:JvmName("BridgeDemo")
+
+fun tag(): String = "ok"
+
+fun main() {
+    println(tag())
+}`,
+    expectedOutput: "ok",
+    explanation: "File annotation does not change Kotlin call within same module — still `tag()`.",
+  },
+  endQ2: {
+    id: "kb-m7-ann-end2",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "`@JvmOverloads` is most useful for",
+    options: [
+      { text: "Kotlin-only projects with no Java", correct: false, feedback: "Superfluous there." },
+      { text: "Constructors and functions with default parameters called from Java", correct: true, feedback: "Generates overloads with progressive parameter lists." },
+      { text: "Marking coroutine entry points", correct: false, feedback: "Use `suspend` and appropriate artifacts." },
+      { text: "Hiding members from Java", correct: false, feedback: "Use `internal` or package-private patterns." },
+    ],
+    explanation: "Improves Java DX when Kotlin defaults would otherwise be invisible.",
+  },
+};
+
+Key annotations for JVM interop:
+
+- **`@file:JvmName`**: rename file facade for Java.
+- **`@JvmName`**: method/property Java name distinct from Kotlin name.
+- **`@JvmOverloads`**: generate Java overloads for default parameters.
+- **`@JvmField`**: expose `val` as public field to avoid getter.
+- **`@Throws`**: document checked exceptions to Java callers.
+
+<Quiz data={quizzes.midQ} label="Annotations" />
+
+## Recap
+
+- Treat annotations as **API design** for Java consumers.
+- Combine with **package structure** to keep binary compatibility.
+
+<Exercise>
+
+Run **`main`** that prints **`ok`** from **`tag()`** (file JvmName is for Java callers; Kotlin works unchanged).
+
+</Exercise>

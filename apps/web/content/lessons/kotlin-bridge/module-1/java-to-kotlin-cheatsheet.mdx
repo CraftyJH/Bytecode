@@ -1,0 +1,102 @@
+export const meta = {
+  title: "Java to Kotlin Syntax Map",
+  duration: 15,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midQ: {
+    id: "kb-m1-cheat-mid",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which Kotlin keyword introduces a read-only local or property binding?",
+    options: [
+      { text: "var", correct: false, feedback: "`var` is mutable." },
+      { text: "val", correct: true, feedback: "`val` is single-assignment (immutable reference)." },
+      { text: "let", correct: false, feedback: "`let` is a scope function on receivers — not a binding keyword." },
+      { text: "final", correct: false, feedback: "Kotlin uses `val` instead of Java `final` for this common case." },
+    ],
+    explanation: "`val` corresponds closely to a Java `final` variable; `var` is for mutable references.",
+  },
+  endQ1: {
+    id: "kb-m1-cheat-end1",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "In a Kotlin string template, which character starts an embedded name or expression inside double quotes?",
+    code: 'Example: "count = ___name"',
+    correctAnswers: ["$"],
+    caseSensitive: true,
+    explanation: "Use `$name` or `${expr}` inside `\"...\"` for templates.",
+  },
+  endQ2: {
+    id: "kb-m1-cheat-end2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `fun main() {
+    val s: String = null
+    println(s.length)
+}`,
+    buggyLine: 2,
+    issue: "A non-null `String` cannot hold `null` — use `String?` or avoid assigning null.",
+    explanation:
+      "Kotlin separates nullable types. Use `String?` and safe calls (`s?.length`) or provide a non-null value.",
+  },
+};
+
+This lesson is a **fast orientation map** — not exhaustive. Keep it nearby while you work through later modules. Prefer **expression-oriented** Kotlin where it clarifies data flow; prefer **statements** where side effects and logging dominate.
+
+## Variables
+
+| Java | Kotlin |
+|------|--------|
+| `final int x = 1;` | `val x = 1` |
+| `int y = 2; y = 3;` | `var y = 2; y = 3` |
+
+Type annotations are optional when inference is clear: `val name: String = "Ada"`.
+
+## Strings
+
+| Java | Kotlin |
+|------|--------|
+| `"Hello, " + name` | `"Hello, $name"` or `"Hello, ${name.uppercase()}"` |
+| `String.format("%02d", n)` | string templates or `n.toString().padStart(2, '0')` |
+
+## Functions
+
+| Java | Kotlin |
+|------|--------|
+| `public static int add(int a, int b)` | `fun add(a: Int, b: Int): Int` (top-level) |
+| overloads for defaults | default parameters (`fun greet(name: String = "World")`) |
+
+## Classes (preview)
+
+| Java | Kotlin |
+|------|--------|
+| verbose POJO + getters | `data class User(val name: String)` |
+| `enum` with behavior | `enum class` with methods |
+
+## Nullability (preview)
+
+| Java | Kotlin |
+|------|--------|
+| `@Nullable String` | `String?` |
+| defensive `if (s != null)` | `s?.length`, smart casts after checks |
+
+<Quiz data={quizzes.midQ} label="Syntax map" />
+
+## Exercise strategy
+
+Use the playground to practice **printing** results — mirroring `System.out.println` habits but with **`println`**. Pay attention to **exact output** when the grader compares strings.
+
+## Recap
+
+- **`val` / `var`** replace many `final`/mutable Java locals.
+- **String templates** replace noisy concatenation.
+- **Expression `if` / `when`** pair well with single-expression functions.
+
+<Exercise>
+
+Print **`50`** on the first line (product of `10 * 5`) and **`done`** on the second line.
+
+</Exercise>

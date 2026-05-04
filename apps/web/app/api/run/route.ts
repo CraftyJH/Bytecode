@@ -6,10 +6,13 @@ const JUDGE0_URL = process.env.JUDGE0_URL ?? "https://ce.judge0.com";
 const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY; // optional — for RapidAPI hosted instance
 
 const JAVA_LANGUAGE_ID = 62; // Java (OpenJDK 13.0.1)
+const KOTLIN_LANGUAGE_ID = 78; // Kotlin (JVM) — Judge0 CE
 
 export interface RunRequest {
   code: string;
   stdin?: string;
+  /** When set to kotlin, uses Judge0 Kotlin language id. Defaults to Java. */
+  language?: "java" | "kotlin";
 }
 
 export interface RunResult {
@@ -42,7 +45,8 @@ export async function POST(req: NextRequest) {
       headers,
       body: JSON.stringify({
         source_code: body.code,
-        language_id: JAVA_LANGUAGE_ID,
+        language_id:
+          body.language === "kotlin" ? KOTLIN_LANGUAGE_ID : JAVA_LANGUAGE_ID,
         stdin: body.stdin ?? "",
       }),
     });
