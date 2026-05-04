@@ -399,6 +399,57 @@ eventBus.on(TaskEventBus.TaskEvent.StatusChanged.class, e ->
     System.out.println("Status changed to: " + e.task().status()));
 ```
 
+<Exercise>
+Define `TaskCreatedEvent` and `TaskStatusChangedEvent` as Java records. Build a simple `EventBus` that maps event classes to `Consumer` handlers. Register one handler per event type, emit both events, and verify each handler fires by printing a confirmation message.
+
+```java
+import java.util.*;
+import java.util.function.Consumer;
+
+public class Main {
+    record TaskCreatedEvent(String title) {}
+    record TaskStatusChangedEvent(String title, String oldStatus, String newStatus) {}
+
+    static class EventBus {
+        private final Map<Class<?>, List<Consumer<Object>>> listeners = new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        <T> void on(Class<T> type, Consumer<T> handler) {
+            listeners.computeIfAbsent(type, k -> new ArrayList<>())
+                     .add(e -> handler.accept(type.cast(e)));
+        }
+
+        void emit(Object event) {
+            List<Consumer<Object>> handlers = listeners.get(event.getClass());
+            if (handlers != null) handlers.forEach(h -> h.accept(event));
+        }
+    }
+
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+
+        // TODO: register a handler for TaskCreatedEvent that prints "Handler fired: task created - " + event.title()
+        // TODO: register a handler for TaskStatusChangedEvent that prints "Handler fired: status changed " + old + " -> " + new
+
+        bus.emit(new TaskCreatedEvent("Implement login"));
+        bus.emit(new TaskStatusChangedEvent("Implement login", "TODO", "IN_PROGRESS"));
+        bus.emit(new TaskCreatedEvent("Write integration tests"));
+
+        System.out.println("Events emitted.");
+    }
+}
+```
+
+**What to verify:**
+- `Handler fired: task created - Implement login` is printed
+- `Handler fired: status changed TODO -> IN_PROGRESS` is printed
+- `Handler fired: task created - Write integration tests` is printed
+- `Events emitted.` appears last
+- No `TaskStatusChangedEvent` handler fires for `TaskCreatedEvent` emissions
+
+<Note>Hint: use `bus.on(TaskCreatedEvent.class, e -> System.out.println("Handler fired: task created - " + e.title()))` — the generic `on` method handles the casting internally.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Builder pattern — composable task queries
