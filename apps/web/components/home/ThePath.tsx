@@ -8,7 +8,7 @@ const tracks = [
     slug: "java-beginner",
     title: "Java Beginner",
     description: "Foundations in Java 21: variables, control flow, methods, arrays, and strings.",
-    tag: "Free, forever.",
+    tag: "Free. Forever.",
     variant: "free" as const,
   },
   {
@@ -16,7 +16,7 @@ const tracks = [
     slug: "java-intermediate",
     title: "Java Intermediate",
     description: "Object-oriented Java: classes, interfaces, exceptions, collections, and files.",
-    tag: "Fully free.",
+    tag: "Free. Forever.",
     variant: "free" as const,
   },
   {

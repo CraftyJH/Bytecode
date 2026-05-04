@@ -10,6 +10,7 @@ export default async function AdminUsersPage() {
     name: (u.user_metadata?.name as string | undefined) ?? undefined,
     plan: (u.app_metadata?.plan as string | undefined) ?? "free",
     role: (u.app_metadata?.role as string | undefined) ?? "",
+    streakDisabled: Boolean(u.app_metadata?.streak_disabled),
     createdAt: u.created_at,
   }));
 

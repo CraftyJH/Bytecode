@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { Button } from "@/components/ui/Button";
 import { Lock, Code2 } from "lucide-react";
+import { fetchBackendUserState, resolvePlanState } from "@/lib/user-state";
 
 const tracks = [
   { num: "01", title: "Java Beginner", progress: 0, total: 8, variant: "free" as const },
@@ -18,6 +19,12 @@ export default async function DashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const backendUser = await fetchBackendUserState(session?.access_token);
+  const plan = resolvePlanState(user, backendUser);
 
   const displayName =
     user?.user_metadata?.name ?? user?.email?.split("@")[0] ?? "there";
@@ -156,7 +163,10 @@ export default async function DashboardPage() {
             </p>
             {[
               { label: "Lessons completed", value: "0" },
-              { label: "Current streak", value: "0 days" },
+              {
+                label: "Current streak",
+                value: `${backendUser?.streakCount ?? 0} day${(backendUser?.streakCount ?? 0) === 1 ? "" : "s"}`,
+              },
               { label: "Quizzes passed", value: "0" },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between items-baseline py-2 border-b last:border-0"
@@ -175,13 +185,20 @@ export default async function DashboardPage() {
             >
               // your plan
             </p>
-            <Pill variant="free" className="mb-3" />
+            <div className="mb-3 flex items-center gap-2">
+              <Pill variant={plan.isPremium ? "premium" : "free"} label={plan.label} />
+              {plan.isAdmin && <Pill variant="premium" label="Admin" />}
+            </div>
             <p className="text-xs text-prose-muted mb-4">
-              Upgrade to Premium for full Java + Kotlin tracks, capstones, and certificates.
+              {plan.isPremium
+                ? "You have full access to premium tracks, capstones, and certificates."
+                : "Upgrade to Premium for full Java + Kotlin tracks, capstones, and certificates."}
             </p>
-            <Button as="a" href="/pricing" variant="secondary" size="sm" className="w-full justify-center">
-              View pricing
-            </Button>
+            {!plan.isPremium && (
+              <Button as="a" href="/pricing" variant="secondary" size="sm" className="w-full justify-center">
+                View pricing
+              </Button>
+            )}
           </Card>
         </div>
       </div>

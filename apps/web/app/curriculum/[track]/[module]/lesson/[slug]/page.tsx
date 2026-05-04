@@ -118,7 +118,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
         }
       >
         {/* Left — lesson prose (60%) */}
-        <article className="flex-1 min-w-0 px-6 lg:px-10 py-10 lg:max-w-[65%] pb-24 lg:pb-10">
+        <article className="flex-1 min-w-0 px-6 lg:px-10 py-10 lg:max-w-[76%] pb-24 lg:pb-10">
 
           {/* Breadcrumb */}
           <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-1.5 text-xs text-prose-faint flex-wrap"

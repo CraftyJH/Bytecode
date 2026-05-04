@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Pill } from "@/components/ui/Pill";
+import { fetchBackendUserState, resolvePlanState } from "@/lib/user-state";
 
 async function changePassword(formData: FormData) {
   "use server";
@@ -32,8 +34,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!user) redirect("/signin");
+
+  const backendUser = await fetchBackendUserState(session?.access_token);
+  const plan = resolvePlanState(user, backendUser);
 
   const { tab = "account", saved, error } = await searchParams;
 
@@ -113,7 +121,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             <div className="flex justify-between items-center py-2 border-b"
               style={{ borderColor: "var(--border-subtle)" }}>
               <span className="text-xs text-prose-muted">Plan</span>
-              <span className="text-xs text-prose">Free</span>
+              <span className="flex items-center gap-2">
+                <Pill variant={plan.isPremium ? "premium" : "free"} label={plan.label} />
+                {plan.isAdmin && <Pill variant="premium" label="Admin" />}
+              </span>
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-xs text-prose-muted">Member since</span>
@@ -193,11 +204,15 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </p>
           <h2 className="text-sm font-semibold text-prose mb-2 tracking-tight">Billing &amp; subscription</h2>
           <p className="text-sm text-prose-muted mb-5">
-            You&apos;re on the Free plan. Upgrade to Premium for full Java + Kotlin tracks, capstones, and certificates.
+            {plan.isPremium
+              ? "You are on Premium access. You can use all tracks, capstones, and certificates."
+              : "You are on the Free plan. Upgrade to Premium for full Java + Kotlin tracks, capstones, and certificates."}
           </p>
-          <Button as="a" href="/pricing" variant="primary" size="sm">
-            View pricing
-          </Button>
+          {!plan.isPremium && (
+            <Button as="a" href="/pricing" variant="primary" size="sm">
+              View pricing
+            </Button>
+          )}
         </Card>
       )}
     </div>

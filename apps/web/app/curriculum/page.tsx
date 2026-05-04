@@ -18,7 +18,7 @@ export default function CurriculumPage() {
         className="mb-12"
       />
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {curriculum.map((track) => (
           <div
             key={track.slug}
@@ -32,7 +32,7 @@ export default function CurriculumPage() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span
-                    className="text-xs text-prose-faint"
+                    className="text-xs text-accent font-semibold tabular-nums"
                     style={{ fontFamily: "var(--font-mono)" }}
                   >
                     {String(track.order).padStart(2, "0")}

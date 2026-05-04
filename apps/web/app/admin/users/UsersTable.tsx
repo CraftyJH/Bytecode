@@ -9,6 +9,7 @@ interface AdminUser {
   name: string | undefined;
   plan: string;
   role: string;
+  streakDisabled: boolean;
   createdAt: string;
 }
 
@@ -56,6 +57,22 @@ export function UsersTable({ users }: UsersTableProps) {
       if (res.ok) {
         setLocalUsers((prev) =>
           prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
+        );
+      }
+    });
+  }
+
+  async function toggleStreak(userId: string, disabled: boolean) {
+    const next = !disabled;
+    startTransition(async () => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ field: "streak_disabled", value: next }),
+      });
+      if (res.ok) {
+        setLocalUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, streakDisabled: next } : u)),
         );
       }
     });
@@ -111,6 +128,9 @@ export function UsersTable({ users }: UsersTableProps) {
               <th className="text-left px-4 py-2.5 text-xs font-medium text-prose-faint hidden lg:table-cell">
                 Joined
               </th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-prose-faint hidden xl:table-cell">
+                Streak
+              </th>
               <th className="text-right px-4 py-2.5 text-xs font-medium text-prose-faint">
                 Actions
               </th>
@@ -120,7 +140,7 @@ export function UsersTable({ users }: UsersTableProps) {
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-8 text-sm text-prose-faint text-center italic"
                 >
                   No users found.
@@ -164,6 +184,15 @@ export function UsersTable({ users }: UsersTableProps) {
                       year: "numeric",
                     })}
                   </td>
+                  <td className="px-4 py-3 hidden xl:table-cell">
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded-sm font-medium ${
+                        u.streakDisabled ? "text-warn bg-warn/10" : "text-ok bg-ok/10"
+                      }`}
+                    >
+                      {u.streakDisabled ? "Disabled" : "Enabled"}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
@@ -187,6 +216,14 @@ export function UsersTable({ users }: UsersTableProps) {
                         style={{ borderColor: "var(--border-emphasis)" }}
                       >
                         {u.role === "admin" ? "Revoke admin" : "Grant admin"}
+                      </button>
+                      <button
+                        onClick={() => toggleStreak(u.id, u.streakDisabled)}
+                        disabled={pending}
+                        className="text-xs px-2 py-1 rounded border text-prose-muted hover:text-prose transition-colors duration-100 disabled:opacity-50 cursor-pointer"
+                        style={{ borderColor: "var(--border-emphasis)" }}
+                      >
+                        {u.streakDisabled ? "Enable streak" : "Disable streak"}
                       </button>
                     </div>
                   </td>

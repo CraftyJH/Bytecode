@@ -27,15 +27,29 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const body = await req.json() as { field: string; value: string };
+  const body = await req.json() as { field: string; value: string | boolean };
   const { field, value } = body;
 
-  if (!["plan", "role"].includes(field)) {
+  if (!["plan", "role", "streak_disabled"].includes(field)) {
     return NextResponse.json({ error: "Invalid field" }, { status: 400 });
   }
 
+  if (field === "streak_disabled" && typeof value !== "boolean") {
+    return NextResponse.json({ error: "Invalid streak_disabled value" }, { status: 400 });
+  }
+
+  if ((field === "plan" || field === "role") && typeof value !== "string") {
+    return NextResponse.json({ error: "Invalid metadata value" }, { status: 400 });
+  }
+
+  const { data: existing } = await adminClient.auth.admin.getUserById(id);
+  const appMetadata = {
+    ...(existing.user?.app_metadata ?? {}),
+    [field]: value,
+  };
+
   const { error } = await adminClient.auth.admin.updateUserById(id, {
-    app_metadata: { [field]: value },
+    app_metadata: appMetadata,
   });
 
   if (error) {

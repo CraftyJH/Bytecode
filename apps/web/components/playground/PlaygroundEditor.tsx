@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Play, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { Play, Loader2, RotateCcw, Trash2, Save, FolderOpen } from "lucide-react";
 import type { RunResult } from "@/app/api/run/route";
 
 const CodeEditor = dynamic(
@@ -24,10 +24,37 @@ const DEFAULT_CODE = `public class Main {
     }
 }`;
 
+const PLAYGROUND_STORAGE_KEY = "bytecode:playground:java";
+
 export function PlaygroundEditor() {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [result, setResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  function saveCode() {
+    try {
+      localStorage.setItem(PLAYGROUND_STORAGE_KEY, code);
+      setNotice("Saved to browser storage.");
+    } catch {
+      setNotice("Could not save code in this browser.");
+    }
+  }
+
+  function loadCode() {
+    try {
+      const stored = localStorage.getItem(PLAYGROUND_STORAGE_KEY);
+      if (!stored) {
+        setNotice("No saved code found.");
+        return;
+      }
+      setCode(stored);
+      setResult(null);
+      setNotice("Loaded saved code.");
+    } catch {
+      setNotice("Could not load saved code.");
+    }
+  }
 
   async function handleRun() {
     setRunning(true);
@@ -82,6 +109,20 @@ export function PlaygroundEditor() {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={saveCode}
+            className="text-prose-faint hover:text-prose-muted transition-colors duration-100 cursor-pointer"
+            title="Save current code"
+          >
+            <Save size={13} />
+          </button>
+          <button
+            onClick={loadCode}
+            className="text-prose-faint hover:text-prose-muted transition-colors duration-100 cursor-pointer"
+            title="Load saved code"
+          >
+            <FolderOpen size={13} />
+          </button>
+          <button
             onClick={() => { setCode(DEFAULT_CODE); setResult(null); }}
             className="text-prose-faint hover:text-prose-muted transition-colors duration-100 cursor-pointer"
             title="Reset to default"
@@ -111,6 +152,15 @@ export function PlaygroundEditor() {
       <div className="flex-1 min-h-0 overflow-hidden">
         <CodeEditor value={code} onChange={setCode} />
       </div>
+
+      {notice && (
+        <div
+          className="px-4 py-2 text-xs border-t text-prose-faint"
+          style={{ borderColor: "var(--border-subtle)", fontFamily: "var(--font-mono)" }}
+        >
+          {notice}
+        </div>
+      )}
 
       {/* Output */}
       <div className="shrink-0 border-t" style={{ borderColor: "var(--border-subtle)" }}>
