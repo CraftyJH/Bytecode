@@ -202,6 +202,75 @@ public void transfer(AccountId from, AccountId to, Money amount) { ... }
 
 <Note>Java **records** (Java 16+) are the fastest way to create value objects. They are immutable, provide `equals`, `hashCode`, and `toString` automatically, and compact constructors let you add validation concisely.</Note>
 
+<Exercise>
+The `UserRecord` below suffers from Primitive Obsession: address, phone, and email are raw `String` fields with no validation. Replace each with a proper value-object class (`PostalAddress`, `PhoneNumber`, `EmailAddress`) that validates on construction. Build a valid user and attempt one invalid construction for each type.
+
+```java
+public class Main {
+    // ---- Provided Primitive-Obsessed record (READ ONLY) ----
+    record UserRecordPrimitive(String address, String phone, String email) {}
+
+    // ---- TODO: value-object classes ----
+    // class PostalAddress {
+    //     final String street, city, zip
+    //     constructor: throw IllegalArgumentException if any field blank
+    //     toString()
+    // }
+    //
+    // class PhoneNumber {
+    //     final String value
+    //     constructor: throw IllegalArgumentException if value doesn't match \d{7,15}
+    //     toString()
+    // }
+    //
+    // class EmailAddress {
+    //     final String value
+    //     constructor: throw IllegalArgumentException if value doesn't contain '@'
+    //     toString()
+    // }
+    //
+    // record UserRecord(PostalAddress address, PhoneNumber phone, EmailAddress email) {}
+
+    public static void main(String[] args) {
+        // Valid user
+        UserRecord user = new UserRecord(
+                new PostalAddress("10 Elm St", "Springfield", "12345"),
+                new PhoneNumber("5551234567"),
+                new EmailAddress("alice@example.com"));
+        System.out.println(user);
+
+        // Invalid phone
+        try {
+            new PhoneNumber("abc");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Bad phone: " + e.getMessage());
+        }
+
+        // Invalid email
+        try {
+            new EmailAddress("not-an-email");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Bad email: " + e.getMessage());
+        }
+
+        // Invalid address (blank city)
+        try {
+            new PostalAddress("5 Main St", "", "00001");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Bad address: " + e.getMessage());
+        }
+    }
+}
+```
+
+**What to verify:**
+- Valid user prints all three fields via `toString()`
+- Each invalid construction prints a `Bad <type>:` line with a descriptive message
+- Value objects have only `final` fields and no setters
+
+<Note>Hint: Use `String.matches("\\d{7,15}")` for phone validation and `value.contains("@")` for email.</Note>
+</Exercise>
+
 ## Feature Envy
 
 A method is more interested in another class's data than its own. It calls getter after getter on a foreign object to do work that belongs there:
@@ -268,6 +337,76 @@ public class Order {
     }
 }
 ```
+
+<Exercise>
+The `AnemicOrder` below is an Anemic Domain Model — just a data bag. Refactor it into a rich `Order` domain model where the class owns its business logic: `addItem(String sku, int qty, double price)` accumulates line items, `applyDiscount(double pct)` reduces the running total, and `total()` returns the current total. Attempt to apply a discount before adding any items and verify the guard throws.
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class Main {
+    // ---- Provided Anemic Model (READ ONLY) ----
+    static class AnemicOrder {
+        private List<String> items = new ArrayList<>();
+        private double total;
+        private double discountPct;
+        // only getters and setters — no behaviour
+        public List<String> getItems()           { return items; }
+        public double getTotal()                 { return total; }
+        public void setTotal(double t)           { total = t; }
+        public double getDiscountPct()           { return discountPct; }
+        public void setDiscountPct(double d)     { discountPct = d; }
+    }
+
+    // ---- TODO: rich Order domain model ----
+    // class Order {
+    //     private List<String> lineItems = new ArrayList<>()
+    //     private double runningTotal = 0.0
+    //
+    //     void addItem(String sku, int qty, double unitPrice)
+    //         appends "sku x qty @ $unitPrice" to lineItems
+    //         adds qty * unitPrice to runningTotal
+    //
+    //     void applyDiscount(double pct)
+    //         throw IllegalStateException("No items") if lineItems is empty
+    //         runningTotal = runningTotal * (1 - pct / 100)
+    //
+    //     double total() { return runningTotal; }
+    //
+    //     List<String> lineItems() { return Collections.unmodifiableList(lineItems); }
+    // }
+
+    public static void main(String[] args) {
+        Order order = new Order();
+
+        // Guard: discount on empty order
+        try {
+            order.applyDiscount(10);
+        } catch (IllegalStateException e) {
+            System.out.println("Guard: " + e.getMessage());
+        }
+
+        order.addItem("SKU-1", 2, 15.00);  // 30.00
+        order.addItem("SKU-2", 1, 20.00);  // 20.00  total: 50.00
+        System.out.printf("Before discount: $%.2f%n", order.total());
+
+        order.applyDiscount(10);           // 10% off -> 45.00
+        System.out.printf("After 10%% discount: $%.2f%n", order.total());
+
+        System.out.println("Line items: " + order.lineItems());
+    }
+}
+```
+
+**What to verify:**
+- Guard prints `Guard: No items`
+- Before discount: `$50.00`
+- After discount: `$45.00`
+- Line items list contains two entries describing each added item
+
+<Note>Hint: `applyDiscount` must check `lineItems.isEmpty()` before modifying `runningTotal`. This is a domain rule — it belongs in the `Order` class, not in a service.</Note>
+</Exercise>
 
 ## Spaghetti inheritance
 

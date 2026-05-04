@@ -261,6 +261,59 @@ Compare that to the JVM version which typically reports 1–3 seconds startup ti
 - Applications requiring maximum sustained throughput (JIT wins here)
 - Teams using dynamic languages features heavily (Groovy scripts, runtime code gen)
 
+<Exercise>
+Write a pure-computation CLI-style program that computes Fibonacci numbers. Then add a detailed comment block discussing why this program is an ideal candidate for native-image compilation (startup time benefit) versus why a long-running REST server would be a poor fit.
+
+```java
+public class Main {
+    // Pure computation — no I/O, no reflection, no dynamic class loading
+    // This is exactly the kind of program that benefits from native-image
+
+    static long fibonacci(int n) {
+        // TODO: implement iterative Fibonacci (not recursive — avoid stack overflow)
+        // Use two variables to track the previous two values
+        return 0;
+    }
+
+    public static void main(String[] args) {
+        // TODO: Parse the first command-line argument as an integer n
+        // If no argument is provided, default to 40
+        int n = args.length > 0 ? Integer.parseInt(args[0]) : 40;
+
+        long start = System.nanoTime();
+        long result = fibonacci(n);
+        long elapsed = System.nanoTime() - start;
+
+        System.out.printf("fibonacci(%d) = %d%n", n, result);
+        System.out.printf("Computation time: %.3f ms%n", elapsed / 1e6);
+
+        /*
+         * TODO: Add a comment block discussing native-image trade-offs for this program:
+         *
+         * WHY native-image is a GOOD fit here:
+         * - (write 2–3 reasons related to startup time, memory, and use pattern)
+         *
+         * WHY native-image would be a POOR fit for a long-running server:
+         * - (write 2–3 reasons related to JIT profile-guided optimization,
+         *    peak throughput, and warm-up advantage)
+         *
+         * WHAT the startup time difference looks like in practice:
+         * - JVM:          ~200–500 ms to first output (JVM init + class loading)
+         * - Native image: ~5–30 ms to first output (no JVM, no class loading)
+         * - For a CLI tool called thousands of times in scripts, this matters a lot
+         */
+    }
+}
+```
+
+**What to verify:**
+- The iterative `fibonacci(40)` returns `102334155` without stack overflow
+- The comment block correctly identifies startup time and memory footprint as native-image strengths
+- The comment block correctly identifies that JIT profile-guided optimization gives long-running servers higher peak throughput than AOT
+
+<Note>Hint: `fibonacci(0)=0`, `fibonacci(1)=1`, `fibonacci(40)=102334155`. Use `long` to avoid integer overflow for larger values. The iterative approach with two variables runs in O(n) time and O(1) space.</Note>
+</Exercise>
+
 ## Try it
 
 Identify which of these Java features would require native-image configuration hints:

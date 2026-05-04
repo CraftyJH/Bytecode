@@ -204,6 +204,45 @@ class TaskTest {
 
 The `withStatus_validTransition` test verifies two things: the new record has the updated status, *and* the original record is unchanged — confirming immutability.
 
+<Exercise>
+Write 5 unit tests for `TaskStatus.canTransitionTo()` using a simple `check(boolean condition, String label)` helper instead of a test framework. Cover: TODO→IN_PROGRESS (valid), IN_PROGRESS→DONE (valid), TODO→DONE (invalid), DONE→TODO (invalid), and IN_PROGRESS→TODO (invalid). Print `PASS` or `FAIL` for each.
+
+```java
+public class Main {
+    enum TaskStatus {
+        TODO, IN_PROGRESS, DONE, CANCELLED;
+
+        boolean canTransitionTo(TaskStatus next) {
+            return switch (this) {
+                case TODO        -> next == IN_PROGRESS;
+                case IN_PROGRESS -> next == DONE || next == CANCELLED;
+                case DONE        -> false;
+                case CANCELLED   -> false;
+            };
+        }
+    }
+
+    static void check(boolean condition, String label) {
+        System.out.println((condition ? "PASS" : "FAIL") + ": " + label);
+    }
+
+    public static void main(String[] args) {
+        // TODO: write 5 check() calls covering valid and invalid transitions
+        check(TaskStatus.TODO.canTransitionTo(TaskStatus.IN_PROGRESS),
+              "TODO -> IN_PROGRESS should be valid");
+        // add 4 more checks...
+    }
+}
+```
+
+**What to verify:**
+- All 5 lines print `PASS`
+- At least 2 tests verify valid transitions and at least 2 verify invalid ones
+- A `CANCELLED` terminal-state case is included
+
+<Note>Hint: an invalid transition should return `false`, so `check(!TaskStatus.DONE.canTransitionTo(TaskStatus.TODO), "DONE -> TODO should be invalid")` should print `PASS`.</Note>
+</Exercise>
+
 ## Integration test — TaskService with real repository
 
 An **integration test** wires the real `InMemoryTaskRepository` to the real `TaskService`. No mocks. If you use mocks here you are testing your assumptions, not your code.
@@ -284,6 +323,82 @@ class TaskServiceIntegrationTest {
     }
 }
 ```
+
+<Exercise>
+Write an integration test (no framework — use `check()`) that creates a real `InMemoryTaskRepository` and a `TaskService`, creates 3 tasks, updates the status of two of them, and verifies the final state by querying the repository directly. The test must confirm the task count and the statuses of all three tasks.
+
+```java
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+
+public class Main {
+    enum TaskStatus {
+        TODO, IN_PROGRESS, DONE;
+        boolean canTransitionTo(TaskStatus n) {
+            return switch (this) {
+                case TODO -> n == IN_PROGRESS;
+                case IN_PROGRESS -> n == DONE;
+                case DONE -> false;
+            };
+        }
+    }
+
+    record Task(UUID id, String title, TaskStatus status) {
+        Task withStatus(TaskStatus s) { return new Task(id, title, s); }
+        static Task create(String title) {
+            return new Task(UUID.randomUUID(), title, TaskStatus.TODO);
+        }
+    }
+
+    static class Repo {
+        private final Map<UUID, Task> store = new ConcurrentHashMap<>();
+        void save(Task t) { store.put(t.id(), t); }
+        Optional<Task> findById(UUID id) { return Optional.ofNullable(store.get(id)); }
+        long count() { return store.size(); }
+    }
+
+    static class TaskService {
+        private final Repo repo;
+        TaskService(Repo repo) { this.repo = repo; }
+        Task create(String title) { Task t = Task.create(title); repo.save(t); return t; }
+        Optional<Task> updateStatus(UUID id, TaskStatus next) {
+            return repo.findById(id)
+                .filter(t -> t.status().canTransitionTo(next))
+                .map(t -> { Task u = t.withStatus(next); repo.save(u); return u; });
+        }
+    }
+
+    static void check(boolean cond, String label) {
+        System.out.println((cond ? "PASS" : "FAIL") + ": " + label);
+    }
+
+    public static void main(String[] args) {
+        Repo repo = new Repo();
+        TaskService svc = new TaskService(repo);
+
+        Task t1 = svc.create("Write specs");
+        Task t2 = svc.create("Build feature");
+        Task t3 = svc.create("Review PR");
+
+        svc.updateStatus(t1.id(), TaskStatus.IN_PROGRESS);
+        svc.updateStatus(t2.id(), TaskStatus.IN_PROGRESS);
+        svc.updateStatus(t2.id(), TaskStatus.DONE);
+
+        // TODO: write check() assertions verifying the state
+        check(repo.count() == 3, "repository holds 3 tasks");
+        // add more checks for individual task statuses...
+    }
+}
+```
+
+**What to verify:**
+- `PASS: repository holds 3 tasks` is printed
+- The test also checks that `t1` is `IN_PROGRESS`, `t2` is `DONE`, and `t3` is still `TODO`
+- All assertions print `PASS`
+
+<Note>Hint: use `repo.findById(t1.id()).map(Task::status).orElse(null)` to retrieve the current status for assertions.</Note>
+</Exercise>
 
 ## Parameterised validation tests
 
@@ -367,6 +482,70 @@ class RepositoryConcurrencyTest {
 ```
 
 <Note>The `start` latch synchronises all threads to begin at the same instant, maximising contention. Without it, threads would start staggered and the test would be far less likely to expose races.</Note>
+
+<Exercise>
+Run 10 threads, each creating 10 tasks in the same `InMemoryTaskRepository`. Use a `CountDownLatch` so all threads start at the same instant (maximising contention). After all threads finish, verify with `check()` that `findAll()` returns exactly 100 tasks.
+
+```java
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Main {
+    record Task(int id, String title) {}
+
+    static class InMemoryRepo {
+        private final Map<Integer, Task> store = new ConcurrentHashMap<>();
+        void save(Task t) { store.put(t.id(), t); }
+        List<Task> findAll() { return List.copyOf(store.values()); }
+    }
+
+    static void check(boolean cond, String label) {
+        System.out.println((cond ? "PASS" : "FAIL") + ": " + label);
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        InMemoryRepo repo = new InMemoryRepo();
+        int threadCount = 10;
+        int tasksPerThread = 10;
+
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done  = new CountDownLatch(threadCount);
+        AtomicInteger idGen  = new AtomicInteger(0);
+        ExecutorService exec = Executors.newFixedThreadPool(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            exec.submit(() -> {
+                try {
+                    start.await();  // wait for the gun
+                    for (int j = 0; j < tasksPerThread; j++) {
+                        int id = idGen.incrementAndGet();
+                        repo.save(new Task(id, "Task-" + id));
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        start.countDown();          // fire all threads simultaneously
+        done.await(10, TimeUnit.SECONDS);
+        exec.shutdown();
+
+        // TODO: call check() to verify exactly 100 tasks
+        check(repo.findAll().size() == 100, "all 100 tasks persisted without loss");
+    }
+}
+```
+
+**What to verify:**
+- `PASS: all 100 tasks persisted without loss` is printed
+- No tasks are silently overwritten due to race conditions (thanks to `ConcurrentHashMap` + unique ids)
+
+<Note>Hint: if you see `FAIL`, check that each task has a unique id. Using `AtomicInteger.incrementAndGet()` guarantees uniqueness across threads without locking.</Note>
+</Exercise>
 
 ## Async notification test
 

@@ -234,6 +234,81 @@ public class SlowWordFrequency {
 }
 ```
 
+<Exercise>
+Study the `SlowWordFrequency` implementation above. Without running it yet, identify the 3 performance bottlenecks by adding inline comments to a copy of the code. Then rewrite the `count` method to fix all three issues at once using `HashMap.merge`, a single `toLowerCase` call, and eliminating the manual key scan.
+
+```java
+import java.util.*;
+
+public class Main {
+    /**
+     * TODO: Copy the slow implementation below and add a comment on each
+     * bottleneck line explaining WHAT is slow and WHY.
+     *
+     * Bottleneck 1: the inner for-loop over freq.keySet()
+     *   → What is it doing? What complexity does it create?
+     *
+     * Bottleneck 2: freq.get(key) + freq.put(key, ...)
+     *   → How many hash lookups does this perform per hit?
+     *
+     * Bottleneck 3: word.toLowerCase() called inside the loop
+     *   → What does this allocate on every iteration?
+     */
+    static Map<String, Integer> slowCount(List<String> words) {
+        Map<String, Integer> freq = new HashMap<>();
+        for (String word : words) {
+            String lower = word.toLowerCase();          // bottleneck?
+            boolean found = false;
+            for (String key : freq.keySet()) {          // bottleneck?
+                if (key.equals(lower)) {
+                    freq.put(key, freq.get(key) + 1);   // bottleneck?
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) freq.put(lower, 1);
+        }
+        return freq;
+    }
+
+    /**
+     * TODO: Write the optimized version that fixes all three bottlenecks.
+     * Requirements:
+     * - Use freq.merge(key, 1, Integer::sum) — eliminates the inner loop AND the double lookup
+     * - Call toLowerCase() exactly once per word (same as before, but now it's the only cost)
+     * - Pre-size the HashMap to avoid rehashing: new HashMap<>(words.size() * 2)
+     */
+    static Map<String, Integer> fastCount(List<String> words) {
+        // TODO: implement
+        return null;
+    }
+
+    public static void main(String[] args) {
+        List<String> words = generateWords(10_000);
+        System.out.println("Slow result size: " + slowCount(words).size());
+        System.out.println("Fast result size: " + fastCount(words).size());
+        // Both should print the same number of distinct words
+    }
+
+    static List<String> generateWords(int n) {
+        String[] vocab = {"The", "cat", "sat", "on", "the", "mat",
+                          "A", "dog", "ran", "through", "a", "field"};
+        List<String> words = new ArrayList<>(n);
+        Random rng = new Random(42);
+        for (int i = 0; i < n; i++) words.add(vocab[rng.nextInt(vocab.length)]);
+        return words;
+    }
+}
+```
+
+**What to verify:**
+- Both `slowCount` and `fastCount` produce identical result maps (same keys, same counts)
+- Your comments correctly identify: O(n×m) inner loop, two-lookup get+put, and per-iteration String allocation
+- The optimized version uses `merge` and removes the `found` flag and the inner for-loop entirely
+
+<Note>Hint: `map.merge(key, 1, Integer::sum)` is equivalent to `map.put(key, map.getOrDefault(key, 0) + 1)` but uses only one hash lookup instead of two. It also reads better.</Note>
+</Exercise>
+
 ## Step-by-step optimization
 
 **Step 1: Fix the O(n×m) keySet scan**
@@ -301,6 +376,133 @@ public class FastWordFrequency {
 ```
 
 Expected result on typical hardware: `SlowWordFrequency` ~400–800 ms; `FastWordFrequency` ~30–60 ms — a 10–20× improvement from algorithmic fixes alone, with no JVM flags or micro-optimization tricks.
+
+<Exercise>
+Add timing code around both the slow and fast `count` implementations. Run each counting 10,000 words in a loop (repeat the count 5 times after a warm-up). Print the average elapsed time and the speedup factor.
+
+```java
+import java.util.*;
+
+public class Main {
+    // TODO: Copy slowCount() and fastCount() from Exercise 1 into this file
+
+    static List<String> generateWords(int n) {
+        String[] vocab = {"The", "cat", "sat", "on", "the", "mat",
+                          "A", "dog", "ran", "through", "a", "field"};
+        List<String> words = new ArrayList<>(n);
+        Random rng = new Random(42);
+        for (int i = 0; i < n; i++) words.add(vocab[rng.nextInt(vocab.length)]);
+        return words;
+    }
+
+    static long measureMs(Runnable task, int repetitions) {
+        // TODO: Run task.run() 'repetitions' times
+        // Record total time with System.nanoTime()
+        // Return average time per repetition in milliseconds
+        return 0;
+    }
+
+    public static void main(String[] args) {
+        List<String> words = generateWords(10_000);
+
+        // Warm up: run both methods several times before measuring
+        // TODO: call slowCount(words) and fastCount(words) 3 times each to warm up
+
+        int repetitions = 5;
+
+        // TODO: Measure slowCount using measureMs() with 5 repetitions
+        // TODO: Measure fastCount using measureMs() with 5 repetitions
+
+        // TODO: Print slow average time in ms
+        // TODO: Print fast average time in ms
+        // TODO: Print speedup ratio: slowTime / fastTime
+        // TODO: Print a one-line interpretation: "FastCount is ~Xx faster than SlowCount"
+
+        // Sanity check: both should produce the same number of distinct words
+        System.out.println("Distinct words (slow): " + slowCount(words).size());
+        System.out.println("Distinct words (fast): " + fastCount(words).size());
+    }
+}
+```
+
+**What to verify:**
+- `slowCount` takes tens to hundreds of milliseconds for 10k words (O(n×m) behavior)
+- `fastCount` takes under 5 ms for 10k words
+- The speedup factor is at least 10×; with larger word lists it will be even higher
+
+<Note>Hint: wrap the call in a lambda: `measureMs(() -> slowCount(words), 5)`. Make sure to actually call `task.run()` inside `measureMs` — otherwise you are measuring nothing.</Note>
+</Exercise>
+
+<Exercise>
+Extend the optimized `fastCount` to be thread-safe. Use `ConcurrentHashMap` and `merge` to simulate 4 threads each processing a quarter of the word list in parallel. Verify that the final counts exactly match the single-threaded result.
+
+```java
+import java.util.*;
+import java.util.concurrent.*;
+
+public class Main {
+    static List<String> generateWords(int n) {
+        String[] vocab = {"The", "cat", "sat", "on", "the", "mat",
+                          "A", "dog", "ran", "through", "a", "field"};
+        List<String> words = new ArrayList<>(n);
+        Random rng = new Random(42);
+        for (int i = 0; i < n; i++) words.add(vocab[rng.nextInt(vocab.length)]);
+        return words;
+    }
+
+    // Single-threaded reference implementation
+    static Map<String, Integer> singleThreadedCount(List<String> words) {
+        Map<String, Integer> freq = new HashMap<>(words.size() * 2);
+        for (String word : words) {
+            freq.merge(word.toLowerCase(), 1, Integer::sum);
+        }
+        return freq;
+    }
+
+    // TODO: Implement multi-threaded version
+    static Map<String, Integer> multiThreadedCount(List<String> words)
+            throws InterruptedException, ExecutionException {
+        int threadCount = 4;
+        // TODO: Create a ConcurrentHashMap<String, Integer> to hold shared results
+
+        // TODO: Split words into 4 equal sub-lists (each covering words.size()/4 elements)
+        // Hint: use words.subList(start, end)
+
+        // TODO: Create an ExecutorService with 4 threads
+
+        // TODO: Submit one Callable per sub-list that calls merge() on each word
+        // in its sub-list into the shared ConcurrentHashMap
+
+        // TODO: Wait for all tasks to complete (call get() on each Future)
+
+        // TODO: Shut down the executor
+
+        // TODO: Return the shared ConcurrentHashMap
+        return null;
+    }
+
+    public static void main(String[] args) throws Exception {
+        List<String> words = generateWords(100_000);
+
+        Map<String, Integer> single = singleThreadedCount(words);
+        Map<String, Integer> multi  = multiThreadedCount(words);
+
+        // TODO: Verify that both maps contain exactly the same keys and values
+        // Print "PASS" if they match, "FAIL: <details>" if they differ
+
+        // TODO: Time both versions over 10 repetitions and print the speedup
+        // (multi-threaded may not be faster for small lists due to thread overhead)
+    }
+}
+```
+
+**What to verify:**
+- The multi-threaded result is identical to the single-threaded result (same keys and counts)
+- `ConcurrentHashMap.merge` is atomic — no count is lost even when 4 threads write the same key simultaneously
+- For 100k+ words, the multi-threaded version may show a speedup on a multi-core machine
+
+<Note>Hint: `ConcurrentHashMap.merge` is thread-safe and atomic per key, so no additional synchronization is needed. The key difference from `HashMap.merge` is that concurrent updates to different keys happen in parallel without blocking each other.</Note>
+</Exercise>
 
 ## Try it
 

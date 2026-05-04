@@ -291,6 +291,56 @@ public class EventBus {
 
 `CopyOnWriteArrayList` ensures that iterating the handler list in `publish` is safe even if another thread is adding a subscriber at the same time.
 
+<Exercise>
+Implement a thread-safe publish-subscribe system. Subscribers register a `Runnable` handler for a topic string. When the publisher calls `publish(topic)`, all registered handlers for that topic are invoked. Use `ConcurrentHashMap` with `CopyOnWriteArrayList` for the registry.
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    static class EventBus {
+        private final ConcurrentHashMap<String, CopyOnWriteArrayList<Runnable>> registry =
+            new ConcurrentHashMap<>();
+
+        public void subscribe(String topic, Runnable handler) {
+            // TODO: add handler to the list for this topic (create list if absent)
+            registry.computeIfAbsent(topic, k -> new CopyOnWriteArrayList<>()).add(handler);
+        }
+
+        public void publish(String topic) {
+            // TODO: retrieve the handler list and invoke each handler
+            CopyOnWriteArrayList<Runnable> handlers = registry.get(topic);
+            if (handlers != null) handlers.forEach(Runnable::run);
+        }
+    }
+
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+
+        bus.subscribe("login",  () -> System.out.println("Handler A: user logged in"));
+        bus.subscribe("login",  () -> System.out.println("Handler B: send welcome email"));
+        bus.subscribe("logout", () -> System.out.println("Handler C: user logged out"));
+
+        System.out.println("-- Publishing login --");
+        bus.publish("login");
+
+        System.out.println("-- Publishing logout --");
+        bus.publish("logout");
+
+        System.out.println("-- Publishing unknown --");
+        bus.publish("unknown");   // no handlers — should not throw
+    }
+}
+```
+
+**What to verify:**
+- `"-- Publishing login --"` is followed by both `"Handler A: user logged in"` and `"Handler B: send welcome email"`
+- `"-- Publishing logout --"` is followed by `"Handler C: user logged out"`
+- `"-- Publishing unknown --"` produces no output and no exception
+
+<Note>Hint: `computeIfAbsent(topic, k -> new CopyOnWriteArrayList<>())` atomically creates the list on first subscription. `CopyOnWriteArrayList` is safe to iterate while another thread subscribes concurrently.</Note>
+</Exercise>
+
 ## Graceful shutdown
 
 A well-behaved concurrent application shuts down cleanly — finishing in-flight work, releasing resources, and not leaving background threads to die with errors:
@@ -326,6 +376,81 @@ public class Application {
 ```
 
 The pattern: `shutdown()` → `awaitTermination(timeout)` → `shutdownNow()` as a last resort.
+
+<Exercise>
+**Challenge:** Extend the 3-stage pipeline from the earlier exercise with a `shutdown()` method that combines a volatile stop flag and a poison pill. The pipeline should drain any items already in the queues before stopping, rather than dropping them abruptly.
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    static final int POISON = -1;
+    static volatile boolean running = true;
+
+    static BlockingQueue<Integer> queue1 = new ArrayBlockingQueue<>(10);
+    static BlockingQueue<Integer> queue2 = new ArrayBlockingQueue<>(10);
+
+    static void shutdown() throws InterruptedException {
+        // Set stop flag then inject poison pill to drain remaining items
+        running = false;
+        queue1.put(POISON);   // signals stage1 to stop after draining
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        // Producer: generates items while running
+        Thread producer = new Thread(() -> {
+            try {
+                int i = 1;
+                while (running) {
+                    queue1.put(i++);
+                    Thread.sleep(30);
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        // Stage 1: doubles items, propagates poison pill
+        Thread stage1 = new Thread(() -> {
+            try {
+                while (true) {
+                    int val = queue1.take();
+                    if (val == POISON) { queue2.put(POISON); break; }
+                    queue2.put(val * 2);
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        // Consumer: prints items, stops on poison pill
+        Thread consumer = new Thread(() -> {
+            try {
+                while (true) {
+                    int val = queue2.take();
+                    if (val == POISON) break;
+                    System.out.println("Consumed: " + val);
+                }
+                System.out.println("Pipeline drained and stopped");
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        producer.start(); stage1.start(); consumer.start();
+
+        // Let the pipeline run briefly, then shut it down gracefully
+        Thread.sleep(150);
+        shutdown();
+
+        producer.join(); stage1.join(); consumer.join();
+        System.out.println("Shutdown complete");
+    }
+}
+```
+
+**What to verify:**
+- Several items are consumed (roughly 4–5 depending on timing)
+- `"Pipeline drained and stopped"` is printed — showing remaining queued items were processed before stop
+- `"Shutdown complete"` is printed last
+- No items already in the queue are dropped
+
+<Note>Hint: setting `running = false` stops the producer from adding new items. Inserting the poison pill into `queue1` then signals stage1 to stop — but only after processing any items ahead of it in the queue, so nothing is lost.</Note>
+</Exercise>
 
 ## Try it
 

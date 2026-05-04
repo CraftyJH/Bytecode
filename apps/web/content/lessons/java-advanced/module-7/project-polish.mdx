@@ -261,6 +261,88 @@ public class UndoableTaskService {
 
 <Note>Undo operations bypass domain transition guards intentionally — they are a privileged, system-level reversal, not a user-initiated status change. Document this clearly in the Javadoc of `undo()`.</Note>
 
+<Exercise>
+Implement `CreateTaskCommand` and `DeleteTaskCommand`, both implementing a `Command` interface with `execute()` and `undo()`. Build a `CommandHistory` class with `execute(Command)` and `undo()` methods backed by a `Deque`. Run 3 commands (create task A, create task B, delete task A), then undo 2 of them. Print the repository size after each operation.
+
+```java
+import java.util.*;
+
+public class Main {
+    record Task(int id, String title) {}
+
+    interface Command {
+        void execute();
+        void undo();
+    }
+
+    static class Repo {
+        private final Map<Integer, Task> store = new LinkedHashMap<>();
+        void save(Task t) { store.put(t.id(), t); }
+        void delete(int id) { store.remove(id); }
+        int size() { return store.size(); }
+    }
+
+    static class CreateTaskCommand implements Command {
+        private final Repo repo;
+        private final Task task;
+        CreateTaskCommand(Repo repo, Task task) { this.repo = repo; this.task = task; }
+        // TODO: execute saves, undo deletes
+        public void execute() {}
+        public void undo() {}
+    }
+
+    static class DeleteTaskCommand implements Command {
+        private final Repo repo;
+        private final Task task;
+        DeleteTaskCommand(Repo repo, Task task) { this.repo = repo; this.task = task; }
+        // TODO: execute deletes, undo saves
+        public void execute() {}
+        public void undo() {}
+    }
+
+    static class CommandHistory {
+        private final Deque<Command> history = new ArrayDeque<>();
+        void execute(Command cmd) {
+            // TODO: execute and push to history
+        }
+        boolean undo() {
+            // TODO: pop and undo; return false if empty
+            return false;
+        }
+    }
+
+    public static void main(String[] args) {
+        Repo repo = new Repo();
+        CommandHistory history = new CommandHistory();
+        Task taskA = new Task(1, "Task A");
+        Task taskB = new Task(2, "Task B");
+
+        history.execute(new CreateTaskCommand(repo, taskA));
+        System.out.println("After create A: " + repo.size());
+
+        history.execute(new CreateTaskCommand(repo, taskB));
+        System.out.println("After create B: " + repo.size());
+
+        history.execute(new DeleteTaskCommand(repo, taskA));
+        System.out.println("After delete A: " + repo.size());
+
+        history.undo();
+        System.out.println("After undo 1:   " + repo.size());
+
+        history.undo();
+        System.out.println("After undo 2:   " + repo.size());
+    }
+}
+```
+
+**What to verify:**
+- `After create A: 1`, `After create B: 2`, `After delete A: 1`
+- `After undo 1: 2` (delete is undone — task A is restored)
+- `After undo 2: 1` (create B is undone — task B is removed)
+
+<Note>Hint: `CommandHistory.execute` should call `cmd.execute()` then `history.push(cmd)`. `undo` should call `history.pop().undo()` if the deque is non-empty.</Note>
+</Exercise>
+
 ## Observer pattern — the TaskEventBus
 
 The **Observer pattern** decouples event producers from event consumers. Our generic `TaskEventBus` (which mirrors the EventBus from Module 1) broadcasts domain events to registered listeners:
