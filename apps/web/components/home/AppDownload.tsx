@@ -40,14 +40,13 @@ export function AppDownload() {
                 <span className="text-xs text-prose-faint">(soon)</span>
               </a>
               <a
-                href="#"
-                aria-label="Get it on Google Play (coming soon)"
-                className="flex items-center gap-2.5 px-5 py-3 rounded-md border text-sm font-medium text-prose-muted hover:text-prose hover:bg-subtle transition-colors duration-100"
-                style={{ borderColor: "var(--border-emphasis)" }}
+                href="/get-the-app/android"
+                aria-label="Download Bytecode Android APK and install instructions"
+                className="flex items-center gap-2.5 px-5 py-3 rounded-md text-sm font-medium bg-accent text-inverse hover:bg-accent-warm transition-colors duration-100"
               >
                 <Smartphone size={16} />
-                Google Play
-                <span className="text-xs text-prose-faint">(soon)</span>
+                Android APK
+                <span className="text-xs opacity-80">(download)</span>
               </a>
             </div>
           </div>
