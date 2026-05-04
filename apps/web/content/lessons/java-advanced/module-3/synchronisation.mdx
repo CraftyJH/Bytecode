@@ -1,0 +1,226 @@
+export const meta = {
+  title: "Synchronisation — synchronized Keyword",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "sy-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    static int counter = 0;
+
+    public static void main(String[] args) throws InterruptedException {
+        Runnable inc = () -> {
+            for (int i = 0; i < 1000; i++) counter++;
+        };
+        Thread t1 = new Thread(inc);
+        Thread t2 = new Thread(inc);
+        t1.start(); t2.start();
+        t1.join();  t2.join();
+        System.out.println(counter);
+    }
+}`,
+    expectedOutput: "A value ≤ 2000 (often less — e.g. 1643 or 1872)",
+    explanation: "Without synchronisation the increment `counter++` is not atomic: it compiles to a read, an add, and a write. When two threads interleave those three steps they can both read the same value, increment it independently, and write back, losing one update. The final total is therefore unpredictable and usually less than 2000.",
+  },
+  endQ1: {
+    id: "sy-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Two `synchronized` methods `foo()` and `bar()` exist on the same object. Thread A is inside `foo()`. Can Thread B enter `bar()` at the same time?",
+    options: [
+      { text: "Yes — each method has its own lock.", correct: false, feedback: "Both methods synchronise on the same intrinsic lock: the `this` object. Only one thread can hold it at a time." },
+      { text: "No — both methods share the object's intrinsic lock.", correct: true, feedback: "Correct. `synchronized` instance methods all lock on `this`. Thread B must wait until A releases the lock by exiting foo()." },
+      { text: "Yes — synchronized only blocks threads calling the same method.", correct: false, feedback: "synchronized blocks any thread trying to acquire the *same* lock, regardless of which synchronized method it wants to enter." },
+      { text: "It depends on whether the methods are static.", correct: false, feedback: "For instance (non-static) methods the lock is always `this`. Static synchronized methods use the Class object as the lock." },
+    ],
+    explanation: "Every Java object has one intrinsic lock (monitor). All `synchronized` instance methods on that object compete for the *same* lock. This ensures that only one thread is inside *any* of those methods at a given time.",
+  },
+  endQ2: {
+    id: "sy-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the synchronized block so it locks on `this`:",
+    code: `public void increment() {
+    synchronized (___) {
+        count++;
+    }
+}`,
+    correctAnswers: ["this"],
+    caseSensitive: true,
+    explanation: "`synchronized (this)` acquires the intrinsic lock of the current object. It is equivalent to marking the entire method `synchronized`, but lets you narrow the critical section to only the lines that actually need protection.",
+  },
+  endQ3: {
+    id: "sy-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Counter {
+    private int count = 0;
+
+    public synchronized void increment() {
+        count++;
+    }
+
+    public int getCount() {   // bug here
+        return count;
+    }
+}`,
+    buggyLine: 8,
+    issue: "`getCount()` is not synchronized, so a reading thread may see a stale cached value of `count` even though `increment()` is synchronized.",
+    explanation: "Synchronisation provides both mutual exclusion *and* visibility. If the reader is not synchronized on the same lock, the Java Memory Model does not guarantee it will see the latest write. Both the writer (increment) and the reader (getCount) must synchronise on the same lock.",
+  },
+};
+
+Every multi-threaded application that shares mutable state faces the same fundamental hazard: a **race condition**. When two threads read and write the same variable without coordination, the result depends on the exact timing of CPU scheduling — something you cannot control or predict. Java's `synchronized` keyword is the oldest and most straightforward tool for eliminating race conditions. Understanding it deeply — what it locks, what it guarantees, and where it falls short — is essential before moving on to more advanced primitives.
+
+## The race condition problem
+
+Consider a simple shared counter. Without any protection:
+
+```java
+public class UnsafeCounter {
+    private int count = 0;
+
+    public void increment() {
+        count++;   // NOT atomic: read + add + write
+    }
+
+    public int getCount() { return count; }
+}
+```
+
+`count++` looks like one operation but compiles to three bytecode instructions: load the value, add 1, store the result. Two threads can interleave these steps and both write back the same incremented value, effectively losing one increment. Run 5 threads incrementing 1 000 times each and the final count will almost certainly be less than 5 000.
+
+## synchronized methods
+
+Marking a method `synchronized` makes the JVM acquire the object's **intrinsic lock** (also called a monitor lock) before the method body executes, and release it when the method returns:
+
+```java
+public class SafeCounter {
+    private int count = 0;
+
+    public synchronized void increment() {
+        count++;   // now atomic with respect to other synchronized methods
+    }
+
+    public synchronized int getCount() {
+        return count;
+    }
+}
+```
+
+Only one thread can hold the intrinsic lock at a time. Any other thread that calls a `synchronized` method on the same object blocks until the lock is free.
+
+<Note>Both the write *and* the read must be synchronised on the same lock to guarantee visibility. A non-synchronised `getCount()` can return a stale cached value even when `increment()` is properly synchronised.</Note>
+
+## synchronized blocks
+
+Sometimes you want to protect only part of a method — the critical section. A `synchronized` block lets you specify exactly what to lock:
+
+```java
+public class BatchCounter {
+    private final Object lock = new Object();
+    private int count = 0;
+
+    public void addBatch(int[] values) {
+        // expensive pre-processing — no need to hold the lock
+        int sum = 0;
+        for (int v : values) sum += v;
+
+        synchronized (lock) {
+            count += sum;   // only this write needs protection
+        }
+    }
+}
+```
+
+Using a dedicated private `lock` object (rather than `this`) is often better practice: it prevents external code from locking on `this` and interfering with your synchronisation strategy.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Intrinsic lock and visibility
+
+Acquiring a lock flushes the acquiring thread's CPU cache so it reads fresh values from main memory. Releasing a lock flushes writes back to main memory. This means `synchronized` gives you two guarantees:
+
+1. **Mutual exclusion** — only one thread executes the critical section at a time.
+2. **Visibility** — changes made inside a `synchronized` block are visible to the next thread that acquires the *same* lock.
+
+## Static synchronized methods
+
+A `static synchronized` method locks on the **Class object** (`Counter.class`), not on any instance. This is a separate lock from any instance's intrinsic lock:
+
+```java
+public class IdGenerator {
+    private static int nextId = 0;
+
+    public static synchronized int generate() {
+        return ++nextId;
+    }
+}
+```
+
+Instance-synchronized and class-synchronized methods do not interfere with each other — they use different locks.
+
+## Try it
+
+Build a synchronized counter and hammer it from 5 threads, 1 000 increments each. The total must always be exactly 5 000:
+
+```java
+public class Main {
+    static class Counter {
+        private int count = 0;
+
+        public synchronized void increment() { count++; }
+        public synchronized int getCount()   { return count; }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        Counter counter = new Counter();
+        Thread[] threads = new Thread[5];
+
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < 1000; j++) counter.increment();
+            });
+        }
+
+        for (Thread t : threads) t.start();
+        for (Thread t : threads) t.join();
+
+        System.out.println("Final count: " + counter.getCount());  // always 5000
+    }
+}
+```
+
+Now remove `synchronized` from `increment()` and run it again — observe the inconsistent totals. Re-add `synchronized` and confirm it is always 5 000.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Synchronising only the writer, not the reader** — `synchronized` must be applied consistently on both read and write paths to guarantee visibility.
+- **Locking on different objects** — `synchronized (lock1)` and `synchronized (lock2)` provide no mutual exclusion between them. All threads protecting the same data must lock on the *same* object.
+- **Holding the lock too long** — synchronising an entire method that does I/O, network calls, or heavy computation blocks all other threads for far too long. Narrow the critical section to only the shared-state access.
+- **Confusing instance locks and class locks** — `synchronized` on an instance method and `static synchronized` use completely separate locks; they do not protect each other.
+
+## Recap
+
+- **Race conditions** arise when multiple threads read and write shared mutable state without coordination.
+- `synchronized` on a method acquires the object's intrinsic lock for the duration of the call, providing mutual exclusion and visibility.
+- `synchronized (expr) { ... }` lets you lock any object and narrow the critical section.
+- Both reads and writes to shared variables must be synchronised on the same lock.
+- Static `synchronized` methods lock on the `Class` object, not on `this`.
+
+**Up next:** `synchronized` can be heavy-handed. Lesson 3 introduces `volatile` and the `Atomic` classes for lighter-weight visibility and atomicity guarantees.

@@ -1,0 +1,203 @@
+export const meta = {
+  title: "Lambda Expressions — Syntax, Capture & Effectively Final",
+  duration: 14,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "le-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        int base = 10;
+        Runnable r = () -> System.out.println(base + 5);
+        base = 20; // compile error? or fine?
+        r.run();
+    }
+}`,
+    expectedOutput: "Compile error: Variable used in lambda expression should be effectively final",
+    explanation: "The variable `base` is reassigned after the lambda captures it. Java requires captured local variables to be effectively final — never reassigned after their initial assignment. The line `base = 20` breaks that rule, causing a compile-time error.",
+  },
+  endQ1: {
+    id: "le-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which lambda syntax is valid for a single-expression body that returns a value?",
+    options: [
+      { text: "`(x) -> { return x * 2 }`", correct: false, feedback: "A block body needs a semicolon after the return statement: `{ return x * 2; }`." },
+      { text: "`(x) -> x * 2`", correct: true, feedback: "Correct — the expression body omits braces and the `return` keyword. The expression's value is implicitly returned." },
+      { text: "`x => x * 2`", correct: false, feedback: "Arrow syntax with `=>` is JavaScript/C#. Java uses `->`." },
+      { text: "`lambda(x) { return x * 2; }`", correct: false, feedback: "Java has no `lambda` keyword. Lambdas are anonymous, written as parameters then arrow then body." },
+    ],
+    explanation: "Java lambdas use `->`. A single-expression body `(params) -> expr` implicitly returns the expression. A block body `(params) -> { statements; }` requires an explicit `return` and a semicolon on every statement.",
+  },
+  endQ2: {
+    id: "le-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Fill in the blank so the lambda compiles. The variable `limit` must not be reassigned after this line:",
+    code: `int limit = 5;
+Predicate<Integer> small = n -> n < ___;`,
+    correctAnswers: ["limit"],
+    caseSensitive: true,
+    explanation: "`limit` is effectively final because it is assigned once and never changed. The lambda can capture it directly. Anything that reassigns `limit` later would break this.",
+  },
+  endQ3: {
+    id: "le-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Counter {
+    private int count = 0;
+
+    public Runnable makeIncrementer() {
+        int step = 1;
+        step = 2;
+        return () -> count += step;
+    }
+}`,
+    buggyLine: 6,
+    issue: "Variable `step` is reassigned after declaration, making it not effectively final — it cannot be captured by the lambda on line 7.",
+    explanation: "Lambda bodies can only capture local variables that are effectively final. `step` is assigned on line 5 and then reassigned on line 6, so the compiler rejects the capture on line 7. Remove `step = 2` and initialise directly with `int step = 2;` to fix it.",
+  },
+};
+
+Lambda expressions are Java's concise way to represent a single-method interface — what the language calls a *functional interface*. Before lambdas arrived in Java 8, wiring a callback, a comparator, or a strategy meant writing a full anonymous class. With lambdas, the same intent fits on one readable line. Modern Java code — streams, CompletableFuture, Spring event handlers — is built almost entirely on top of lambdas.
+
+## Syntax: expression body vs block body
+
+The simplest form drops the braces and the `return` keyword. The expression's value is implicitly returned:
+
+```java
+// Single parameter, expression body
+Function<String, Integer> len = s -> s.length();
+
+// Two parameters, expression body
+BinaryOperator<Integer> add = (a, b) -> a + b;
+
+// Zero parameters
+Supplier<String> greeting = () -> "Hello";
+```
+
+When the body needs more than one statement, add braces and an explicit `return`:
+
+```java
+Function<Integer, String> classify = n -> {
+    if (n < 0) return "negative";
+    if (n == 0) return "zero";
+    return "positive";
+};
+```
+
+The type of the lambda is always inferred from context — whatever functional interface the variable or parameter expects. You rarely (if ever) need to write the type yourself.
+
+## Parameter types and parentheses
+
+- **Single parameter, type inferred:** `s -> s.length()` — no parentheses needed.
+- **Single parameter, type explicit:** `(String s) -> s.length()` — parentheses required when you declare the type.
+- **Multiple parameters:** `(a, b) -> a + b` — always parenthesised.
+- **Zero parameters:** `() -> 42` — empty parens are required.
+
+## Capturing local variables — effectively final
+
+Lambdas can read local variables from the enclosing scope, but only if those variables are *effectively final*: assigned exactly once and never changed thereafter.
+
+```java
+int multiplier = 3;                          // assigned once — effectively final
+Function<Integer, Integer> triple = n -> n * multiplier; // OK
+System.out.println(triple.apply(7));          // 21
+```
+
+The following fails to compile:
+
+```java
+int counter = 0;
+Runnable bump = () -> counter++;  // ERROR: counter is not effectively final
+```
+
+The restriction exists because lambdas may outlive the stack frame they were created in (they can be stored in fields, passed to threads, etc.). Allowing mutation of local variables would make that memory-safe reasoning impossible.
+
+<Note>Instance fields and static fields are **not** subject to the effectively-final restriction. A lambda can freely read and write `this.count` because the object is heap-allocated and lives independently of any single stack frame. The restriction is only for **local variables**.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## `this` in lambdas vs anonymous classes
+
+One subtle difference between a lambda and an anonymous class: `this` means something different in each.
+
+```java
+public class Outer {
+    private String name = "Outer";
+
+    void demo() {
+        // Anonymous class — `this` refers to the anonymous class instance
+        Runnable anon = new Runnable() {
+            @Override public void run() {
+                System.out.println(this.getClass().getSimpleName()); // prints something like "Outer$1"
+            }
+        };
+
+        // Lambda — `this` refers to the enclosing Outer instance
+        Runnable lam = () -> System.out.println(this.name); // prints "Outer"
+
+        anon.run();
+        lam.run();
+    }
+}
+```
+
+Lambdas do not introduce a new scope for `this`. They are *closures over the enclosing object*, not objects in their own right. This makes them lighter than anonymous classes (no new class file, no extra object allocation in many JVM implementations).
+
+## Try it
+
+Open the editor and experiment with these three lambdas:
+
+```java
+import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // 1. Function: String -> Integer (length)
+        Function<String, Integer> length = s -> s.length();
+        System.out.println(length.apply("lambda"));  // 6
+
+        // 2. BiFunction: (Integer, Integer) -> Integer (multiply)
+        BiFunction<Integer, Integer, Integer> multiply = (a, b) -> a * b;
+        System.out.println(multiply.apply(6, 7));    // 42
+
+        // 3. Consumer: print with prefix
+        Consumer<String> printer = s -> System.out.println(">> " + s);
+        printer.accept("Hello from lambda");         // >> Hello from lambda
+    }
+}
+```
+
+Modify `length` to return the string reversed instead. Then change `multiply` to a block-body lambda that also prints the operands before returning.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Mutating a captured local variable** — any reassignment (including `i++`, `+=`, etc.) makes the variable not effectively final. Initialise it to the final value before the lambda, or store state in an array `int[] count = {0};` (the array reference is final even if its contents change — though this pattern is a code smell).
+- **Forgetting empty parentheses for zero-argument lambdas** — `() -> 42` not `-> 42`. The parens are always required when there are no parameters.
+- **Wrapping simple lambdas in anonymous classes** — if you find yourself writing `new Comparator<String>() { public int compare(...) { ... } }`, that is almost always better as a lambda or method reference.
+- **Confusing block body and expression body return** — `x -> { x * 2 }` is a compile error (no `return`). Either drop the braces (`x -> x * 2`) or add the return (`x -> { return x * 2; }`).
+
+## Recap
+
+- Lambda syntax: `(params) -> expr` for single-expression; `(params) -> { stmts; }` for multi-statement
+- Captured local variables must be **effectively final** — assigned once, never changed
+- `this` inside a lambda refers to the **enclosing class**, not the lambda itself
+- Lambdas are lighter than anonymous classes: no new class file, `this` is inherited
+
+**Up next:** The built-in functional interfaces that lambdas plug into — `Function`, `Consumer`, `Supplier`, `Predicate`, and their variants.

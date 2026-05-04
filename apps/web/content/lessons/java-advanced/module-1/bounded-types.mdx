@@ -1,0 +1,222 @@
+export const meta = {
+  title: "Bounded Type Parameters",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "bt-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the effect of declaring `<T extends Comparable<T>>`?",
+    options: [
+      { text: "T must be a primitive type like int or double.", correct: false, feedback: "Primitives cannot be used as type arguments at all. `extends` here constrains T to a reference type that implements Comparable." },
+      { text: "T must be exactly the Comparable class, not a subtype.", correct: false, feedback: "`extends` in a bound means 'is a subtype of' — it includes Comparable itself and anything that implements it." },
+      { text: "T must implement Comparable<T>, so the method compareTo(T) can be called inside the generic code.", correct: true, feedback: "Correct. The bound gives the compiler enough information to allow `a.compareTo(b)` inside the method body." },
+      { text: "T can be any type; the bound is just a hint for documentation.", correct: false, feedback: "Bounds are enforced by the compiler. Passing a type that doesn't satisfy the bound is a compile error." },
+    ],
+    explanation: "An upper bound `T extends SomeType` tells the compiler that T is guaranteed to have all the methods of SomeType. Inside the generic code you can freely call those methods on a variable of type T.",
+  },
+  endQ1: {
+    id: "bt-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    static <T extends Comparable<T>> T max(T a, T b) {
+        return a.compareTo(b) >= 0 ? a : b;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(max(3, 7));
+        System.out.println(max("banana", "apple"));
+    }
+}`,
+    expectedOutput: "7\nbanana",
+    explanation: "`max(3, 7)` compares integers: 3.compareTo(7) < 0 so b=7 is returned. `max(\"banana\", \"apple\")` compares strings lexicographically: 'b' > 'a' so `a.compareTo(b) > 0` and \"banana\" is returned.",
+  },
+  endQ2: {
+    id: "bt-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the method signature so that T must implement both Cloneable and Serializable:",
+    code: `public <T extends Cloneable ___ Serializable> void process(T item) { }`,
+    correctAnswers: ["&"],
+    caseSensitive: true,
+    explanation: "Multiple bounds are joined with `&`. The first bound may be a class; subsequent bounds must be interfaces. `extends` appears only once at the start.",
+  },
+  endQ3: {
+    id: "bt-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class MathUtils {
+    public static <T> T clamp(T value, T min, T max) {
+        if (value.compareTo(min) < 0) return min;   // bug here
+        if (value.compareTo(max) > 0) return max;
+        return value;
+    }
+}`,
+    buggyLine: 3,
+    issue: "`T` has no bound, so the compiler doesn't know that `compareTo` exists. The method needs `<T extends Comparable<T>>`.",
+    explanation: "Without a bound, T is treated as Object, which has no `compareTo` method. Adding `<T extends Comparable<T>>` tells the compiler T is guaranteed to provide `compareTo`, making the comparison legal.",
+  },
+};
+
+Unbounded type parameters are powerful but limited: inside a generic method, you can only call methods that every object has — basically just `Object`'s methods like `toString()` and `equals()`. The moment you want to compare, sort, or clone a generic value, you need a **bounded type parameter**. Bounds are how production generic APIs like `Collections.sort`, `TreeMap`, and `Stream.max` can operate on arbitrary types without giving up compile-time safety.
+
+## Upper bounds with `extends`
+
+An upper bound constrains T to a type that is a subtype of the given class or interface:
+
+```java
+public class NumberBox<T extends Number> {
+    private T value;
+
+    public NumberBox(T value) { this.value = value; }
+
+    /** Works because T is guaranteed to extend Number. */
+    public double doubleValue() {
+        return value.doubleValue();  // Number.doubleValue() is always available
+    }
+}
+```
+
+Usage:
+
+```java
+NumberBox<Integer> ib = new NumberBox<>(42);
+NumberBox<Double>  db = new NumberBox<>(3.14);
+System.out.println(ib.doubleValue()); // 42.0
+System.out.println(db.doubleValue()); // 3.14
+
+// Compile error — String does not extend Number:
+// NumberBox<String> sb = new NumberBox<>("oops");
+```
+
+The most common bound in the wild is `T extends Comparable<T>`, which lets you call `compareTo` inside generic algorithms:
+
+```java
+public static <T extends Comparable<T>> T max(T a, T b) {
+    return a.compareTo(b) >= 0 ? a : b;
+}
+```
+
+This single method works for `Integer`, `String`, `LocalDate`, `BigDecimal`, and any other type that implements `Comparable`.
+
+<Note>The bound `T extends Comparable<T>` is a **recursive bound** — T must be comparable to itself, not to some arbitrary other type. This pattern is used throughout the JDK (`Enum<E extends Enum<E>>` is a famous example).</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Multiple bounds
+
+A type parameter can require *multiple* supertypes using `&`:
+
+```java
+// T must implement both Cloneable and Serializable
+public <T extends Cloneable & Serializable> void deepCopy(T item) { ... }
+
+// At most one class (must be first), rest must be interfaces
+public <T extends AbstractBase & Runnable & AutoCloseable> void manage(T resource) { ... }
+```
+
+Multiple bounds are rare in application code but common in library code that needs to work safely with objects that come from unknown call sites. For example, a serialization helper might require `Serializable`; a copy utility might require `Cloneable`.
+
+```java
+import java.io.Serializable;
+
+public class Registry<T extends Comparable<T> & Serializable> {
+    private final java.util.TreeSet<T> items = new java.util.TreeSet<>();
+
+    public void add(T item)    { items.add(item); }
+    public T    min()          { return items.first(); }
+    public T    max()          { return items.last(); }
+}
+```
+
+Because T extends `Comparable<T>`, `TreeSet` can sort. Because T extends `Serializable`, the registry can be serialized to disk. Both guarantees come from a single type parameter declaration.
+
+## Writing `max` and `clamp`
+
+These two methods show bounded generics in their most practical form:
+
+```java
+public class Algorithms {
+    /** Returns the larger of a and b by natural ordering. */
+    public static <T extends Comparable<T>> T max(T a, T b) {
+        return a.compareTo(b) >= 0 ? a : b;
+    }
+
+    /**
+     * Clamps value to [min, max].
+     * Equivalent to Math.max(min, Math.min(value, max)) but for any Comparable.
+     */
+    public static <T extends Comparable<T>> T clamp(T value, T min, T max) {
+        if (value.compareTo(min) < 0) return min;
+        if (value.compareTo(max) > 0) return max;
+        return value;
+    }
+}
+```
+
+Usage:
+
+```java
+System.out.println(Algorithms.max(10, 7));           // 10
+System.out.println(Algorithms.max("zebra", "ant"));  // zebra
+System.out.println(Algorithms.clamp(15, 0, 10));     // 10
+System.out.println(Algorithms.clamp(-5, 0, 10));     // 0
+System.out.println(Algorithms.clamp(5,  0, 10));     // 5
+```
+
+## Try it
+
+Add a `min(List<T>)` method to the `Algorithms` class that finds the minimum element in a list:
+
+```java
+import java.util.List;
+
+public class Main {
+    static <T extends Comparable<T>> T min(List<T> list) {
+        if (list.isEmpty()) throw new IllegalArgumentException("empty list");
+        T result = list.get(0);
+        for (T item : list) {
+            if (item.compareTo(result) < 0) result = item;
+        }
+        return result;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(min(List.of(3, 1, 4, 1, 5, 9)));  // 1
+        System.out.println(min(List.of("pear", "apple", "mango"))); // apple
+    }
+}
+```
+
+Experiment: remove `extends Comparable<T>` from the type parameter and observe the compiler error that appears on the `compareTo` call.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using `extends` for interfaces** — in bounds, `extends` means "is a subtype of", so it applies to both classes *and* interfaces. Writing `<T implements Runnable>` is a compile error; write `<T extends Runnable>`.
+- **Putting the class bound after an interface bound** — `<T extends Serializable & AbstractBase>` is illegal if `AbstractBase` is a class (only one class allowed and it must come first). Reorder to `<T extends AbstractBase & Serializable>`.
+- **Forgetting the bound makes a single method reusable** — some developers write overloads for each type when a single bounded generic method would do. If three types all implement `Comparable`, one `max` method covers all three.
+- **Over-bounding** — adding unnecessary bounds makes methods harder to call with custom types. Only add a bound when you actually need to call a method provided by that type inside the generic code.
+
+## Recap
+
+- An **upper bound** `<T extends SomeType>` restricts T and unlocks the methods of `SomeType` inside the generic code.
+- The most common bound is `<T extends Comparable<T>>` for sorting and comparison.
+- **Multiple bounds** use `&`; at most one class (must be first), then interfaces.
+- Bounds are enforced by the compiler — passing an incompatible type is a compile error.
+
+**Up next:** Wildcards — `? extends`, `? super`, and unbounded `?` for flexible API design.

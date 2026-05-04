@@ -1,0 +1,214 @@
+export const meta = {
+  title: "TDD — Red, Green, Refactor",
+  duration: 13,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "tdd-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is the correct order of the TDD cycle?",
+    options: [
+      { text: "Green → Red → Refactor", correct: false, feedback: "This skips the crucial first step: writing a failing test before any production code." },
+      { text: "Red → Green → Refactor", correct: true, feedback: "Correct — write a failing test (Red), write just enough code to pass it (Green), then improve the design (Refactor)." },
+      { text: "Refactor → Red → Green", correct: false, feedback: "Refactoring comes last, after you have a passing test to protect you." },
+      { text: "Red → Refactor → Green", correct: false, feedback: "You should never refactor against a failing test — you have no safety net yet." },
+    ],
+    explanation: "Red → Green → Refactor is the heartbeat of TDD. Writing the failing test first forces you to think about the API before implementation. The green step is intentionally minimal. Refactoring is safe only once you have a passing test suite.",
+  },
+  endQ1: {
+    id: "tdd-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which statement best describes why TDD is said to 'drive design'?",
+    options: [
+      { text: "It generates UML diagrams automatically.", correct: false, feedback: "TDD has nothing to do with UML generation." },
+      { text: "Writing the test first forces you to define a clean, usable API before implementation.", correct: true, feedback: "Correct — you must decide what you want to call, how to construct it, and what it should return, all before writing a single line of production code." },
+      { text: "It prevents all bugs by running tests continuously.", correct: false, feedback: "TDD reduces bugs but does not prevent all of them. Its primary benefit is design feedback, not exhaustive bug prevention." },
+      { text: "It enforces 100% code coverage by definition.", correct: false, feedback: "TDD naturally produces high coverage, but the goal is design and confidence, not a coverage metric." },
+    ],
+    explanation: "When you write a test first, you become the first consumer of your own API. Pain at test-writing time — awkward constructors, too many parameters, hard to express intent — is feedback that the design needs work, before any implementation locks you in.",
+  },
+  endQ2: {
+    id: "tdd-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the test method name following Given-When-Then naming so it reads: given an empty stack, when pop is called, then it should throw.",
+    code: `@Test
+void ___EmptyStack_WhenPopCalled_ThenThrowsException() { }`,
+    correctAnswers: ["given"],
+    caseSensitive: false,
+    explanation: "Given-When-Then naming makes the precondition, action, and expected outcome immediately readable without opening the method body. The prefix `given` (or `should`, `when`) establishes context.",
+  },
+  endQ3: {
+    id: "tdd-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "In the test pyramid, which layer should have the most tests?",
+    options: [
+      { text: "End-to-end tests", correct: false, feedback: "E2E tests are slow, flaky, and expensive. They sit at the top of the pyramid and should be fewest in number." },
+      { text: "Integration tests", correct: false, feedback: "Integration tests are the middle layer — more than E2E but fewer than unit tests." },
+      { text: "Unit tests", correct: true, feedback: "Correct — unit tests are fast, isolated, and cheap to run. They form the wide base of the pyramid." },
+      { text: "All layers should have an equal number of tests.", correct: false, feedback: "Equality across layers leads to a slow, brittle suite. The pyramid shape is intentional." },
+    ],
+    explanation: "The test pyramid (coined by Mike Cohn) shows unit tests as the broad, cheap base; integration tests in the middle; and a narrow tip of E2E tests. Each layer validates something the one below cannot, but at higher cost and slower speed.",
+  },
+};
+
+Testing is one of the clearest dividing lines between code written for an assignment and code written for production. Professional Java teams ship with confidence because they have a test suite that catches regressions, documents behaviour, and makes refactoring safe. Test-Driven Development (TDD) goes one step further: tests are not an afterthought — they drive the design itself.
+
+## The TDD cycle: Red → Green → Refactor
+
+TDD is built on a three-step loop that you repeat for every small piece of behaviour:
+
+1. **Red** — Write a test for behaviour that does not exist yet. Run it. Watch it fail. The red failure confirms the test is actually testing something.
+2. **Green** — Write the *minimum* production code required to make the test pass. Resist the urge to over-engineer at this stage.
+3. **Refactor** — With a passing test providing a safety net, clean up duplication, rename poorly chosen identifiers, and improve structure. Run the tests again to confirm nothing broke.
+
+```java
+// Red — this test fails because Stack doesn't exist yet
+@Test
+void givenEmptyStack_whenPop_thenThrowsEmptyStackException() {
+    Stack<Integer> stack = new Stack<>();
+    assertThrows(EmptyStackException.class, stack::pop);
+}
+```
+
+Once the test is red, write just enough to turn it green:
+
+```java
+public class Stack<T> {
+    private final Deque<T> data = new ArrayDeque<>();
+
+    public T pop() {
+        if (data.isEmpty()) throw new EmptyStackException();
+        return data.pop();
+    }
+}
+```
+
+Now the test is green. The refactor step might extract a constant, rename a variable, or do nothing at all if the code is already clean.
+
+## Why tests drive design
+
+Writing the test first makes you the first *consumer* of your own API. Before typing a single line of implementation you must decide:
+
+- What is this class called?
+- How is it constructed?
+- What does the method return?
+- What does it do on error?
+
+If the test feels awkward to write — too many constructor arguments, a method that returns something hard to assert on — that is design feedback arriving at the cheapest possible moment. Fixing a design smell before implementation costs minutes. Fixing it after production deployment can cost days.
+
+## The test pyramid
+
+Not all tests are equal. The classic *test pyramid* describes three layers:
+
+| Layer | Speed | Scope | Quantity |
+|---|---|---|---|
+| Unit | Milliseconds | One class in isolation | Many (hundreds) |
+| Integration | Seconds | Multiple components together | Moderate (dozens) |
+| End-to-end | Minutes | Full system via UI or API | Few (handfuls) |
+
+Unit tests are fast, focused, and cheap. They form the wide base. E2E tests are slow, environment-sensitive, and expensive to maintain — they sit at the narrow tip.
+
+<Note>TDD is particularly well-suited to the unit test layer. Writing integration and E2E tests first is usually impractical because the infrastructure they depend on isn't set up yet.</Note>
+
+## Arrange-Act-Assert
+
+Every test — TDD or otherwise — should follow the **Arrange-Act-Assert** (AAA) structure:
+
+```java
+@Test
+void givenStackWithOneItem_whenPop_thenReturnsItem() {
+    // Arrange
+    Stack<String> stack = new Stack<>();
+    stack.push("hello");
+
+    // Act
+    String result = stack.pop();
+
+    // Assert
+    assertEquals("hello", result);
+    assertTrue(stack.isEmpty());
+}
+```
+
+This separation makes the test self-documenting. A reader instantly sees the precondition, the action under test, and the expected outcome.
+
+## Given-When-Then naming
+
+Method names like `test1` or `checkPop` are meaningless. The industry standard is to encode the scenario directly in the name:
+
+```
+given<Precondition>_when<Action>_then<ExpectedOutcome>
+```
+
+Or equivalently: `should<DoSomething>_when<Condition>`. Either convention is fine; consistency within a project matters more than which one you choose.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Benefits and limits of TDD
+
+**Benefits:**
+- Produces a living specification — the test suite documents exactly what the code does
+- Catches regressions immediately as the codebase grows
+- Forces small, focused units that are easy to test (and therefore easy to understand)
+- Enables fearless refactoring
+
+**Limits:**
+- Requires discipline and practice; the first few hours feel slower
+- Poorly written tests can be as much a maintenance burden as poorly written production code
+- Not all code lends itself to unit testing — UI interactions, hardware drivers, and highly stateful legacy systems can be hard to test-drive from scratch
+- TDD alone does not eliminate the need for integration and system tests
+
+## Try it
+
+Here is a failing test for a `Stack.push()` and `size()` method:
+
+```java
+@Test
+void givenEmptyStack_whenPushTwoItems_thenSizeIsTwo() {
+    // Arrange
+    Stack<Integer> stack = new Stack<>();
+
+    // Act
+    stack.push(10);
+    stack.push(20);
+
+    // Assert
+    assertEquals(2, stack.size());
+}
+```
+
+Write the minimal `Stack` implementation that makes this test pass. Then add a second failing test for `peek()` — it should return the top element without removing it — and implement it. Follow the Red → Green → Refactor loop explicitly for each step.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Writing too much code in the Green step** — the rule is *minimum code to pass*. If you implement three methods when the test only exercises one, you have no test covering the other two.
+- **Skipping the Red step** — running a test without first confirming it fails means you don't know whether the test is actually testing anything. A test that always passes regardless of implementation is worthless.
+- **Giant Arrange sections** — if you need 20 lines to set up a test, the unit under test probably has too many dependencies. Let test pain guide you toward a better design.
+- **Ignoring the Refactor step** — green code is not necessarily clean code. Skipping refactor causes TDD projects to accumulate the same technical debt as projects with no tests.
+
+## Recap
+
+- TDD cycle: **Red** (failing test) → **Green** (minimal pass) → **Refactor** (clean up)
+- Tests written first force design decisions before implementation locks them in
+- Use **Arrange-Act-Assert** structure to keep tests readable
+- **Given-When-Then** naming makes test intent visible without reading the body
+- The test pyramid puts fast, isolated unit tests at the base and slow E2E tests at the tip
+
+**Up next:** JUnit 5 — the annotations and assertions that power the Java testing ecosystem.

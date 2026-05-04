@@ -1,0 +1,251 @@
+export const meta = {
+  title: "Generic Classes & Multiple Type Parameters",
+  duration: 14,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "gc-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does `class Box<T>` mean in Java?",
+    options: [
+      { text: "Box is a subclass of T.", correct: false, feedback: "The angle-bracket syntax declares a type parameter, not a parent class. Inheritance uses `extends`." },
+      { text: "Box is a class that can hold a value of any type T, where T is chosen by the caller.", correct: true, feedback: "Correct! T is a placeholder resolved at compile time when the caller writes `Box<String>` or `Box<Integer>`." },
+      { text: "T is always replaced by Object at runtime.", correct: false, feedback: "That describes type erasure (covered in lesson 5). At the source level, T carries the specific type the caller provides." },
+      { text: "Box can only store objects that extend T.", correct: false, feedback: "That would be an upper-bounded wildcard like `<? extends T>`. Plain `<T>` is unconstrained." },
+    ],
+    explanation: "`class Box<T>` declares T as a **type parameter** — a named placeholder for any reference type. Callers substitute a real type when they instantiate the class: `Box<String> b = new Box<>()`. The compiler then treats every occurrence of T inside the class as String.",
+  },
+  endQ1: {
+    id: "gc-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    static class Box<T> {
+        private T value;
+        Box(T value) { this.value = value; }
+        T get() { return value; }
+    }
+
+    public static void main(String[] args) {
+        Box<String> s = new Box<>("hello");
+        Box<Integer> n = new Box<>(42);
+        System.out.println(s.get().toUpperCase());
+        System.out.println(n.get() * 2);
+    }
+}`,
+    expectedOutput: "HELLO\n84",
+    explanation: "`s.get()` returns a String so `toUpperCase()` compiles fine. `n.get()` returns an Integer which auto-unboxes to int, so `* 2` gives 84.",
+  },
+  endQ2: {
+    id: "gc-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the class header so that Pair holds two independent type parameters:",
+    code: `public class Pair<___, ___> {
+    private A first;
+    private B second;
+}`,
+    correctAnswers: ["A, B"],
+    caseSensitive: false,
+    explanation: "Two type parameters are separated by a comma inside the angle brackets. By convention the first is A and the second B, though any identifiers work.",
+  },
+  endQ3: {
+    id: "gc-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Wrapper {
+    private Object value;
+
+    public void set(Object value) { this.value = value; }
+    public Object get()           { return value; }
+
+    public static void main(String[] args) {
+        Wrapper w = new Wrapper();
+        w.set("Java");
+        String s = w.get();   // bug here
+        System.out.println(s);
+    }
+}`,
+    buggyLine: 10,
+    issue: "Missing cast: `w.get()` returns Object, not String, so assignment to String requires an explicit `(String)` cast — which generics eliminate entirely.",
+    explanation: "Using raw Object forces callers to cast every return value, which is unsafe and verbose. Replacing `Wrapper` with `Wrapper<T>` would make `get()` return T, giving a compile-time guarantee without any cast.",
+  },
+};
+
+Generics are one of the most impactful features in the Java type system. Before generics arrived in Java 5, every collection returned `Object` — every element retrieval required a manual cast, and a mismatched cast crashed at runtime with `ClassCastException`. Generics move that error to compile time, where it costs nothing to fix. Production codebases today use generic classes everywhere: `List<Order>`, `Map<UserId, Account>`, `Optional<Config>`, `CompletableFuture<Response>`. Understanding how to *write* generic classes — not just consume them — unlocks a whole tier of reusable library-quality code.
+
+## Declaring a generic class
+
+A type parameter is declared in angle brackets immediately after the class name. By convention, single-letter uppercase names are used: `T` for a general type, `E` for an element, `K`/`V` for key/value, `R` for a return type.
+
+```java
+public class Box<T> {
+    private T value;
+
+    public Box(T value) {
+        this.value = value;
+    }
+
+    public T get() {
+        return value;
+    }
+
+    public void set(T value) {
+        this.value = value;
+    }
+}
+```
+
+The caller decides what `T` is:
+
+```java
+Box<String>  stringBox = new Box<>("hello");
+Box<Integer> intBox    = new Box<>(100);
+
+String  s = stringBox.get();  // no cast required
+Integer n = intBox.get();     // no cast required
+
+// Compile error — type safety at work:
+// stringBox.set(42);  // cannot set an int into Box<String>
+```
+
+The diamond operator `<>` on the right-hand side lets the compiler infer the type argument from context, saving you from repeating `new Box<String>("hello")`.
+
+<Note>Type parameters are **reference types only**. `Box<int>` is illegal; use `Box<Integer>` instead. Java's autoboxing quietly converts primitives when you call `new Box<>(42)`, so in practice this restriction rarely slows you down.</Note>
+
+## Multiple type parameters
+
+A class can declare as many type parameters as it needs. The classic example is a key-value `Pair`:
+
+```java
+public class Pair<A, B> {
+    private final A first;
+    private final B second;
+
+    public Pair(A first, B second) {
+        this.first  = first;
+        this.second = second;
+    }
+
+    public A getFirst()  { return first; }
+    public B getSecond() { return second; }
+
+    /** Returns a new Pair with the elements swapped. */
+    public Pair<B, A> swap() {
+        return new Pair<>(second, first);
+    }
+
+    @Override
+    public String toString() {
+        return "(" + first + ", " + second + ")";
+    }
+}
+```
+
+Usage:
+
+```java
+Pair<String, Integer> p = new Pair<>("Alice", 30);
+System.out.println(p.getFirst());   // Alice
+System.out.println(p.getSecond());  // 30
+
+Pair<Integer, String> swapped = p.swap();
+System.out.println(swapped);        // (30, Alice)
+```
+
+The compiler tracks `A` and `B` independently. On a `Pair<String, Integer>`, `getFirst()` returns `String` and `getSecond()` returns `Integer` — no casts, no ambiguity.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Type parameters flow through fields and methods
+
+Every field whose declared type mentions a type parameter, and every method that mentions a type parameter in its signature, is automatically "specialized" when you use a concrete type argument. This is pure compile-time machinery; at runtime there is only one class file.
+
+```java
+public class Triple<X, Y, Z> {
+    public X first;
+    public Y second;
+    public Z third;
+
+    public Triple(X x, Y y, Z z) {
+        this.first  = x;
+        this.second = y;
+        this.third  = z;
+    }
+
+    public <R> Triple<R, Y, Z> mapFirst(java.util.function.Function<X, R> f) {
+        return new Triple<>(f.apply(first), second, third);
+    }
+}
+```
+
+`mapFirst` is a *generic method* inside a generic class — it introduces its own type parameter `R` independent of `X`, `Y`, `Z`. Lesson 4 covers generic methods in depth.
+
+## Try it
+
+Build a `Pair<A, B>` class and exercise all three methods:
+
+```java
+public class Main {
+    static class Pair<A, B> {
+        private final A first;
+        private final B second;
+
+        public Pair(A first, B second) {
+            this.first  = first;
+            this.second = second;
+        }
+
+        public A getFirst()  { return first; }
+        public B getSecond() { return second; }
+
+        public Pair<B, A> swap() {
+            return new Pair<>(second, first);
+        }
+
+        @Override
+        public String toString() {
+            return "(" + first + ", " + second + ")";
+        }
+    }
+
+    public static void main(String[] args) {
+        Pair<String, Integer> p = new Pair<>("Java", 21);
+        System.out.println(p);                  // (Java, 21)
+        System.out.println(p.swap());           // (21, Java)
+        System.out.println(p.getFirst().length()); // 4
+    }
+}
+```
+
+Try changing the type arguments to `<Double, Boolean>` and constructing a new pair. Notice the compiler catches any type mismatch immediately.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using raw types** — writing `Box b = new Box("hi")` instead of `Box<String> b = new Box<>("hi")` silences compiler warnings and reintroduces the cast problems generics were designed to prevent. Enable `-Xlint:unchecked` in your build to surface these.
+- **Casting instead of parameterising** — if you find yourself writing `(String) container.get()`, the container probably should be `Container<String>`. Every explicit cast is a place where a `ClassCastException` can hide.
+- **Confusing the type parameter with a class name** — `T` is not a class you import; it's a placeholder that lives only within the class declaration. Writing `new T()` or `T.class` won't compile (see lesson 5 for the workaround).
+- **Forgetting the diamond on the right-hand side** — `new Box<String>("hi")` is legal but redundant; `new Box<>("hi")` infers `String` from the variable type. Use the diamond consistently.
+
+## Recap
+
+- A **generic class** declares one or more type parameters in `<>` after the class name; callers substitute real types when instantiating.
+- Type parameters flow to every field and method that references them, eliminating casts and surfacing type errors at compile time.
+- Multiple type parameters (`<A, B>`) are comma-separated; each is independent.
+- The **diamond operator** `<>` lets the compiler infer type arguments from context.
+
+**Up next:** Bounded type parameters — constraining `T` so you can call methods on it.

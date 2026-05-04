@@ -1,0 +1,214 @@
+export const meta = {
+  title: "Threads & Runnable — The Basics",
+  duration: 13,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "tr-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What happens if you call `run()` directly on a Thread instead of `start()`?",
+    options: [
+      { text: "A new thread is spawned and run() executes on it.", correct: false, feedback: "Only start() creates a new OS thread. run() is just an ordinary method call." },
+      { text: "The run() method executes on the *current* thread, no new thread is created.", correct: true, feedback: "Correct. run() is a plain method. Calling it directly blocks the calling thread — concurrency never happens." },
+      { text: "A compile error is raised because run() is protected.", correct: false, feedback: "run() is public in Thread. It compiles fine but does not start a new thread." },
+      { text: "An IllegalThreadStateException is thrown at runtime.", correct: false, feedback: "That exception is thrown when you call start() on a thread that has already been started, not when you call run()." },
+    ],
+    explanation: "`start()` asks the JVM to allocate a new OS thread and *then* call `run()` on that thread. Calling `run()` yourself skips the thread creation entirely — the method runs synchronously on the current thread, defeating the entire purpose.",
+  },
+  endQ1: {
+    id: "tr-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        Thread t = new Thread(() -> System.out.println("worker"));
+        System.out.println("before");
+        t.start();
+        t.join();
+        System.out.println("after");
+    }
+}`,
+    expectedOutput: "before\nworker\nafter",
+    explanation: "`before` prints on the main thread before start(). `t.join()` blocks the main thread until the worker finishes, guaranteeing `worker` prints before `after`.",
+  },
+  endQ2: {
+    id: "tr-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the lambda-based thread so it prints the current thread's name:",
+    code: `Thread t = new Thread(() -> System.out.println(Thread.___().getName()));
+t.start();`,
+    correctAnswers: ["currentThread"],
+    caseSensitive: true,
+    explanation: "`Thread.currentThread()` is a static method that returns a reference to the Thread object currently executing. Calling `.getName()` on it gives the human-readable thread name.",
+  },
+  endQ3: {
+    id: "tr-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        Thread t = new Thread(() -> {
+            System.out.println("running");
+        });
+        t.run();   // intended to start a new thread
+        System.out.println("main done");
+    }
+}`,
+    buggyLine: 6,
+    issue: "`t.run()` executes the Runnable on the current (main) thread instead of spawning a new one. It should be `t.start()`.",
+    explanation: "The symptoms are subtle: the code prints correctly but never uses a second thread. Under load or in tests that assert concurrency this produces wrong behaviour. Always call `start()` to actually launch a thread.",
+  },
+};
+
+Threads are the foundation of every concurrent Java application. Whether you're handling thousands of HTTP requests per second, crunching data in parallel across CPU cores, or keeping a UI responsive while a background job runs, you are ultimately creating and managing threads. Modern frameworks hide much of this behind thread pools and async APIs, but understanding raw `Thread` and `Runnable` is non-negotiable: it is what every higher-level abstraction is built on, and it is the first thing you reach for when debugging a concurrency bug.
+
+## Creating threads — two core approaches
+
+### Extending Thread
+
+The oldest approach subclasses `Thread` and overrides `run()`:
+
+```java
+public class HelloThread extends Thread {
+    @Override
+    public void run() {
+        System.out.println("Hello from " + getName());
+    }
+
+    public static void main(String[] args) {
+        HelloThread t = new HelloThread();
+        t.start();   // <-- creates a new OS thread, then calls run() on it
+    }
+}
+```
+
+This works, but tightly couples your task logic to the threading mechanism. Prefer the `Runnable` approach.
+
+### Implementing Runnable (preferred)
+
+`Runnable` is a functional interface with one method: `void run()`. Pass it to a `Thread` constructor:
+
+```java
+Runnable task = () -> System.out.println("Hello from " + Thread.currentThread().getName());
+
+Thread t = new Thread(task);
+t.start();
+```
+
+Using a lambda or a separate `Runnable` class keeps your task logic independent of how it is scheduled — the same `Runnable` can be handed to an `ExecutorService`, a `Thread`, or a test harness.
+
+<Note>Never call `t.run()` when you mean `t.start()`. `run()` is an ordinary method call — it executes synchronously on the *calling* thread. `start()` creates the new thread and then calls `run()` on it. This is one of the most common beginner mistakes in Java concurrency.</Note>
+
+## Thread lifecycle
+
+A thread passes through several states during its life:
+
+- **NEW** — constructed but `start()` not yet called.
+- **RUNNABLE** — executing (or ready to execute, waiting for a CPU slot).
+- **TIMED_WAITING** — sleeping via `Thread.sleep()` or waiting with a timeout.
+- **WAITING** — blocked in `join()` or `wait()` with no timeout.
+- **BLOCKED** — waiting to acquire a monitor lock.
+- **TERMINATED** — `run()` has returned.
+
+## Thread.sleep() and joining
+
+`Thread.sleep(millis)` pauses the current thread for at least the specified number of milliseconds, yielding the CPU to other threads. It throws the checked `InterruptedException`, which you must handle:
+
+```java
+Thread worker = new Thread(() -> {
+    try {
+        System.out.println("Working…");
+        Thread.sleep(500);
+        System.out.println("Done");
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();  // restore interrupt flag
+        System.out.println("Interrupted!");
+    }
+});
+worker.start();
+worker.join();   // main thread waits for worker to finish
+System.out.println("All done");
+```
+
+`join()` is essential when you need a result or a side-effect from a thread before continuing.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Thread name, ID, and daemon threads
+
+Every thread has a name (defaults to `Thread-0`, `Thread-1`, …), an auto-assigned numeric ID, and a daemon flag:
+
+```java
+Thread t = new Thread(() -> {
+    Thread self = Thread.currentThread();
+    System.out.println("Name: " + self.getName());
+    System.out.println("ID:   " + self.getId());
+    System.out.println("Daemon: " + self.isDaemon());
+});
+t.setName("my-worker");
+t.setDaemon(false);   // user thread — JVM won't exit until it finishes
+t.start();
+```
+
+A **daemon thread** is a background thread (like the JVM garbage collector). The JVM exits as soon as all *non-daemon* (user) threads have finished, even if daemon threads are still running. Mark background helper threads as daemon if their work is non-essential and you don't want them to delay shutdown.
+
+<Note>Set the daemon flag **before** calling `start()`. Changing it after the thread has started throws `IllegalThreadStateException`.</Note>
+
+## Try it
+
+Create three threads, give each a name, and have each print its own name and ID:
+
+```java
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        String[] names = {"alpha", "beta", "gamma"};
+        Thread[] threads = new Thread[3];
+
+        for (int i = 0; i < 3; i++) {
+            String name = names[i];
+            threads[i] = new Thread(() -> {
+                Thread self = Thread.currentThread();
+                System.out.println(self.getName() + " (id=" + self.getId() + ")");
+            }, name);
+        }
+
+        for (Thread t : threads) t.start();
+        for (Thread t : threads) t.join();
+
+        System.out.println("All threads finished");
+    }
+}
+```
+
+Run it several times. Notice that the print order of `alpha`, `beta`, and `gamma` varies — the OS scheduler decides which thread runs when.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Calling `run()` instead of `start()`** — no new thread is created; the task runs on the calling thread and all concurrency benefits vanish.
+- **Swallowing `InterruptedException`** — catching it and doing nothing silently discards the interrupt signal. Always either propagate the exception or restore the interrupt flag with `Thread.currentThread().interrupt()`.
+- **Forgetting `join()`** — the main thread can exit before worker threads finish, producing incomplete results or missing output in short programs.
+- **Setting daemon status after `start()`** — calling `t.setDaemon(true)` after the thread is running throws `IllegalThreadStateException`; configure threads fully before starting them.
+
+## Recap
+
+- Use `new Thread(runnable).start()` to launch a new thread; prefer `Runnable` (or a lambda) over subclassing `Thread`.
+- `start()` creates the OS thread; `run()` is a plain method call — never confuse the two.
+- `Thread.sleep(ms)` pauses the current thread; `join()` waits for another thread to finish.
+- Threads have names, numeric IDs, and a daemon flag. Daemon threads do not prevent JVM shutdown.
+
+**Up next:** When multiple threads share data, things go wrong fast — lesson 2 covers the `synchronized` keyword and how to protect shared state.

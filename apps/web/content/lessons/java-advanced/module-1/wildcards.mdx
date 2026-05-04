@@ -1,0 +1,228 @@
+export const meta = {
+  title: "Wildcards — ? extends, ? super, and Unbounded",
+  duration: 15,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "wc-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which wildcard should you use for a method that only *reads* values out of a collection of numbers?",
+    options: [
+      { text: "`List<Number>`", correct: false, feedback: "This only accepts exactly `List<Number>` — a `List<Integer>` or `List<Double>` would be rejected even though every Integer is a Number." },
+      { text: "`List<? extends Number>`", correct: true, feedback: "Correct! `? extends Number` accepts any list whose element type is Number or a subtype. You can safely read elements as Number. This is the Producer Extends half of PECS." },
+      { text: "`List<? super Number>`", correct: false, feedback: "`? super Number` accepts Number and its supertypes (Object). You could add Numbers to such a list, but reading elements only gives you Object — not useful when you need Number." },
+      { text: "`List<?>`", correct: false, feedback: "Unbounded wildcard works but is too loose — you can only get Object back, losing the Number methods you presumably need." },
+    ],
+    explanation: "**PECS: Producer Extends, Consumer Super.** When a collection *produces* values you read, use `? extends T`. When a collection *consumes* values you write, use `? super T`.",
+  },
+  endQ1: {
+    id: "wc-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    static double sum(List<? extends Number> list) {
+        double total = 0;
+        for (Number n : list) total += n.doubleValue();
+        return total;
+    }
+
+    public static void main(String[] args) {
+        List<Integer> ints    = List.of(1, 2, 3);
+        List<Double>  doubles = List.of(1.5, 2.5);
+        System.out.println(sum(ints));
+        System.out.println(sum(doubles));
+    }
+}`,
+    expectedOutput: "6.0\n4.0",
+    explanation: "`sum` accepts any list of Number subtypes. For ints: 1+2+3=6.0. For doubles: 1.5+2.5=4.0. The `? extends Number` wildcard makes both calls legal.",
+  },
+  endQ2: {
+    id: "wc-end-2",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Why is `List<Integer>` not a subtype of `List<Number>` in Java?",
+    options: [
+      { text: "Because Integer and Number are unrelated types.", correct: false, feedback: "Integer extends Number — they are related. The issue is with the generic container, not the element types." },
+      { text: "Because generics are invariant: if you could assign `List<Integer>` to `List<Number>`, you could then add a Double to the list, breaking type safety.", correct: true, feedback: "Exactly. `listOfNumbers.add(3.14)` would succeed through the `List<Number>` reference but the underlying `List<Integer>` would be corrupted. Invariance prevents this." },
+      { text: "Because Java erases generic types at runtime, so both are just List.", correct: false, feedback: "Erasure is a runtime concept; subtyping is enforced at compile time. Erasure doesn't explain why the assignment is rejected by the compiler." },
+      { text: "It is a subtype — the assignment compiles fine.", correct: false, feedback: "`List<Number> nums = new ArrayList<Integer>()` is a compile error. Generics are invariant unless you use wildcards." },
+    ],
+    explanation: "Generic types are **invariant** in Java. `List<Integer>` and `List<Number>` are unrelated types even though `Integer extends Number`. The wildcard `List<? extends Number>` is the covariant type that accepts both.",
+  },
+  endQ3: {
+    id: "wc-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Fill in the wildcard so that `fill` can accept a `List<Integer>` or a `List<Number>` and add an integer to it:",
+    code: `static void fill(List<? ___ Integer> list, int count) {
+    for (int i = 0; i < count; i++) list.add(i);
+}`,
+    correctAnswers: ["super"],
+    caseSensitive: true,
+    explanation: "`? super Integer` means the list's element type is Integer or any supertype (Number, Object). This allows calling `list.add(i)` because Integer is always safe to put into such a list. This is the Consumer Super half of PECS.",
+  },
+};
+
+Generics in Java are **invariant**: `List<Integer>` is not a `List<Number>` even though `Integer extends Number`. This surprises most developers the first time they see it, and for good reason — it looks overly strict. Wildcards are how the Java type system adds the flexibility you need while preserving safety. They are used throughout the Collections API, Streams, and virtually every framework that deals with heterogeneous data. Mastering wildcards is essential for writing APIs that don't unnecessarily reject valid inputs.
+
+## Why `List<Number>` is not `List<Integer>`
+
+Consider what would break if generics were covariant (subtype-compatible):
+
+```java
+List<Integer> ints = new ArrayList<>();
+ints.add(1);
+ints.add(2);
+
+// Suppose this were legal (it is NOT):
+List<Number> nums = ints;   // compile error in real Java
+
+nums.add(3.14);             // This would add a Double into a List<Integer>!
+Integer x = ints.get(2);   // ClassCastException at runtime
+```
+
+The compiler rejects the assignment to prevent this corruption. Generics are invariant to preserve the guarantee that a `List<Integer>` only ever contains integers.
+
+The solution is wildcards — typed placeholders that express "some type that satisfies a constraint" without fixing the exact type.
+
+## `? extends T` — the producer wildcard
+
+Use `? extends T` when you only *read* values from a structure (the structure **produces** values of type T):
+
+```java
+public static double sum(List<? extends Number> list) {
+    double total = 0;
+    for (Number n : list) {
+        total += n.doubleValue();   // safe: element type is Number or a subtype
+    }
+    return total;
+}
+```
+
+Now the same method accepts `List<Integer>`, `List<Double>`, `List<BigDecimal>`, and `List<Number>`:
+
+```java
+sum(List.of(1, 2, 3));          // List<Integer>  ✓
+sum(List.of(1.5, 2.5, 3.5));   // List<Double>   ✓
+sum(List.of(1, 2.0, 3L));      // List<Number>   ✓
+```
+
+<Note>You **cannot add** to a `List<? extends T>`. The compiler doesn't know the exact type — it might be `List<Integer>`, so adding a `Double` would be illegal. The only thing you can read out is a `T` (or a supertype of T).</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## `? super T` — the consumer wildcard
+
+Use `? super T` when you only *write* values into a structure (the structure **consumes** values of type T):
+
+```java
+public static void fill(List<? super Integer> list, int count) {
+    for (int i = 0; i < count; i++) {
+        list.add(i);   // safe: Integer can always go into a List<Integer>,
+                       // List<Number>, or List<Object>
+    }
+}
+```
+
+This accepts `List<Integer>`, `List<Number>`, and `List<Object>`:
+
+```java
+List<Number> numbers = new ArrayList<>();
+fill(numbers, 3);          // ✓ — Integer is a Number
+System.out.println(numbers); // [0, 1, 2]
+```
+
+When you read from a `? super T` list, you only get `Object` back, because the compiler can't guarantee anything more specific.
+
+## Unbounded wildcard `<?>`
+
+Use `<?>` when you don't care about the element type at all — you're only using methods that don't involve T:
+
+```java
+public static void printAll(List<?> list) {
+    for (Object element : list) {
+        System.out.println(element);   // Object.toString() is always available
+    }
+}
+```
+
+`List<?>` is different from `List<Object>`. A `List<Object>` only accepts a `List<Object>`; a `List<?>` accepts any list regardless of its element type.
+
+## The PECS rule
+
+A useful mnemonic for remembering which wildcard to use:
+
+**P**roducer **E**xtends, **C**onsumer **S**uper.
+
+- If a collection is a *source* you read from → `? extends T`
+- If a collection is a *sink* you write to → `? super T`
+- If it's both (rare) → use the exact type parameter `T`
+
+The JDK `Collections.copy(dest, src)` demonstrates both in one signature:
+
+```java
+public static <T> void copy(List<? super T> dest, List<? extends T> src)
+```
+
+`src` produces T values (extends), `dest` consumes them (super).
+
+## Try it
+
+Implement `sumIntegers` that sums any list of Number subtypes, and `addRange` that fills any compatible list:
+
+```java
+import java.util.*;
+
+public class Main {
+    static double sumIntegers(List<? extends Number> list) {
+        double total = 0;
+        for (Number n : list) total += n.doubleValue();
+        return total;
+    }
+
+    static void addRange(List<? super Integer> list, int from, int to) {
+        for (int i = from; i <= to; i++) list.add(i);
+    }
+
+    public static void main(String[] args) {
+        System.out.println(sumIntegers(List.of(10, 20, 30)));   // 60.0
+
+        List<Number> nums = new ArrayList<>();
+        addRange(nums, 1, 5);
+        System.out.println(nums);  // [1, 2, 3, 4, 5]
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Trying to add to a `? extends T` list** — `list.add(something)` on a `List<? extends Number>` is a compile error. The compiler can't verify the exact element type, so it disallows all additions (except `null`). Redesign as `? super T` if you need to add.
+- **Using `List<Object>` instead of `List<?>`** — `List<Object>` is far less flexible. A method that accepts `List<Object>` rejects `List<String>`. Use `List<?>` when the element type doesn't matter.
+- **Confusing declaration-site and use-site variance** — Java uses use-site variance (wildcards at the call site). In Kotlin or Scala you declare variance on the class itself. In Java, you express it on every method parameter that needs it.
+- **Reading `? super T` as "only supertypes"** — the wildcard means "T or any supertype of T". A `List<? super Integer>` *includes* `List<Integer>` itself, not just strict supertypes.
+
+## Recap
+
+- Java generics are **invariant**: `List<Integer>` is not a `List<Number>`.
+- **`? extends T`** (producer wildcard): read-only covariant view; accepts subtypes.
+- **`? super T`** (consumer wildcard): write-capable contravariant view; accepts supertypes.
+- **`<?>`** (unbounded): accepts any parameterisation; elements readable only as Object.
+- **PECS**: Producer Extends, Consumer Super.
+
+**Up next:** Generic methods and type inference — letting the compiler deduce type arguments automatically.

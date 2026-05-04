@@ -1,0 +1,212 @@
+export const meta = {
+  title: "The java.util.function Zoo",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "fz-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which functional interface best represents a function that takes a `String` and returns a `boolean`?",
+    options: [
+      { text: "`Function<String, Boolean>`", correct: false, feedback: "This works, but the more precise and idiomatic choice is `Predicate<String>`, which is designed for boolean tests and adds `and()`, `or()`, `negate()` helpers." },
+      { text: "`Predicate<String>`", correct: true, feedback: "Correct — `Predicate<T>` is specifically designed for single-argument boolean tests. Its `test(String s)` method returns a `boolean` (primitive, not boxed)." },
+      { text: "`Consumer<String>`", correct: false, feedback: "`Consumer<T>` accepts a value and returns nothing (`void`). It cannot return a boolean." },
+      { text: "`Supplier<String>`", correct: false, feedback: "`Supplier<T>` takes *no* argument and returns a `T`. It goes in the wrong direction entirely." },
+    ],
+    explanation: "`Predicate<T>` is purpose-built for `T -> boolean` tests. Prefer it over `Function<T, Boolean>` because it is more readable and provides composable helpers like `and()`, `or()`, and `negate()`.",
+  },
+  endQ1: {
+    id: "fz-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Function<String, String> shout = s -> s.toUpperCase();
+        Function<String, String> exclaim = s -> s + "!";
+        Function<String, String> combined = shout.andThen(exclaim);
+        System.out.println(combined.apply("hello"));
+    }
+}`,
+    expectedOutput: "HELLO!",
+    explanation: "`andThen` chains functions left-to-right. `shout` first produces `\"HELLO\"`, then `exclaim` appends `\"!\"` to produce `\"HELLO!\"`.",
+  },
+  endQ2: {
+    id: "fz-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Fill in the functional interface type so that `factory` accepts no arguments and returns a new `ArrayList`:",
+    code: `___<List<String>> factory = ArrayList::new;`,
+    correctAnswers: ["Supplier"],
+    caseSensitive: true,
+    explanation: "`Supplier<T>` models a zero-argument factory: `T get()`. Here `T` is `List<String>`, and the constructor reference `ArrayList::new` is the implementation.",
+  },
+  endQ3: {
+    id: "fz-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.function.*;
+
+public class Main {
+    public static void main(String[] args) {
+        BinaryOperator<String> concat = (a, b) -> a + b;
+        Consumer<String> printer = s -> System.out.println(s);
+        printer.accept(concat.apply("hello", " world"));
+        String result = printer.accept("test");
+        System.out.println(result);
+    }
+}`,
+    buggyLine: 8,
+    issue: "`Consumer<T>.accept()` returns `void`, not a value. Assigning its return to `String result` is a compile error.",
+    explanation: "`Consumer<T>` is for side effects only — it consumes a value and returns nothing. You cannot capture its return value. If you need both a side effect and a return value, use a `Function` and perform the side effect inside, or call the side effect separately.",
+  },
+};
+
+The `java.util.function` package is the vocabulary of functional Java. Every lambda you write plugs into one of these interfaces — either directly or through a library method that accepts them. Knowing which interface fits which shape of function lets you read and write modern Java fluently, without guessing what the compiler expects.
+
+## The core interfaces
+
+Java's functional interfaces are named by *shape*: how many inputs, what output.
+
+| Interface | Method | Shape |
+|---|---|---|
+| `Function<T, R>` | `R apply(T t)` | one in, one out |
+| `BiFunction<T, U, R>` | `R apply(T t, U u)` | two in, one out |
+| `Consumer<T>` | `void accept(T t)` | one in, no out |
+| `Supplier<T>` | `T get()` | no in, one out |
+| `Predicate<T>` | `boolean test(T t)` | one in, boolean out |
+| `UnaryOperator<T>` | `T apply(T t)` | one in, same type out |
+| `BinaryOperator<T>` | `T apply(T t1, T t2)` | two same-type in, same type out |
+
+`UnaryOperator<T>` extends `Function<T, T>` and `BinaryOperator<T>` extends `BiFunction<T, T, T>`. They exist for the common case where the input and output type are the same, so you don't repeat the type parameter.
+
+```java
+import java.util.function.*;
+
+Function<String, Integer>   toLength  = String::length;        // String -> Integer
+BiFunction<Integer,Integer,Integer> mul = (a, b) -> a * b;     // two ints -> int
+Consumer<String>            log       = System.out::println;    // String -> void
+Supplier<Double>            rand      = Math::random;           // () -> Double
+Predicate<String>           nonEmpty  = s -> !s.isEmpty();     // String -> boolean
+UnaryOperator<String>       shout     = String::toUpperCase;   // String -> String
+BinaryOperator<Integer>     sum       = Integer::sum;          // (int,int) -> int
+```
+
+## @FunctionalInterface
+
+Any interface with exactly one abstract method is a functional interface, and a lambda can implement it. The `@FunctionalInterface` annotation is optional but recommended — it tells the compiler to error if you accidentally add a second abstract method:
+
+```java
+@FunctionalInterface
+public interface Transformer<T> {
+    T transform(T input);
+    // adding another abstract method here would be a compile error
+}
+
+Transformer<String> reverse = s -> new StringBuilder(s).reverse().toString();
+System.out.println(reverse.transform("Java")); // avaJ
+```
+
+The annotation documents intent and protects the interface's contract. Any interface in the JDK that carries `@FunctionalInterface` is guaranteed safe to use as a lambda target.
+
+<Note>Default methods and static methods do **not** count toward the abstract-method count. An interface can have many default/static methods and still be a valid functional interface as long as it has exactly one abstract method.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Composing with andThen, compose, and negate
+
+The standard functional interfaces include composition helpers — methods that combine two functions into one.
+
+**Function composition:**
+
+```java
+Function<String, String> trim   = String::trim;
+Function<String, String> upper  = String::toUpperCase;
+Function<String, Integer> count = String::length;
+
+// andThen: left-to-right — trim first, then uppercase
+Function<String, String> trimThenUpper = trim.andThen(upper);
+System.out.println(trimThenUpper.apply("  hello  ")); // HELLO
+
+// compose: right-to-left — upper runs first, then trim
+// (rarely used, but mirrors mathematical function composition)
+Function<String, String> upperThenTrim = trim.compose(upper);
+System.out.println(upperThenTrim.apply("  hello  ")); // HELLO (same here, order matters when operations differ)
+```
+
+**Predicate composition:**
+
+```java
+Predicate<String> longEnough = s -> s.length() >= 5;
+Predicate<String> noSpaces   = s -> !s.contains(" ");
+
+Predicate<String> valid = longEnough.and(noSpaces);
+System.out.println(valid.test("hello"));     // true
+System.out.println(valid.test("hi"));        // false (too short)
+System.out.println(valid.test("hello world")); // false (has space)
+
+Predicate<String> either = longEnough.or(noSpaces);
+Predicate<String> notLong = longEnough.negate();
+```
+
+## Try it
+
+Write a method that accepts a `Function<String, String>` and a list of strings, applies the function to each, and returns the results:
+
+```java
+import java.util.*;
+import java.util.function.*;
+import java.util.stream.*;
+
+public class Main {
+    static List<String> transform(List<String> items, Function<String, String> fn) {
+        return items.stream().map(fn).collect(Collectors.toList());
+    }
+
+    public static void main(String[] args) {
+        List<String> words = List.of("hello", "world", "java");
+
+        // Pass different functional interface implementations
+        System.out.println(transform(words, String::toUpperCase));
+        System.out.println(transform(words, s -> s + "!"));
+
+        // Compose: uppercase then exclaim
+        Function<String, String> shoutAndExclaim =
+            ((Function<String,String>) String::toUpperCase).andThen(s -> s + "!");
+        System.out.println(transform(words, shoutAndExclaim));
+    }
+}
+```
+
+Try adding a `Predicate<String>` that filters out words shorter than 4 characters before transforming.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using `Function<T, Boolean>` instead of `Predicate<T>`** — `Predicate<T>` returns a primitive `boolean`, not a boxed `Boolean`, and comes with `and()`, `or()`, `negate()`. Prefer it for boolean tests.
+- **Confusing `andThen` and `compose`** — `f.andThen(g)` means `g(f(x))` (f first). `f.compose(g)` means `f(g(x))` (g first). When in doubt, `andThen` reads left-to-right and is usually what you want.
+- **Ignoring primitive specialisations** — `IntFunction<R>`, `ToIntFunction<T>`, `IntUnaryOperator` etc. avoid boxing overhead in tight loops. For high-throughput code, check whether a primitive variant exists.
+- **Implementing `@FunctionalInterface` with more than one abstract method** — the interface stops being a functional interface and can no longer be used as a lambda target. The annotation turns this into a compile-time error, which is exactly why you should use it.
+
+## Recap
+
+- `Function<T,R>`, `Consumer<T>`, `Supplier<T>`, `Predicate<T>` are the four fundamental shapes
+- `BiFunction`, `UnaryOperator`, `BinaryOperator` cover common two-argument and same-type variants
+- `@FunctionalInterface` documents intent and guards the single-abstract-method constraint
+- `andThen` / `compose` chain `Function`s; `and` / `or` / `negate` combine `Predicate`s
+
+**Up next:** Method references — four concise forms that often replace lambdas entirely.

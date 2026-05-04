@@ -1,0 +1,207 @@
+export const meta = {
+  title: "Why Design Patterns? The Gang of Four",
+  duration: 12,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "wp-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which of the three GoF pattern categories is primarily concerned with how objects are created?",
+    options: [
+      { text: "Structural", correct: false, feedback: "Structural patterns deal with how classes and objects are composed into larger structures." },
+      { text: "Behavioral", correct: false, feedback: "Behavioral patterns define how objects communicate and share responsibilities." },
+      { text: "Creational", correct: true, feedback: "Correct! Creational patterns abstract the instantiation process — Factory, Builder, Singleton, and Prototype all belong here." },
+      { text: "Functional", correct: false, feedback: "Functional is not one of the three GoF categories. The three are Creational, Structural, and Behavioral." },
+    ],
+    explanation: "The Gang of Four divided the 23 classic patterns into three families. **Creational** patterns manage object creation, **Structural** patterns manage object composition, and **Behavioral** patterns manage object communication.",
+  },
+  endQ1: {
+    id: "wp-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "The book 'Design Patterns: Elements of Reusable Object-Oriented Software' was authored by four people. What nickname did the software community give them?",
+    options: [
+      { text: "The Four Horsemen", correct: false, feedback: "Not quite — that name comes from mythology, not software history." },
+      { text: "The Gang of Four (GoF)", correct: true, feedback: "Correct! Gamma, Helm, Johnson, and Vlissides are collectively known as the Gang of Four." },
+      { text: "The Core Four", correct: false, feedback: "The correct term is the Gang of Four, coined informally by the Java community." },
+      { text: "The Pattern Pioneers", correct: false, feedback: "This isn't the standard term. The correct nickname is the Gang of Four." },
+    ],
+    explanation: "Erich Gamma, Richard Helm, Ralph Johnson, and John Vlissides published the seminal patterns book in 1994. The community nicknamed them the **Gang of Four (GoF)**, and the abbreviation stuck.",
+  },
+  endQ2: {
+    id: "wp-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A junior developer wraps a single integer field in three layers of Strategy, Observer, and Factory 'just in case it grows'. This is an example of:",
+    options: [
+      { text: "Good defensive design", correct: false, feedback: "Anticipating change is good, but adding three patterns to a single integer is premature complexity, not defence." },
+      { text: "Over-engineering / pattern abuse", correct: true, feedback: "Correct. Applying patterns where they add no current value is over-engineering — a common anti-pattern in itself." },
+      { text: "Behavioral pattern usage", correct: false, feedback: "Observer and Strategy are behavioral patterns, but the question is about whether applying them here is appropriate — which it isn't." },
+      { text: "Refactoring", correct: false, feedback: "Refactoring improves existing code without changing behaviour. Adding unnecessary patterns to a simple field is the opposite of simplifying." },
+    ],
+    explanation: "Patterns solve recurring problems in context. Applying them where there is no problem — especially to simple constructs — is called **over-engineering**. Always ask: 'what problem does this pattern solve here?'",
+  },
+  endQ3: {
+    id: "wp-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the UML relationship type: a solid line with a filled arrowhead from class A to class B represents ___.",
+    code: `// A ——► B  (solid line, filled triangle arrowhead)
+// This means A ___ B`,
+    correctAnswers: ["extends", "inherits from", "inheritance"],
+    caseSensitive: false,
+    explanation: "In UML class diagrams, a solid line with a filled (closed) arrowhead pointing from subclass to superclass denotes **inheritance** (extends). A dashed line with an open arrowhead denotes implementation (implements).",
+  },
+};
+
+Software development is full of recurring problems. How do you create an object without hard-coding its exact class? How do you add behaviour to an object at runtime without altering its class? How do you notify many objects when something changes? Experienced engineers solved these problems, recognised the solutions were reusable, and wrote them down. The result — the 1994 book by Gamma, Helm, Johnson, and Vlissides — became one of the most influential software engineering texts ever written.
+
+## What is a design pattern?
+
+A **design pattern** is a named, reusable solution to a commonly occurring problem in a given context. It is not finished code you paste in. It is a template describing a structure, the roles of the participants, and the trade-offs.
+
+Patterns give teams a shared vocabulary. Instead of a five-minute explanation, an engineer can say "use a Factory Method here" and convey a precise, well-understood structure.
+
+```
+Pattern anatomy (GoF style)
+──────────────────────────
+Name        — the shared vocabulary word (e.g., "Strategy")
+Intent      — what problem it solves
+Motivation  — a concrete scenario
+Structure   — a UML class diagram
+Participants — the roles and their responsibilities
+Consequences — trade-offs, benefits, liabilities
+```
+
+## The three GoF categories
+
+The 23 GoF patterns are grouped by their primary purpose:
+
+| Category | Concern | Examples |
+|---|---|---|
+| **Creational** | How objects are created | Singleton, Factory Method, Abstract Factory, Builder, Prototype |
+| **Structural** | How classes/objects are composed | Adapter, Decorator, Proxy, Facade, Composite, Bridge, Flyweight |
+| **Behavioral** | How objects communicate | Observer, Strategy, Command, Iterator, Template Method, Chain of Responsibility |
+
+```java
+// Creational: you say WHAT you need, not HOW to build it
+Shape s = ShapeFactory.create("circle");   // Factory Method
+
+// Structural: you compose behaviour without changing the original class
+InputStream in = new BufferedInputStream(new FileInputStream("data.bin")); // Decorator
+
+// Behavioral: you define how objects interact
+button.addActionListener(e -> handleClick()); // Observer (simplified)
+```
+
+<Note>These categories overlap at the edges. A Proxy, for instance, has elements of both structural composition and behavioral delegation. When classifying a pattern, focus on its primary intent.</Note>
+
+## UML notation basics for Java developers
+
+You will encounter UML class diagrams whenever patterns are documented. The essentials:
+
+```
+─────────────────────────────────────────────────────
+Notation            Meaning
+─────────────────────────────────────────────────────
+A ──────► B         Association: A holds a reference to B
+A ------► B         Dependency: A uses B (dashed, open arrow)
+A ═══════► B        Realisation: A implements interface B (dashed, filled triangle)
+A ────────► B       Inheritance: A extends B (solid, filled triangle)
+◆──────── B         Composition: A owns B (filled diamond on A's side)
+◇──────── B         Aggregation: A has B (open diamond on A's side)
+─────────────────────────────────────────────────────
+```
+
+In Java terms:
+- **Inheritance** → `class Dog extends Animal`
+- **Realisation** → `class Dog implements Runnable`
+- **Composition** → `Engine` exists only inside `Car`; destroyed with it
+- **Aggregation** → `Team` holds `Player` references, but players outlive the team
+
+## When patterns help — and when they hurt
+
+Patterns are useful when:
+- The same structural problem recurs across the codebase
+- You need to isolate a variation point (e.g., pluggable algorithms)
+- You want to enforce constraints (e.g., only one instance)
+- You need to decouple producers from consumers
+
+Patterns hurt when:
+- The problem they solve does not exist in your code
+- The added indirection exceeds the complexity it removes
+- A simpler construct (a lambda, an interface, a record) suffices
+- They are applied for resume-padding rather than necessity
+
+> **Rule of thumb:** if you cannot name the concrete problem the pattern solves in your specific code, do not introduce it.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Try it — pattern category identification
+
+Read each scenario and decide which GoF category (Creational, Structural, or Behavioral) best fits. No IDE needed — this is a reasoning exercise.
+
+**Scenario A:** Your application's logging infrastructure requires a single, shared log writer. Many classes need access to it, but constructing a new one for each class would create conflicting log files.
+
+```
+// Which category?
+// Hint: the key concern is HOW the object is obtained and
+//       HOW MANY instances should exist.
+```
+
+_Answer: Creational (Singleton pattern controls object creation and limits instance count.)_
+
+---
+
+**Scenario B:** A third-party payment library exposes `OldPaymentGateway.charge(int cents)`. Your code relies on an interface `PaymentProcessor.pay(Money amount)`. You cannot modify the library.
+
+```
+// Which category?
+// Hint: the key concern is making two incompatible interfaces
+//       work together — structural composition.
+```
+
+_Answer: Structural (Adapter pattern wraps the legacy interface inside the expected one.)_
+
+---
+
+**Scenario C:** A spreadsheet cell should update all dependent formula cells and chart widgets whenever its value changes, without the cell knowing what depends on it.
+
+```
+// Which category?
+// Hint: the key concern is one-to-many notification
+//       and decoupling the sender from recipients.
+```
+
+_Answer: Behavioral (Observer pattern manages the notification relationship.)_
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Treating patterns as requirements** — patterns are optional tools. Do not force every class to use one.
+- **Confusing category with intent** — Decorator is Structural, not Behavioral, even though it changes behaviour. Always check the intent column.
+- **Memorising UML instead of understanding it** — focus on what each arrow communicates about dependency and ownership.
+- **Equating patterns with best practices** — a pattern is a known trade-off, not an uncritically good idea. Understand the liabilities column of each pattern.
+
+## Recap
+
+- The Gang of Four published 23 patterns in 1994, grouped into **Creational**, **Structural**, and **Behavioral** families
+- A pattern is a **named, reusable solution template**, not copy-paste code
+- UML class diagrams use arrows to express inheritance, implementation, association, and composition
+- Patterns help when a concrete, recurring problem exists in your code; they hurt when applied speculatively
+- The shared vocabulary patterns provide is often their greatest day-to-day value
+
+**Up next:** Singleton & Factory Method — two creational patterns that control how objects come into existence and why getting them wrong causes subtle, hard-to-test bugs.

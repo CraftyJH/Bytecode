@@ -1920,8 +1920,2259 @@ public class Main {
     title: "Java Advanced",
     order: 3,
     isPremium: true,
-    tagline: "Lambdas, streams, concurrency, JVM internals.",
-    modules: [],
+    tagline: "Generics, functional Java, concurrency, design patterns, testing, JVM internals.",
+    modules: [
+      // ── Module 1: Generics In Depth ─────────────────────────────────────
+      {
+        slug: "module-1",
+        title: "Generics In Depth",
+        order: 1,
+        isPremium: true,
+        lessons: [
+          {
+            slug: "generic-classes",
+            title: "Generic Classes & Multiple Type Parameters",
+            order: 1, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    static class Pair<A, B> {
+        private A first;
+        private B second;
+        Pair(A first, B second) { this.first = first; this.second = second; }
+        // TODO: implement getFirst(), getSecond(), and swap() returning Pair<B,A>
+        public A getFirst()    { return null; }
+        public B getSecond()   { return null; }
+        public Pair<B, A> swap() { return null; }
+        public String toString() { return "(" + first + ", " + second + ")"; }
+    }
+    public static void main(String[] args) {
+        Pair<String, Integer> p = new Pair<>("hello", 42);
+        System.out.println(p.getFirst());
+        System.out.println(p.getSecond());
+        System.out.println(p.swap());
+    }
+}`,
+            expectedOutput: "hello\n42\n(42, hello)",
+          },
+          {
+            slug: "bounded-types",
+            title: "Bounded Type Parameters",
+            order: 2, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.List;
+public class Main {
+    // TODO: return the largest element using T extends Comparable<T>
+    static <T extends Comparable<T>> T max(List<T> items) {
+        T result = items.get(0);
+        // complete the loop
+        return result;
+    }
+    // TODO: clamp value to [lo, hi]
+    static <T extends Comparable<T>> T clamp(T value, T lo, T hi) {
+        return value; // fix this
+    }
+    public static void main(String[] args) {
+        System.out.println(max(List.of(3, 1, 4, 1, 5, 9)));
+        System.out.println(max(List.of("mango", "apple", "cherry")));
+        System.out.println(clamp(15, 1, 10));
+        System.out.println(clamp(5,  1, 10));
+    }
+}`,
+            expectedOutput: "9\nmango\n10\n5",
+          },
+          {
+            slug: "wildcards",
+            title: "Wildcards — ? extends, ? super, and Unbounded",
+            order: 3, duration: 15, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // TODO: sum any list of numbers using ? extends Number
+    static double sum(List<? extends Number> nums) { return 0; }
+
+    // TODO: add integers 1..count to a list using ? super Integer
+    static void fill(List<? super Integer> list, int count) {}
+
+    public static void main(String[] args) {
+        System.out.println(sum(List.of(1, 2, 3, 4, 5)));
+        System.out.println(sum(List.of(1.5, 2.5)));
+        List<Number> out = new ArrayList<>();
+        fill(out, 4);
+        System.out.println(out);
+    }
+}`,
+            expectedOutput: "15.0\n4.0\n[1, 2, 3, 4]",
+          },
+          {
+            slug: "generic-methods",
+            title: "Generic Methods & Type Inference",
+            order: 4, duration: 13, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.function.*;
+public class Main {
+    // TODO: return a new list of items satisfying predicate
+    static <T> List<T> filter(List<T> list, Predicate<T> test) { return List.of(); }
+
+    // TODO: return a new list with f applied to every element
+    static <T, R> List<R> map(List<T> list, Function<T, R> f) { return List.of(); }
+
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(1, 2, 3, 4, 5, 6);
+        System.out.println(filter(nums, n -> n % 2 == 0));
+        System.out.println(map(nums, n -> n * n));
+        System.out.println(map(List.of("a", "bb", "ccc"), String::length));
+    }
+}`,
+            expectedOutput: "[2, 4, 6]\n[1, 4, 9, 16, 25, 36]\n[1, 2, 3]",
+          },
+          {
+            slug: "type-erasure",
+            title: "Type Erasure, Bridge Methods & Raw Types",
+            order: 5, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    static class Box<T> {
+        private T value;
+        Box(T value) { this.value = value; }
+        public T get() { return value; }
+    }
+    // Use Class<T> token because instanceof Box<String> is illegal after erasure
+    static <T> boolean holds(Box<?> box, Class<T> type) {
+        // TODO: return true if the box's value is an instance of type
+        return false;
+    }
+    public static void main(String[] args) {
+        Box<String>  bs = new Box<>("hello");
+        Box<Integer> bi = new Box<>(99);
+        System.out.println(bs.getClass() == bi.getClass()); // same raw type
+        System.out.println(holds(bs, String.class));
+        System.out.println(holds(bi, Integer.class));
+        System.out.println(holds(bs, Integer.class));
+    }
+}`,
+            expectedOutput: "true\ntrue\ntrue\nfalse",
+          },
+          {
+            slug: "comparable-comparator",
+            title: "Comparable vs Comparator — Chaining & Reversal",
+            order: 6, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    record Employee(String name, String dept, int salary) {}
+    public static void main(String[] args) {
+        List<Employee> staff = new ArrayList<>(List.of(
+            new Employee("Dave",  "Engineering", 90000),
+            new Employee("Alice", "Marketing",   70000),
+            new Employee("Bob",   "Engineering", 85000),
+            new Employee("Carol", "Marketing",   70000)
+        ));
+        // TODO: sort by dept asc, then salary desc, then name asc
+        Comparator<Employee> comp = null; // replace with real comparator
+        staff.sort(comp);
+        staff.forEach(e -> System.out.println(e.name() + " " + e.dept() + " " + e.salary()));
+    }
+}`,
+            expectedOutput: "Dave Engineering 90000\nBob Engineering 85000\nAlice Marketing 70000\nCarol Marketing 70000",
+          },
+          {
+            slug: "generic-data-structures",
+            title: "Building Generic Data Structures",
+            order: 7, duration: 16, isPremium: true,
+            starterCode:
+`public class Main {
+    static class Stack<T> {
+        @SuppressWarnings("unchecked")
+        private T[] data = (T[]) new Object[16];
+        private int top = 0;
+        public void push(T item) { /* TODO: store at data[top++] */ }
+        public T pop() {
+            // TODO: decrement top, null out slot, return element
+            return null;
+        }
+        public T peek()       { return top == 0 ? null : data[top - 1]; }
+        public boolean isEmpty() { return top == 0; }
+        public int size()     { return top; }
+    }
+    public static void main(String[] args) {
+        Stack<String> s = new Stack<>();
+        s.push("a"); s.push("b"); s.push("c");
+        System.out.println(s.peek());
+        System.out.println(s.pop());
+        System.out.println(s.size());
+        System.out.println(s.isEmpty());
+    }
+}`,
+            expectedOutput: "c\nc\n2\nfalse",
+          },
+          {
+            slug: "generic-algorithms",
+            title: "Generic Search & Sort Algorithms",
+            order: 8, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // TODO: binary search — return index or -1
+    static <T extends Comparable<T>> int binarySearch(List<T> sorted, T target) {
+        int lo = 0, hi = sorted.size() - 1;
+        // complete the algorithm
+        return -1;
+    }
+    // TODO: merge two sorted lists into one sorted list
+    static <T extends Comparable<T>> List<T> merge(List<T> a, List<T> b) {
+        return List.of();
+    }
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(2, 5, 8, 12, 16, 23, 38);
+        System.out.println(binarySearch(nums, 12));
+        System.out.println(binarySearch(nums, 10));
+        System.out.println(merge(List.of(1, 3, 5), List.of(2, 4, 6)));
+    }
+}`,
+            expectedOutput: "3\n-1\n[1, 2, 3, 4, 5, 6]",
+          },
+          {
+            slug: "type-tokens",
+            title: "Type Tokens — Class<T> as a Runtime Key",
+            order: 9, duration: 13, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    static class TypedMap {
+        private final Map<Class<?>, Object> map = new HashMap<>();
+        public <T> void put(Class<T> type, T value) { map.put(type, value); }
+        @SuppressWarnings("unchecked")
+        public <T> T get(Class<T> type) {
+            // TODO: retrieve and cast using type.cast()
+            return null;
+        }
+        public boolean has(Class<?> type) { return map.containsKey(type); }
+    }
+    public static void main(String[] args) {
+        TypedMap tm = new TypedMap();
+        tm.put(String.class,  "Bytecode");
+        tm.put(Integer.class, 2025);
+        System.out.println(tm.get(String.class));
+        System.out.println(tm.get(Integer.class));
+        System.out.println(tm.has(Double.class));
+    }
+}`,
+            expectedOutput: "Bytecode\n2025\nfalse",
+          },
+          {
+            slug: "generic-event-bus",
+            title: "Capstone: Type-Safe Event Bus",
+            order: 10, duration: 18, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.function.Consumer;
+public class Main {
+    static class EventBus {
+        private final Map<Class<?>, List<Consumer<Object>>> handlers = new HashMap<>();
+        @SuppressWarnings("unchecked")
+        public <T> void on(Class<T> type, Consumer<T> handler) {
+            // TODO: add (Consumer<Object>) handler to the list for this type
+        }
+        @SuppressWarnings("unchecked")
+        public <T> void emit(T event) {
+            // TODO: invoke all handlers registered for event.getClass()
+        }
+    }
+    record Login(String user)  {}
+    record Purchase(String item, double price) {}
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+        bus.on(Login.class,    e -> System.out.println("LOGIN: "  + e.user()));
+        bus.on(Purchase.class, e -> System.out.printf("BUY: %s $%.2f%n", e.item(), e.price()));
+        bus.emit(new Login("alice"));
+        bus.emit(new Purchase("Java Book", 29.99));
+    }
+}`,
+            expectedOutput: "LOGIN: alice\nBUY: Java Book $29.99",
+          },
+        ],
+      },
+
+      // ── Module 2: Functional Java ────────────────────────────────────────
+      {
+        slug: "module-2",
+        title: "Functional Java",
+        order: 2,
+        isPremium: true,
+        lessons: [
+          {
+            slug: "lambda-expressions",
+            title: "Lambda Expressions — Syntax, Capture & Effectively Final",
+            order: 1, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.function.*;
+public class Main {
+    public static void main(String[] args) {
+        // TODO: lambda returning the length of a String
+        Function<String, Integer> length = s -> 0; // fix
+
+        // TODO: lambda returning product of two ints
+        BiFunction<Integer, Integer, Integer> multiply = (a, b) -> 0; // fix
+
+        // TODO: Predicate returning true if number is positive
+        Predicate<Integer> positive = n -> false; // fix
+
+        // TODO: sort by length then alphabetically using a lambda comparator
+        List<String> words = new ArrayList<>(List.of("fig", "apple", "kiwi", "pear", "cat"));
+        words.sort(null); // fix
+
+        System.out.println(length.apply("Bytecode"));
+        System.out.println(multiply.apply(6, 7));
+        System.out.println(positive.test(-5) + " " + positive.test(3));
+        System.out.println(words);
+    }
+}`,
+            expectedOutput: "8\n42\nfalse true\n[cat, fig, kiwi, pear, apple]",
+          },
+          {
+            slug: "functional-interfaces",
+            title: "Functional Interfaces — Function, Predicate, Consumer, Supplier",
+            order: 2, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.function.*;
+public class Main {
+    static <T, R> void pipeline(T input,
+                                 Predicate<T> validate,
+                                 Function<T, R> transform,
+                                 Consumer<R> consume) {
+        // TODO: if validate passes, transform then consume
+    }
+    public static void main(String[] args) {
+        pipeline("  hello  ",
+            s -> !s.isBlank(),
+            s -> s.trim().toUpperCase(),
+            s -> System.out.println("Out: " + s));
+
+        pipeline(7,
+            n -> n > 0,
+            n -> n * n,
+            n -> System.out.println("Squared: " + n));
+
+        // Should print nothing — fails validation
+        pipeline("",
+            s -> !s.isBlank(),
+            s -> s.toUpperCase(),
+            s -> System.out.println("SKIP: " + s));
+    }
+}`,
+            expectedOutput: "Out: HELLO\nSquared: 49",
+          },
+          {
+            slug: "method-references",
+            title: "Method References — Static, Instance & Constructor",
+            order: 3, duration: 13, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+public class Main {
+    record Product(String name, double price) {
+        String label() { return name + ": $" + price; }
+    }
+    static double withTax(double p) { return Math.round(p * 1.20 * 100) / 100.0; }
+
+    public static void main(String[] args) {
+        // TODO: replace lambdas with method references where possible
+        List<String> raw = List.of("  Alice  ", "  Bob  ", "  Carol  ");
+        raw.stream().map(s -> s.trim()).forEach(s -> System.out.println(s));
+
+        List<Double> prices = List.of(10.0, 25.0, 50.0);
+        prices.stream().map(p -> withTax(p)).forEach(p -> System.out.println(p));
+
+        List<Product> products = List.of(new Product("Book", 15.0), new Product("Pen", 2.5));
+        products.stream().map(p -> p.label()).forEach(s -> System.out.println(s));
+    }
+}`,
+            expectedOutput: "Alice\nBob\nCarol\n12.0\n30.0\n60.0\nBook: $15.0\nPen: $2.5",
+          },
+          {
+            slug: "streams-filter-map",
+            title: "Streams — filter, map, flatMap, sorted & limit",
+            order: 4, duration: 15, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+public class Main {
+    record Order(String customer, List<String> items) {}
+    public static void main(String[] args) {
+        List<Integer> nums = List.of(5, 3, 8, 1, 9, 2, 7, 4, 6);
+
+        // TODO: even numbers, sorted ascending, first 3
+        List<Integer> result1 = nums.stream()
+            .collect(Collectors.toList()); // fix pipeline
+        System.out.println(result1);
+
+        // TODO: squares of odd numbers > 4
+        List<Integer> result2 = nums.stream()
+            .collect(Collectors.toList()); // fix pipeline
+        System.out.println(result2);
+
+        // TODO: flatMap all items from all orders into one sorted list
+        List<Order> orders = List.of(
+            new Order("Alice", List.of("pen", "book")),
+            new Order("Bob",   List.of("desk", "pen"))
+        );
+        List<String> allItems = orders.stream()
+            .collect(Collectors.toList()); // fix pipeline
+        System.out.println(allItems);
+    }
+}`,
+            expectedOutput: "[2, 4, 6]\n[49, 81]\n[book, desk, pen, pen]",
+          },
+          {
+            slug: "streams-terminal",
+            title: "Streams — collect, reduce, count & matching",
+            order: 5, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+public class Main {
+    record Student(String name, int score) {}
+    public static void main(String[] args) {
+        List<Student> students = List.of(
+            new Student("Alice", 92),
+            new Student("Bob",   78),
+            new Student("Carol", 85),
+            new Student("Dave",  92),
+            new Student("Eve",   60)
+        );
+        // TODO: count students scoring >= 80
+        long highScorers = 0; // fix
+        System.out.println(highScorers);
+
+        // TODO: sum all scores using reduce
+        int total = 0; // fix
+        System.out.println(total);
+
+        // TODO: collect names of students scoring >= 85, sorted
+        List<String> topNames = List.of(); // fix
+        System.out.println(topNames);
+
+        // TODO: is there any student with score == 100?
+        boolean perfect = false; // fix
+        System.out.println(perfect);
+    }
+}`,
+            expectedOutput: "3\n407\n[Alice, Carol, Dave]\nfalse",
+          },
+          {
+            slug: "collectors",
+            title: "Collectors — groupingBy, partitioningBy, joining & more",
+            order: 6, duration: 16, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+public class Main {
+    record Product(String category, String name, double price) {}
+    public static void main(String[] args) {
+        List<Product> products = List.of(
+            new Product("Books",     "Clean Code",    35.0),
+            new Product("Books",     "Effective Java",45.0),
+            new Product("Hardware",  "Keyboard",      80.0),
+            new Product("Hardware",  "Mouse",         40.0),
+            new Product("Software",  "IntelliJ",     200.0)
+        );
+        // TODO: group by category, print category -> count
+        Map<String, Long> countByCategory = Map.of(); // fix
+        new TreeMap<>(countByCategory).forEach((k, v) -> System.out.println(k + ": " + v));
+
+        // TODO: partition into expensive (price > 50) and cheap
+        Map<Boolean, List<String>> byPrice = Map.of(); // fix
+        System.out.println(byPrice.get(true).stream().sorted().collect(Collectors.toList()));
+        System.out.println(byPrice.get(false).stream().sorted().collect(Collectors.toList()));
+
+        // TODO: join all product names, separated by ", "
+        String joined = ""; // fix
+        System.out.println(joined);
+    }
+}`,
+            expectedOutput: "Books: 2\nHardware: 2\nSoftware: 1\n[IntelliJ, Keyboard]\n[Clean Code, Effective Java, Mouse]\nClean Code, Effective Java, Keyboard, Mouse, IntelliJ",
+          },
+          {
+            slug: "optional",
+            title: "Optional — Creating, Chaining & Anti-Patterns",
+            order: 7, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    record User(String name, String email) {}
+
+    static Optional<User> findByName(List<User> users, String name) {
+        // TODO: return first user matching name, or empty
+        return Optional.empty();
+    }
+
+    public static void main(String[] args) {
+        List<User> users = List.of(
+            new User("Alice", "alice@example.com"),
+            new User("Bob",   null)
+        );
+        // print email uppercased, or "NO EMAIL" if absent
+        findByName(users, "Alice")
+            .map(u -> u.email())
+            .map(String::toUpperCase)
+            .ifPresentOrElse(System.out::println, () -> System.out.println("NO EMAIL"));
+
+        findByName(users, "Bob")
+            .map(u -> u.email())
+            .map(String::toUpperCase)
+            .ifPresentOrElse(System.out::println, () -> System.out.println("NO EMAIL"));
+
+        findByName(users, "Carol")
+            .ifPresentOrElse(u -> System.out.println(u.name()), () -> System.out.println("NOT FOUND"));
+    }
+}`,
+            expectedOutput: "ALICE@EXAMPLE.COM\nNO EMAIL\nNOT FOUND",
+          },
+          {
+            slug: "composing-functions",
+            title: "Composing Functions — andThen, compose & Predicate Combinators",
+            order: 8, duration: 13, isPremium: true,
+            starterCode:
+`import java.util.function.*;
+public class Main {
+    public static void main(String[] args) {
+        Function<String, String> trim   = String::trim;
+        Function<String, String> upper  = String::toUpperCase;
+        Function<String, Integer> length = String::length;
+
+        // TODO: compose: trim THEN upper THEN length
+        Function<String, Integer> pipeline = null; // fix
+        System.out.println(pipeline.apply("  hello world  "));
+
+        Predicate<Integer> positive  = n -> n > 0;
+        Predicate<Integer> even      = n -> n % 2 == 0;
+        Predicate<Integer> under100  = n -> n < 100;
+
+        // TODO: build predicate: positive AND even AND under100
+        Predicate<Integer> combined = null; // fix
+        System.out.println(combined.test(42));
+        System.out.println(combined.test(-4));
+        System.out.println(combined.test(104));
+
+        // TODO: negate combined
+        System.out.println(combined.negate().test(42));
+    }
+}`,
+            expectedOutput: "11\ntrue\nfalse\nfalse\nfalse",
+          },
+          {
+            slug: "parallel-streams",
+            title: "Parallel Streams — When to Use & Thread Safety",
+            order: 9, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+import java.util.concurrent.atomic.AtomicInteger;
+public class Main {
+    public static void main(String[] args) {
+        // Sequential sum
+        long seqSum = LongStream.rangeClosed(1, 1_000_000).sum();
+        System.out.println(seqSum);
+
+        // Parallel sum — same result
+        long parSum = LongStream.rangeClosed(1, 1_000_000).parallel().sum();
+        System.out.println(parSum);
+
+        // TODO: use AtomicInteger to safely count even numbers in parallel
+        AtomicInteger evenCount = new AtomicInteger(0);
+        IntStream.rangeClosed(1, 100).parallel().forEach(n -> {
+            // NOTE: do NOT use a plain int counter here — why not?
+            if (n % 2 == 0) evenCount.incrementAndGet();
+        });
+        System.out.println(evenCount.get());
+    }
+}`,
+            expectedOutput: "500000500000\n500000500000\n50",
+          },
+          {
+            slug: "functional-patterns",
+            title: "Functional Design Patterns — Strategy, Command & Pipeline",
+            order: 10, duration: 16, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.function.*;
+public class Main {
+    // Strategy pattern via Function
+    static double applyDiscount(double price, Function<Double, Double> strategy) {
+        return strategy.apply(price);
+    }
+
+    // Command pattern via Runnable queue
+    static List<Runnable> commandQueue = new ArrayList<>();
+    static void enqueue(Runnable cmd) { commandQueue.add(cmd); }
+    static void runAll()              { commandQueue.forEach(Runnable::run); }
+
+    public static void main(String[] args) {
+        // TODO: create three discount strategies as lambdas:
+        // 10% off, 20% off, buy-one-get-one (50% off)
+        Function<Double, Double> tenPct  = p -> p;  // fix
+        Function<Double, Double> twentyPct = p -> p; // fix
+        Function<Double, Double> bogo    = p -> p;  // fix
+
+        System.out.printf("%.2f%n", applyDiscount(100.0, tenPct));
+        System.out.printf("%.2f%n", applyDiscount(100.0, twentyPct));
+        System.out.printf("%.2f%n", applyDiscount(100.0, bogo));
+
+        // TODO: enqueue 3 print commands then run them
+        enqueue(() -> System.out.println("cmd1"));
+        enqueue(() -> System.out.println("cmd2"));
+        enqueue(() -> System.out.println("cmd3"));
+        runAll();
+    }
+}`,
+            expectedOutput: "90.00\n80.00\n50.00\ncmd1\ncmd2\ncmd3",
+          },
+        ],
+      },
+
+      // ── Module 3: Concurrency ────────────────────────────────────────────
+      {
+        slug: "module-3",
+        title: "Concurrency",
+        order: 3,
+        isPremium: true,
+        lessons: [
+          {
+            slug: "threads-runnable",
+            title: "Threads & Runnable — Creating and Joining Threads",
+            order: 1, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        // TODO: create and start two threads that each print their name 3 times
+        Thread t1 = new Thread(() -> {
+            for (int i = 0; i < 3; i++) System.out.println("Thread-A: " + i);
+        });
+        // TODO: create Thread-B similarly
+        Thread t2 = null; // fix
+
+        t1.start();
+        if (t2 != null) t2.start();
+        t1.join();
+        if (t2 != null) t2.join();
+        System.out.println("Done");
+    }
+}`,
+            expectedOutput: "__any__",
+          },
+          {
+            slug: "synchronisation",
+            title: "Synchronisation — synchronized, Monitors & Visibility",
+            order: 2, duration: 16, isPremium: true,
+            starterCode:
+`import java.util.concurrent.*;
+public class Main {
+    static class Counter {
+        private int count = 0;
+        // TODO: make increment() thread-safe with synchronized
+        public void increment() { count++; }
+        public int get() { return count; }
+    }
+    public static void main(String[] args) throws InterruptedException {
+        Counter counter = new Counter();
+        int threads = 10, increments = 1000;
+        Thread[] ts = new Thread[threads];
+        for (int i = 0; i < threads; i++) {
+            ts[i] = new Thread(() -> {
+                for (int j = 0; j < increments; j++) counter.increment();
+            });
+            ts[i].start();
+        }
+        for (Thread t : ts) t.join();
+        // Without synchronization this will be < 10000; with it, exactly 10000
+        System.out.println(counter.get());
+    }
+}`,
+            expectedOutput: "10000",
+          },
+          {
+            slug: "volatile-atomics",
+            title: "volatile & Atomic Types — Visibility Without Locking",
+            order: 3, duration: 15, isPremium: true,
+            starterCode:
+`import java.util.concurrent.atomic.*;
+public class Main {
+    // TODO: use AtomicLong for a thread-safe hit counter
+    static AtomicLong hits   = new AtomicLong(0);
+    static AtomicLong misses = new AtomicLong(0);
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread[] ts = new Thread[5];
+        for (int i = 0; i < ts.length; i++) {
+            int id = i;
+            ts[i] = new Thread(() -> {
+                for (int j = 0; j < 200; j++) {
+                    if ((id + j) % 3 == 0) hits.incrementAndGet();
+                    else                   misses.incrementAndGet();
+                }
+            });
+            ts[i].start();
+        }
+        for (Thread t : ts) t.join();
+        System.out.println(hits.get() + misses.get()); // must be 1000
+        System.out.println(hits.get() > 0);
+    }
+}`,
+            expectedOutput: "1000\ntrue",
+          },
+          {
+            slug: "deadlock",
+            title: "Deadlock, Livelock & Starvation — Causes & Avoidance",
+            order: 4, duration: 15, isPremium: true,
+            starterCode:
+`public class Main {
+    static final Object LOCK_A = new Object();
+    static final Object LOCK_B = new Object();
+
+    // This pair of threads can deadlock if lock order is inconsistent
+    static Thread threadAlpha() {
+        return new Thread(() -> {
+            synchronized (LOCK_A) {
+                try { Thread.sleep(10); } catch (InterruptedException e) {}
+                synchronized (LOCK_B) { System.out.println("Alpha done"); }
+            }
+        });
+    }
+    static Thread threadBeta() {
+        // TODO: fix the lock order here so it cannot deadlock with threadAlpha
+        return new Thread(() -> {
+            synchronized (LOCK_B) { // change this order to fix
+                synchronized (LOCK_A) { System.out.println("Beta done"); }
+            }
+        });
+    }
+    public static void main(String[] args) throws InterruptedException {
+        Thread a = threadAlpha(), b = threadBeta();
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println("Finished");
+    }
+}`,
+            expectedOutput: "__any__",
+          },
+          {
+            slug: "executor-framework",
+            title: "The Executor Framework — Thread Pools & Task Submission",
+            order: 5, duration: 16, isPremium: true,
+            starterCode:
+`import java.util.concurrent.*;
+import java.util.*;
+public class Main {
+    static int expensiveWork(int n) {
+        return n * n; // pretend this takes time
+    }
+    public static void main(String[] args) throws Exception {
+        // TODO: create a fixed thread pool of 4 threads
+        ExecutorService pool = null; // fix
+
+        // TODO: submit 10 tasks and collect their Future<Integer> results
+        List<Future<Integer>> futures = new ArrayList<>();
+        for (int i = 1; i <= 10; i++) {
+            final int n = i;
+            futures.add(null); // fix — submit callable
+        }
+
+        int sum = 0;
+        for (Future<Integer> f : futures) sum += f.get();
+
+        System.out.println(sum); // 1+4+9+...+100 = 385
+        if (pool != null) pool.shutdown();
+    }
+}`,
+            expectedOutput: "385",
+          },
+          {
+            slug: "callable-future",
+            title: "Callable<T> & Future — Results, Cancellation & Timeouts",
+            order: 6, duration: 15, isPremium: true,
+            starterCode:
+`import java.util.concurrent.*;
+public class Main {
+    static String fetchData(String source) throws InterruptedException {
+        Thread.sleep(50); // simulate I/O
+        return "data-from-" + source;
+    }
+    public static void main(String[] args) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        // TODO: submit two Callable tasks and retrieve results
+        Future<String> f1 = null; // fix
+        Future<String> f2 = null; // fix
+
+        System.out.println(f1 != null ? f1.get() : "missing");
+        System.out.println(f2 != null ? f2.get() : "missing");
+
+        // TODO: demonstrate isDone() after get()
+        System.out.println(f1 != null && f1.isDone());
+
+        pool.shutdown();
+    }
+}`,
+            expectedOutput: "data-from-alpha\ndata-from-beta\ntrue",
+          },
+          {
+            slug: "completable-future-1",
+            title: "CompletableFuture I — supplyAsync, thenApply & exceptionally",
+            order: 7, duration: 16, isPremium: true,
+            starterCode:
+`import java.util.concurrent.*;
+public class Main {
+    static String fetchUser(int id) {
+        if (id <= 0) throw new RuntimeException("Invalid id: " + id);
+        return "user-" + id;
+    }
+    public static void main(String[] args) throws Exception {
+        // TODO: build a pipeline: fetchUser(1) -> uppercase -> print length
+        CompletableFuture<Integer> pipeline = CompletableFuture
+            .supplyAsync(() -> fetchUser(1))
+            // .thenApply(...)  add steps here
+            .thenApply(s -> 0); // fix the final step to return length
+
+        System.out.println(pipeline.get()); // should be 6
+
+        // TODO: handle the error case gracefully
+        CompletableFuture<String> withError = CompletableFuture
+            .supplyAsync(() -> fetchUser(-1))
+            .exceptionally(ex -> "error: " + ex.getMessage());
+
+        System.out.println(withError.get());
+    }
+}`,
+            expectedOutput: "6\nerror: Invalid id: -1",
+          },
+          {
+            slug: "completable-future-2",
+            title: "CompletableFuture II — thenCombine, allOf & Complex Pipelines",
+            order: 8, duration: 16, isPremium: true,
+            starterCode:
+`import java.util.concurrent.*;
+import java.util.*;
+public class Main {
+    static CompletableFuture<String> fetchName(int id) {
+        return CompletableFuture.supplyAsync(() -> "User-" + id);
+    }
+    static CompletableFuture<Integer> fetchScore(int id) {
+        return CompletableFuture.supplyAsync(() -> id * 10);
+    }
+    public static void main(String[] args) throws Exception {
+        // TODO: combine name and score for user 5 into one string
+        CompletableFuture<String> combined = fetchName(5)
+            .thenCombine(fetchScore(5), (name, score) -> name + "=" + score); // this one is done
+        System.out.println(combined.get());
+
+        // TODO: wait for ALL of three fetches to complete, then print each
+        CompletableFuture<String> f1 = fetchName(1);
+        CompletableFuture<String> f2 = fetchName(2);
+        CompletableFuture<String> f3 = fetchName(3);
+        CompletableFuture.allOf(f1, f2, f3).join();
+        List<String> names = List.of(f1.get(), f2.get(), f3.get());
+        System.out.println(names);
+    }
+}`,
+            expectedOutput: "User-5=50\n[User-1, User-2, User-3]",
+          },
+          {
+            slug: "concurrent-collections",
+            title: "Concurrent Collections — ConcurrentHashMap, BlockingQueue & More",
+            order: 9, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.concurrent.*;
+import java.util.*;
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        // ConcurrentHashMap — safe for concurrent reads/writes
+        ConcurrentHashMap<String, Integer> wordCount = new ConcurrentHashMap<>();
+
+        Thread[] writers = new Thread[4];
+        String[] words = {"java", "kotlin", "java", "streams", "kotlin", "java"};
+
+        for (int i = 0; i < writers.length; i++) {
+            final int start = i;
+            writers[i] = new Thread(() -> {
+                for (int j = start; j < words.length; j += 4)
+                    wordCount.merge(words[j], 1, Integer::sum);
+            });
+            writers[i].start();
+        }
+        for (Thread t : writers) t.join();
+        new TreeMap<>(wordCount).forEach((k, v) -> System.out.println(k + "=" + v));
+
+        // LinkedBlockingQueue producer-consumer
+        BlockingQueue<Integer> queue = new LinkedBlockingQueue<>(10);
+        // TODO: enqueue 1-5 then drain and sum
+        for (int i = 1; i <= 5; i++) queue.put(i);
+        int sum = 0;
+        while (!queue.isEmpty()) sum += queue.take();
+        System.out.println(sum);
+    }
+}`,
+            expectedOutput: "java=3\nkotlin=2\nstreams=1\n15",
+          },
+          {
+            slug: "locks-conditions",
+            title: "ReentrantLock, ReadWriteLock & Conditions",
+            order: 10, duration: 16, isPremium: true,
+            starterCode:
+`import java.util.concurrent.locks.*;
+import java.util.*;
+public class Main {
+    static class BoundedBuffer<T> {
+        private final Queue<T> queue = new LinkedList<>();
+        private final int capacity;
+        private final Lock lock = new ReentrantLock();
+        private final Condition notFull  = lock.newCondition();
+        private final Condition notEmpty = lock.newCondition();
+
+        BoundedBuffer(int capacity) { this.capacity = capacity; }
+
+        public void put(T item) throws InterruptedException {
+            lock.lock();
+            try {
+                while (queue.size() == capacity) notFull.await();
+                queue.add(item);
+                notEmpty.signal();
+            } finally { lock.unlock(); }
+        }
+
+        public T take() throws InterruptedException {
+            lock.lock();
+            try {
+                while (queue.isEmpty()) notEmpty.await();
+                T item = queue.poll();
+                notFull.signal();
+                return item;
+            } finally { lock.unlock(); }
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        BoundedBuffer<Integer> buf = new BoundedBuffer<>(3);
+        Thread producer = new Thread(() -> {
+            try { for (int i = 1; i <= 5; i++) buf.put(i); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+        Thread consumer = new Thread(() -> {
+            try { for (int i = 0; i < 5; i++) System.out.println(buf.take()); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+        producer.start(); consumer.start();
+        producer.join(); consumer.join();
+    }
+}`,
+            expectedOutput: "1\n2\n3\n4\n5",
+          },
+          {
+            slug: "virtual-threads",
+            title: "Virtual Threads — Project Loom & Structured Concurrency",
+            order: 11, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.concurrent.*;
+import java.util.*;
+public class Main {
+    static String processRequest(int id) {
+        // Simulate I/O by yielding; virtual threads handle this efficiently
+        Thread.yield();
+        return "response-" + id;
+    }
+
+    public static void main(String[] args) throws Exception {
+        // TODO: use Thread.ofVirtual() to start 10 virtual threads
+        List<Thread> threads = new ArrayList<>();
+        List<String> results = Collections.synchronizedList(new ArrayList<>());
+
+        for (int i = 1; i <= 5; i++) {
+            final int id = i;
+            Thread vt = Thread.ofVirtual().start(() -> results.add(processRequest(id)));
+            threads.add(vt);
+        }
+        for (Thread t : threads) t.join();
+
+        Collections.sort(results); // sort for deterministic output
+        results.forEach(System.out::println);
+    }
+}`,
+            expectedOutput: "response-1\nresponse-2\nresponse-3\nresponse-4\nresponse-5",
+          },
+          {
+            slug: "concurrency-patterns",
+            title: "Concurrency Patterns — Producer-Consumer & Work-Stealing",
+            order: 12, duration: 18, isPremium: true,
+            starterCode:
+`import java.util.concurrent.*;
+import java.util.*;
+public class Main {
+    public static void main(String[] args) throws Exception {
+        // Producer-Consumer with a shared BlockingQueue
+        BlockingQueue<Integer> queue = new LinkedBlockingQueue<>();
+        List<Integer> processed = Collections.synchronizedList(new ArrayList<>());
+
+        // Producer: enqueues 1-5 then a sentinel (-1)
+        Thread producer = new Thread(() -> {
+            try {
+                for (int i = 1; i <= 5; i++) queue.put(i);
+                queue.put(-1); // sentinel
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        // TODO: consumer reads until sentinel, squares each value, adds to processed
+        Thread consumer = new Thread(() -> {
+            try {
+                while (true) {
+                    int val = queue.take();
+                    if (val == -1) break;
+                    processed.add(val); // TODO: square val instead
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        producer.start(); consumer.start();
+        producer.join(); consumer.join();
+        System.out.println(processed);
+    }
+}`,
+            expectedOutput: "[1, 4, 9, 16, 25]",
+          },
+        ],
+      },
+
+      // ── Module 4: Design Patterns ────────────────────────────────────────
+      {
+        slug: "module-4",
+        title: "Design Patterns in Java",
+        order: 4,
+        isPremium: true,
+        lessons: [
+          {
+            slug: "why-patterns",
+            title: "Why Design Patterns Exist — GoF, Costs & When Not to Use Them",
+            order: 1, duration: 12, isPremium: true,
+            starterCode:
+`public class Main {
+    // Before patterns: tightly coupled, hard-to-change code
+    static class ReportGenerator {
+        // TODO: refactor this class so output format is swappable
+        // (this exercise is conceptual — the lesson provides the starting point)
+        void generatePDF()  { System.out.println("PDF report"); }
+        void generateCSV()  { System.out.println("CSV report"); }
+        void generateHTML() { System.out.println("HTML report"); }
+    }
+    public static void main(String[] args) {
+        ReportGenerator r = new ReportGenerator();
+        r.generatePDF();
+        r.generateCSV();
+        r.generateHTML();
+    }
+}`,
+            expectedOutput: "PDF report\nCSV report\nHTML report",
+          },
+          {
+            slug: "singleton-factory",
+            title: "Singleton (Thread-Safe) & Static Factory Methods",
+            order: 2, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    // TODO: implement a thread-safe Singleton using the holder idiom
+    static class AppConfig {
+        private final String env;
+        private AppConfig() { this.env = "production"; }
+
+        // Holder idiom — lazy, thread-safe, no synchronisation needed
+        private static class Holder {
+            // TODO: declare INSTANCE here
+        }
+
+        public static AppConfig getInstance() {
+            return null; // fix
+        }
+        public String getEnv() { return env; }
+    }
+
+    // TODO: static factory for a Money value object
+    static class Money {
+        private final long cents;
+        private Money(long cents) { this.cents = cents; }
+        public static Money ofDollars(double amount) { return null; } // fix
+        public String toString() { return "$" + String.format("%.2f", cents / 100.0); }
+    }
+
+    public static void main(String[] args) {
+        AppConfig a = AppConfig.getInstance();
+        AppConfig b = AppConfig.getInstance();
+        System.out.println(a == b);          // true — same instance
+        System.out.println(a.getEnv());
+        System.out.println(Money.ofDollars(9.99));
+    }
+}`,
+            expectedOutput: "true\nproduction\n$9.99",
+          },
+          {
+            slug: "builder",
+            title: "Builder Pattern — Fluent APIs vs Telescoping Constructors",
+            order: 3, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    static class HttpRequest {
+        private final String method;
+        private final String url;
+        private final String body;
+        private final int timeoutMs;
+        private HttpRequest(Builder b) {
+            this.method    = b.method;
+            this.url       = b.url;
+            this.body      = b.body;
+            this.timeoutMs = b.timeoutMs;
+        }
+        public String toString() {
+            return method + " " + url + " body=" + body + " timeout=" + timeoutMs;
+        }
+        static class Builder {
+            private String method = "GET";
+            private String url;
+            private String body   = "";
+            private int timeoutMs = 5000;
+            Builder url(String url)       { this.url = url; return this; }
+            // TODO: implement method(), body(), timeout() fluent setters
+            HttpRequest build() { return new HttpRequest(this); }
+        }
+    }
+    public static void main(String[] args) {
+        HttpRequest req = new HttpRequest.Builder()
+            .url("https://api.example.com/users")
+            .method("POST")
+            .body("{\"name\":\"Alice\"}")
+            .timeout(3000)
+            .build();
+        System.out.println(req);
+    }
+}`,
+            expectedOutput: `POST https://api.example.com/users body={"name":"Alice"} timeout=3000`,
+          },
+          {
+            slug: "adapter-decorator",
+            title: "Adapter & Decorator — Wrapping Incompatible and Enhancing APIs",
+            order: 4, duration: 15, isPremium: true,
+            starterCode:
+`public class Main {
+    // Existing legacy API
+    static class LegacyLogger {
+        void writeLog(String severity, String msg) {
+            System.out.println("[" + severity + "] " + msg);
+        }
+    }
+    // Modern interface callers expect
+    interface Logger {
+        void info(String msg);
+        void error(String msg);
+    }
+    // TODO: implement LoggerAdapter that wraps LegacyLogger and implements Logger
+    static class LoggerAdapter implements Logger {
+        private final LegacyLogger legacy;
+        LoggerAdapter(LegacyLogger legacy) { this.legacy = legacy; }
+        public void info(String msg)  { /* TODO */ }
+        public void error(String msg) { /* TODO */ }
+    }
+    // TODO: Decorator that adds timestamps (just prefix "[TS]" for simplicity)
+    static class TimestampedLogger implements Logger {
+        private final Logger wrapped;
+        TimestampedLogger(Logger wrapped) { this.wrapped = wrapped; }
+        public void info(String msg)  { wrapped.info("[TS] " + msg); }
+        public void error(String msg) { wrapped.error("[TS] " + msg); }
+    }
+    public static void main(String[] args) {
+        Logger log = new TimestampedLogger(new LoggerAdapter(new LegacyLogger()));
+        log.info("Server started");
+        log.error("Connection refused");
+    }
+}`,
+            expectedOutput: "[INFO] [TS] Server started\n[ERROR] [TS] Connection refused",
+          },
+          {
+            slug: "proxy-facade",
+            title: "Proxy (Lazy & Logging) & Facade — Simplifying Subsystems",
+            order: 5, duration: 15, isPremium: true,
+            starterCode:
+`public class Main {
+    interface DataService {
+        String load(String key);
+    }
+    static class RealDataService implements DataService {
+        public String load(String key) {
+            System.out.println("LOAD: " + key);
+            return "value-of-" + key;
+        }
+    }
+    // TODO: LoggingProxy wraps DataService and prints before/after each load
+    static class LoggingProxy implements DataService {
+        private final DataService real;
+        LoggingProxy(DataService real) { this.real = real; }
+        public String load(String key) {
+            return real.load(key); // add logging
+        }
+    }
+    // Facade simplifies three subsystems into one call
+    static class OrderFacade {
+        void placeOrder(String product, int qty) {
+            System.out.println("INVENTORY: reserve " + qty + " " + product);
+            System.out.println("PAYMENT: charge");
+            System.out.println("SHIPPING: dispatch");
+        }
+    }
+    public static void main(String[] args) {
+        DataService svc = new LoggingProxy(new RealDataService());
+        System.out.println(svc.load("user:42"));
+        System.out.println("---");
+        new OrderFacade().placeOrder("Book", 2);
+    }
+}`,
+            expectedOutput: "before load: user:42\nLOAD: user:42\nafter load: user:42\nvalue-of-user:42\n---\nINVENTORY: reserve 2 Book\nPAYMENT: charge\nSHIPPING: dispatch",
+          },
+          {
+            slug: "observer",
+            title: "Observer Pattern — Event Systems & Publisher-Subscriber",
+            order: 6, duration: 16, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    interface StockListener {
+        void onPriceChange(String ticker, double newPrice);
+    }
+    static class StockFeed {
+        private final Map<String, List<StockListener>> listeners = new HashMap<>();
+
+        public void subscribe(String ticker, StockListener l) {
+            listeners.computeIfAbsent(ticker, k -> new ArrayList<>()).add(l);
+        }
+        public void updatePrice(String ticker, double price) {
+            // TODO: notify all listeners for this ticker
+        }
+    }
+    public static void main(String[] args) {
+        StockFeed feed = new StockFeed();
+        feed.subscribe("JAVA", (t, p) -> System.out.printf("Portfolio A: %s = $%.2f%n", t, p));
+        feed.subscribe("JAVA", (t, p) -> System.out.printf("Alert: %s crossed $%.0f%n", t, p));
+        feed.subscribe("KOTLIN", (t, p) -> System.out.printf("Portfolio A: %s = $%.2f%n", t, p));
+        feed.updatePrice("JAVA",   150.00);
+        feed.updatePrice("KOTLIN",  42.50);
+    }
+}`,
+            expectedOutput: "Portfolio A: JAVA = $150.00\nAlert: JAVA crossed $150\nPortfolio A: KOTLIN = $42.50",
+          },
+          {
+            slug: "strategy-command",
+            title: "Strategy & Command — Pluggable Algorithms & Undoable Operations",
+            order: 7, duration: 15, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // Strategy: sorting algorithm is swappable
+    interface SortStrategy {
+        void sort(int[] arr);
+    }
+    static class Sorter {
+        private SortStrategy strategy;
+        Sorter(SortStrategy s) { this.strategy = s; }
+        void setStrategy(SortStrategy s) { this.strategy = s; }
+        void sort(int[] arr) { strategy.sort(arr); }
+    }
+    // Command: undoable text editor operations
+    interface Command { void execute(); void undo(); }
+    static class TextEditor {
+        private StringBuilder text = new StringBuilder();
+        private Deque<Command> history = new ArrayDeque<>();
+        void execute(Command cmd) { cmd.execute(); history.push(cmd); }
+        void undo() { if (!history.isEmpty()) history.pop().undo(); }
+        String getText() { return text.toString(); }
+        // TODO: implement AppendCommand as an inner class using TextEditor.this
+        class AppendCommand implements Command {
+            private final String toAdd;
+            AppendCommand(String s) { this.toAdd = s; }
+            public void execute() { text.append(toAdd); }
+            public void undo()    { text.delete(text.length() - toAdd.length(), text.length()); }
+        }
+    }
+    public static void main(String[] args) {
+        // Strategy
+        Sorter s = new Sorter(arr -> Arrays.sort(arr));
+        int[] nums = {5, 2, 8, 1};
+        s.sort(nums);
+        System.out.println(Arrays.toString(nums));
+        // Command
+        TextEditor ed = new TextEditor();
+        ed.execute(ed.new AppendCommand("Hello"));
+        ed.execute(ed.new AppendCommand(", World"));
+        System.out.println(ed.getText());
+        ed.undo();
+        System.out.println(ed.getText());
+    }
+}`,
+            expectedOutput: "[1, 2, 5, 8]\nHello, World\nHello",
+          },
+          {
+            slug: "iterator-template",
+            title: "Iterator & Template Method — Custom Iteration & Algorithm Skeletons",
+            order: 8, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // Custom Iterable range
+    static class Range implements Iterable<Integer> {
+        private final int start, end, step;
+        Range(int start, int end, int step) { this.start = start; this.end = end; this.step = step; }
+        public Iterator<Integer> iterator() {
+            return new Iterator<>() {
+                int cur = start;
+                public boolean hasNext() { return cur < end; }
+                public Integer next()    { int v = cur; cur += step; return v; }
+            };
+        }
+    }
+    // Template Method: report generation skeleton
+    static abstract class ReportTemplate {
+        // Template method — defines the algorithm skeleton
+        final void generate() {
+            fetchData(); formatHeader(); writeBody(); formatFooter();
+        }
+        abstract void fetchData();
+        abstract void writeBody();
+        void formatHeader() { System.out.println("=== REPORT ==="); }
+        void formatFooter() { System.out.println("=============="); }
+    }
+    static class SalesReport extends ReportTemplate {
+        public void fetchData()  { System.out.println("Fetching sales data"); }
+        public void writeBody()  { System.out.println("Q1: $120k, Q2: $145k"); }
+    }
+    public static void main(String[] args) {
+        for (int n : new Range(1, 10, 2)) System.out.print(n + " ");
+        System.out.println();
+        new SalesReport().generate();
+    }
+}`,
+            expectedOutput: "1 3 5 7 9 \n=== REPORT ===\nFetching sales data\nQ1: $120k, Q2: $145k\n==============",
+          },
+          {
+            slug: "patterns-in-jdk",
+            title: "Patterns in the JDK & Spring — Recognising Them in the Wild",
+            order: 9, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+public class Main {
+    public static void main(String[] args) {
+        // Builder: StringBuilder
+        String result = new StringBuilder()
+            .append("Java ")
+            .append("Design ")
+            .append("Patterns")
+            .toString();
+        System.out.println(result);
+
+        // Iterator: for-each over any Iterable
+        List<String> items = List.of("one", "two", "three");
+        for (String s : items) System.out.println(s);
+
+        // Decorator: Collections.unmodifiableList wraps and restricts
+        List<String> mutable   = new ArrayList<>(List.of("a", "b"));
+        List<String> immutable = Collections.unmodifiableList(mutable);
+        System.out.println(immutable.getClass().getSimpleName());
+
+        // Strategy: Comparator passed to sort
+        List<Integer> nums = new ArrayList<>(List.of(5, 2, 8, 1));
+        nums.sort(Comparator.reverseOrder());
+        System.out.println(nums);
+    }
+}`,
+            expectedOutput: "Java Design Patterns\none\ntwo\nthree\nUnmodifiableRandomAccessList\n[8, 5, 2, 1]",
+          },
+          {
+            slug: "anti-patterns",
+            title: "Anti-Patterns — God Class, Magic Numbers & Premature Abstraction",
+            order: 10, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    // BEFORE: magic numbers everywhere — refactor using named constants
+    static double calculateShipping(double weight, boolean express) {
+        if (weight < 0.5)  return express ? 12.99 : 4.99;
+        if (weight < 5.0)  return express ? 24.99 : 8.99;
+        return express ? 49.99 : 19.99;
+    }
+    public static void main(String[] args) {
+        // TODO: extract named constants for all the magic numbers above
+        // then make these assertions pass:
+        System.out.println(calculateShipping(0.3, false));
+        System.out.println(calculateShipping(0.3, true));
+        System.out.println(calculateShipping(2.0, false));
+        System.out.println(calculateShipping(10.0, true));
+    }
+}`,
+            expectedOutput: "4.99\n12.99\n8.99\n49.99",
+          },
+        ],
+      },
+
+      // ── Module 5: Testing & Code Quality ────────────────────────────────
+      {
+        slug: "module-5",
+        title: "Testing & Code Quality",
+        order: 5,
+        isPremium: true,
+        lessons: [
+          {
+            slug: "tdd-philosophy",
+            title: "TDD Philosophy — Red-Green-Refactor & the Test Pyramid",
+            order: 1, duration: 12, isPremium: true,
+            starterCode:
+`// TDD: write the test first, then make it pass
+// This lesson uses manual assertions since JUnit isn't available in the playground
+public class Main {
+    // The class under test — start with no implementation
+    static class Calculator {
+        int add(int a, int b)      { return 0; }   // TODO: implement
+        int subtract(int a, int b) { return 0; }   // TODO: implement
+        int multiply(int a, int b) { return 0; }   // TODO: implement
+    }
+    // Minimal test harness
+    static int passed = 0, failed = 0;
+    static void assertEqual(String label, int expected, int actual) {
+        if (expected == actual) { System.out.println("PASS: " + label); passed++; }
+        else { System.out.println("FAIL: " + label + " expected=" + expected + " got=" + actual); failed++; }
+    }
+    public static void main(String[] args) {
+        Calculator c = new Calculator();
+        assertEqual("2+3=5",   5,   c.add(2, 3));
+        assertEqual("0+0=0",   0,   c.add(0, 0));
+        assertEqual("10-4=6",  6,   c.subtract(10, 4));
+        assertEqual("3*7=21",  21,  c.multiply(3, 7));
+        assertEqual("neg mul", -12, c.multiply(-3, 4));
+        System.out.println(passed + "/" + (passed + failed) + " passed");
+    }
+}`,
+            expectedOutput: "PASS: 2+3=5\nPASS: 0+0=0\nPASS: 10-4=6\nPASS: 3*7=21\nPASS: neg mul\n5/5 passed",
+          },
+          {
+            slug: "junit5-foundations",
+            title: "JUnit 5 — @Test, Lifecycle Hooks & Assertions",
+            order: 2, duration: 14, isPremium: true,
+            starterCode:
+`// In a real project this would use JUnit 5 annotations.
+// Here we simulate the same test structure with plain Java.
+public class Main {
+    static class StringUtils {
+        static String reverse(String s) { return ""; }             // TODO
+        static boolean isPalindrome(String s) { return false; }    // TODO
+        static String titleCase(String s) { return ""; }           // TODO
+    }
+    static int ok = 0, fail = 0;
+    static void test(String name, boolean pass) {
+        System.out.println((pass ? "PASS" : "FAIL") + " " + name);
+        if (pass) ok++; else fail++;
+    }
+    public static void main(String[] args) {
+        // @BeforeEach equivalent — reset state (none needed here)
+        test("reverse hello",       StringUtils.reverse("hello").equals("olleh"));
+        test("reverse empty",       StringUtils.reverse("").equals(""));
+        test("palindrome racecar",  StringUtils.isPalindrome("racecar"));
+        test("not palindrome java", !StringUtils.isPalindrome("java"));
+        test("titleCase",           StringUtils.titleCase("hello world").equals("Hello World"));
+        System.out.println(ok + "/" + (ok + fail) + " passed");
+    }
+}`,
+            expectedOutput: "PASS reverse hello\nPASS reverse empty\nPASS palindrome racecar\nPASS not palindrome java\nPASS titleCase\n5/5 passed",
+          },
+          {
+            slug: "parameterized-tests",
+            title: "Parameterised Tests — @ValueSource, @CsvSource & @MethodSource",
+            order: 3, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.stream.*;
+public class Main {
+    // Class under test
+    static class FizzBuzz {
+        static String of(int n) {
+            // TODO: return "FizzBuzz" div by 15, "Fizz" by 3, "Buzz" by 5, else n
+            return String.valueOf(n);
+        }
+    }
+    // Simulated @CsvSource parameterised test
+    static int ok = 0, fail = 0;
+    static void test(int input, String expected) {
+        String actual = FizzBuzz.of(input);
+        boolean pass = expected.equals(actual);
+        System.out.println((pass?"PASS":"FAIL") + " of(" + input + ") = " + actual);
+        if (pass) ok++; else fail++;
+    }
+    public static void main(String[] args) {
+        // @CsvSource equivalent
+        test(1,  "1");    test(3,  "Fizz");  test(5,  "Buzz");
+        test(15, "FizzBuzz"); test(30, "FizzBuzz");
+        test(9,  "Fizz"); test(10, "Buzz");  test(7,  "7");
+        System.out.println(ok + "/" + (ok + fail) + " passed");
+    }
+}`,
+            expectedOutput: "PASS of(1) = 1\nPASS of(3) = Fizz\nPASS of(5) = Buzz\nPASS of(15) = FizzBuzz\nPASS of(30) = FizzBuzz\nPASS of(9) = Fizz\nPASS of(10) = Buzz\nPASS of(7) = 7\n8/8 passed",
+          },
+          {
+            slug: "mockito",
+            title: "Mocking with Mockito — Stubs, Verify & ArgumentCaptor",
+            order: 4, duration: 16, isPremium: true,
+            starterCode:
+`// Mockito isn't available in the playground — we hand-roll a mock to learn the concepts
+public class Main {
+    interface EmailSender { boolean send(String to, String subject, String body); }
+    interface UserRepository { String findEmailById(int id); }
+
+    static class NotificationService {
+        private final UserRepository repo;
+        private final EmailSender sender;
+        NotificationService(UserRepository r, EmailSender s) { repo = r; sender = s; }
+        boolean notifyUser(int userId, String message) {
+            String email = repo.findEmailById(userId);
+            if (email == null) return false;
+            return sender.send(email, "Notification", message);
+        }
+    }
+
+    public static void main(String[] args) {
+        // Hand-rolled stubs (Mockito does this with @Mock)
+        UserRepository stubRepo = id -> id == 1 ? "alice@example.com" : null;
+
+        // Capturing argument (Mockito: ArgumentCaptor)
+        String[] captured = new String[1];
+        EmailSender spySender = (to, subject, body) -> { captured[0] = to; return true; };
+
+        NotificationService svc = new NotificationService(stubRepo, spySender);
+
+        System.out.println(svc.notifyUser(1, "Hello!"));  // true
+        System.out.println(captured[0]);                   // alice@example.com
+        System.out.println(svc.notifyUser(99, "Hi"));     // false — user not found
+    }
+}`,
+            expectedOutput: "true\nalice@example.com\nfalse",
+          },
+          {
+            slug: "testing-exceptions",
+            title: "Testing Exceptions & Edge Cases — assertThrows & Boundaries",
+            order: 5, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    static class BankAccount {
+        private double balance;
+        BankAccount(double balance) {
+            if (balance < 0) throw new IllegalArgumentException("Negative balance: " + balance);
+            this.balance = balance;
+        }
+        void deposit(double amount) {
+            if (amount <= 0) throw new IllegalArgumentException("Deposit must be positive");
+            balance += amount;
+        }
+        void withdraw(double amount) {
+            if (amount <= 0) throw new IllegalArgumentException("Withdrawal must be positive");
+            if (amount > balance) throw new IllegalStateException("Insufficient funds");
+            balance -= amount;
+        }
+        double getBalance() { return balance; }
+    }
+
+    static void assertThrows(Class<? extends Exception> type, Runnable action, String label) {
+        try { action.run(); System.out.println("FAIL: " + label + " (no exception)"); }
+        catch (Exception e) {
+            if (type.isInstance(e)) System.out.println("PASS: " + label);
+            else System.out.println("FAIL: " + label + " wrong type: " + e.getClass().getSimpleName());
+        }
+    }
+
+    public static void main(String[] args) {
+        BankAccount acc = new BankAccount(100.0);
+        acc.deposit(50.0);
+        System.out.println(acc.getBalance());
+        assertThrows(IllegalArgumentException.class, () -> new BankAccount(-1), "negative initial");
+        assertThrows(IllegalArgumentException.class, () -> acc.deposit(-5), "neg deposit");
+        assertThrows(IllegalStateException.class,    () -> acc.withdraw(999), "overdraft");
+        assertThrows(IllegalArgumentException.class, () -> acc.withdraw(0),  "zero withdraw");
+    }
+}`,
+            expectedOutput: "150.0\nPASS: negative initial\nPASS: neg deposit\nPASS: overdraft\nPASS: zero withdraw",
+          },
+          {
+            slug: "test-structure",
+            title: "Test Structure & Naming — AAA Pattern, Conventions & Flakiness",
+            order: 6, duration: 13, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // The class under test
+    static class ShoppingCart {
+        private final List<String> items = new ArrayList<>();
+        private final Map<String, Double> prices;
+        ShoppingCart(Map<String, Double> prices) { this.prices = prices; }
+        void add(String item) { items.add(item); }
+        void remove(String item) { items.remove(item); }
+        double total() { return items.stream().mapToDouble(i -> prices.getOrDefault(i, 0.0)).sum(); }
+        int size() { return items.size(); }
+    }
+
+    // Well-named AAA tests
+    static int ok = 0, fail = 0;
+    static void test(String name, boolean pass) {
+        System.out.println((pass ? "PASS" : "FAIL") + " " + name); if (pass) ok++; else fail++;
+    }
+
+    public static void main(String[] args) {
+        Map<String, Double> catalog = Map.of("apple", 1.0, "bread", 2.5, "milk", 1.8);
+
+        // arrange_act_assert naming pattern
+        // given_emptyCart_when_addItem_then_sizeIsOne
+        ShoppingCart cart = new ShoppingCart(catalog);
+        cart.add("apple");
+        test("given_empty_when_addApple_then_sizeIsOne", cart.size() == 1);
+
+        // given_cartWithItems_when_calcTotal_then_returnsSum
+        cart.add("bread");
+        test("given_appleAndBread_when_total_then_3.50", cart.total() == 3.5);
+
+        // given_cartWithItem_when_remove_then_sizeDecreases
+        cart.remove("apple");
+        test("given_appleAndBread_when_removeApple_then_sizeIsOne", cart.size() == 1);
+
+        System.out.println(ok + "/" + (ok + fail) + " passed");
+    }
+}`,
+            expectedOutput: "PASS given_empty_when_addApple_then_sizeIsOne\nPASS given_appleAndBread_when_total_then_3.50\nPASS given_appleAndBread_when_removeApple_then_sizeIsOne\n3/3 passed",
+          },
+          {
+            slug: "coverage-quality",
+            title: "Code Coverage — What It Measures & What It Misses",
+            order: 7, duration: 13, isPremium: true,
+            starterCode:
+`public class Main {
+    // A function with multiple branches — exercise: write tests to hit all paths
+    static String classify(int n) {
+        if (n < 0)        return "negative";
+        if (n == 0)        return "zero";
+        if (n % 2 == 0)   return "positive-even";
+        return "positive-odd";
+    }
+
+    static int ok = 0, fail = 0;
+    static void test(String name, boolean pass) {
+        System.out.println((pass ? "PASS" : "FAIL") + " " + name); if (pass) ok++; else fail++;
+    }
+
+    public static void main(String[] args) {
+        // TODO: add tests for every branch (100% branch coverage)
+        test("negative",      classify(-5).equals("negative"));
+        test("zero",          classify(0).equals("zero"));
+        test("positive-even", classify(4).equals("positive-even"));
+        test("positive-odd",  classify(7).equals("positive-odd"));
+        // Challenge: what edge cases does branch coverage miss?
+        test("boundary -1",   classify(-1).equals("negative"));
+        test("boundary 1",    classify(1).equals("positive-odd"));
+        System.out.println(ok + "/" + (ok + fail) + " passed");
+    }
+}`,
+            expectedOutput: "PASS negative\nPASS zero\nPASS positive-even\nPASS positive-odd\nPASS boundary -1\nPASS boundary 1\n6/6 passed",
+          },
+          {
+            slug: "integration-testing",
+            title: "Integration Testing Concepts — Real Dependencies & TestContainers",
+            order: 8, duration: 14, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // Simulating an integration test where real components interact
+    interface DataStore {
+        void save(String key, String value);
+        Optional<String> load(String key);
+    }
+
+    // Real implementation
+    static class InMemoryStore implements DataStore {
+        private final Map<String, String> store = new HashMap<>();
+        public void save(String k, String v) { store.put(k, v); }
+        public Optional<String> load(String k) { return Optional.ofNullable(store.get(k)); }
+    }
+
+    static class UserService {
+        private final DataStore store;
+        UserService(DataStore store) { this.store = store; }
+        void createUser(String id, String name) { store.save("user:" + id, name); }
+        Optional<String> getUser(String id)     { return store.load("user:" + id); }
+    }
+
+    public static void main(String[] args) {
+        // Integration test: real InMemoryStore + real UserService
+        DataStore realStore = new InMemoryStore();
+        UserService svc = new UserService(realStore);
+        svc.createUser("1", "Alice");
+        svc.createUser("2", "Bob");
+        System.out.println(svc.getUser("1").orElse("not found"));
+        System.out.println(svc.getUser("2").orElse("not found"));
+        System.out.println(svc.getUser("3").orElse("not found"));
+    }
+}`,
+            expectedOutput: "Alice\nBob\nnot found",
+          },
+        ],
+      },
+
+      // ── Module 6: JVM Internals & Performance ────────────────────────────
+      {
+        slug: "module-6",
+        title: "JVM Internals & Performance",
+        order: 6,
+        isPremium: true,
+        lessons: [
+          {
+            slug: "jvm-architecture",
+            title: "JVM Architecture — Classloading, Bytecode & JIT Compilation",
+            order: 1, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    public static void main(String[] args) {
+        // Classloading: inspect the classloader chain
+        Class<?> clazz = String.class;
+        System.out.println(clazz.getName());
+        System.out.println(clazz.getClassLoader()); // null = bootstrap loader
+
+        // Reflection: inspect methods count (JDK version-dependent, just show it's > 0)
+        System.out.println(clazz.getMethods().length > 0);
+
+        // JIT warm-up demonstration: tight loop that JIT will optimise
+        long sum = 0;
+        for (long i = 0; i < 1_000_000L; i++) sum += i;
+        System.out.println(sum);
+    }
+}`,
+            expectedOutput: "java.lang.String\nnull\ntrue\n499999500000",
+          },
+          {
+            slug: "garbage-collection",
+            title: "Garbage Collection — G1, ZGC, GC Roots & Tuning",
+            order: 2, duration: 16, isPremium: true,
+            starterCode:
+`public class Main {
+    static class Node {
+        Node next;
+        byte[] data;
+        Node(int kb) { data = new byte[kb * 1024]; }
+    }
+
+    public static void main(String[] args) {
+        // Create objects, some become unreachable (eligible for GC)
+        for (int i = 0; i < 100; i++) {
+            Node n = new Node(10); // unreachable after iteration — GC candidate
+            if (i == 0) System.out.println("Node size approx: " + n.data.length);
+        }
+
+        // Request GC (no guarantee it runs, but demonstrates the concept)
+        Runtime rt = Runtime.getRuntime();
+        long before = rt.totalMemory() - rt.freeMemory();
+        System.gc();
+        long after = rt.totalMemory() - rt.freeMemory();
+
+        System.out.println("GC ran: " + (after <= before));
+        System.out.println("Max memory MB: " + (rt.maxMemory() / 1024 / 1024 > 0));
+    }
+}`,
+            expectedOutput: "Node size approx: 10240\nGC ran: true\nMax memory MB: true",
+          },
+          {
+            slug: "memory-model",
+            title: "Java Memory Model — Heap, Stack, Metaspace & Object Headers",
+            order: 3, duration: 15, isPremium: true,
+            starterCode:
+`public class Main {
+    // Demonstrating stack vs heap allocation
+    static int recursionDepth(int n) {
+        if (n <= 0) return 0;
+        // Each call frame lives on the stack
+        int local = n * 2; // stack variable
+        return 1 + recursionDepth(n - 1);
+    }
+
+    public static void main(String[] args) {
+        // Heap: objects survive method return
+        String[] heapArr = new String[3];
+        heapArr[0] = "a"; heapArr[1] = "b"; heapArr[2] = "c";
+
+        // Stack: local primitives live in current frame
+        int stackVar = 42;
+
+        System.out.println(recursionDepth(10));
+        System.out.println(stackVar);
+        System.out.println(heapArr[1]);
+
+        // String interning: two literals → same object (string pool in heap)
+        String s1 = "hello";
+        String s2 = "hello";
+        System.out.println(s1 == s2);       // true — interned
+        System.out.println(s1 == new String("hello")); // false — new heap object
+    }
+}`,
+            expectedOutput: "10\n42\nb\ntrue\nfalse",
+          },
+          {
+            slug: "profiling-tools",
+            title: "Profiling Tools — Reading Flame Graphs & Finding Hotspots",
+            order: 4, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    // A deliberately inefficient implementation — profile to find the bottleneck
+    static boolean isPrime(int n) {
+        if (n < 2) return false;
+        for (int i = 2; i < n; i++) { // O(n) — should be O(sqrt(n))
+            if (n % i == 0) return false;
+        }
+        return true;
+    }
+
+    // TODO: implement fastIsPrime using sqrt optimisation
+    static boolean fastIsPrime(int n) {
+        return isPrime(n); // replace with the optimised version
+    }
+
+    public static void main(String[] args) {
+        // Count primes up to 10000 with both implementations
+        long slowCount = 0, fastCount = 0;
+        for (int i = 2; i <= 10000; i++) if (isPrime(i))     slowCount++;
+        for (int i = 2; i <= 10000; i++) if (fastIsPrime(i)) fastCount++;
+        System.out.println(slowCount);
+        System.out.println(fastCount);
+        System.out.println(slowCount == fastCount); // must be true
+    }
+}`,
+            expectedOutput: "1229\n1229\ntrue",
+          },
+          {
+            slug: "benchmarking-jmh",
+            title: "Benchmarking with JMH — Microbenchmarks, Warmup & Pitfalls",
+            order: 5, duration: 16, isPremium: true,
+            starterCode:
+`public class Main {
+    // String concatenation: + vs StringBuilder (classic JMH benchmark topic)
+    static String concatPlus(int n) {
+        String result = "";
+        for (int i = 0; i < n; i++) result += i; // O(n²) — creates new String each time
+        return result;
+    }
+    static String concatBuilder(int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) sb.append(i); // O(n)
+        return sb.toString();
+    }
+    public static void main(String[] args) {
+        // Correctness check (a real JMH benchmark would measure throughput)
+        System.out.println(concatPlus(5).equals(concatBuilder(5)));
+        System.out.println(concatPlus(5));
+
+        // Measure relative time
+        long t0 = System.nanoTime();
+        concatPlus(5000);
+        long plusMs = (System.nanoTime() - t0) / 1_000_000;
+
+        t0 = System.nanoTime();
+        concatBuilder(5000);
+        long sbMs = (System.nanoTime() - t0) / 1_000_000;
+
+        System.out.println("StringBuilder faster: " + (sbMs < plusMs || sbMs == 0));
+    }
+}`,
+            expectedOutput: "true\n01234\nStringBuilder faster: true",
+          },
+          {
+            slug: "performance-traps",
+            title: "Common Performance Traps — Autoboxing, Loops & Premature Optimisation",
+            order: 6, duration: 15, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // Trap 1: Autoboxing in a tight loop
+    static long sumBoxed(int n) {
+        Long sum = 0L; // Long, not long — every += triggers unbox+box
+        for (int i = 0; i < n; i++) sum += i;
+        return sum;
+    }
+    static long sumPrimitive(int n) {
+        long sum = 0L; // TODO: keep this as primitive
+        for (int i = 0; i < n; i++) sum += i;
+        return sum;
+    }
+
+    // Trap 2: indexOf in a loop creating O(n²)
+    static int countOccurrences(String text, char target) {
+        int count = 0;
+        // TODO: iterate with charAt instead of creating substrings
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == target) count++;
+        }
+        return count;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(sumBoxed(1000) == sumPrimitive(1000));
+        System.out.println(sumPrimitive(100));
+        System.out.println(countOccurrences("banana", 'a'));
+    }
+}`,
+            expectedOutput: "true\n4950\n3",
+          },
+          {
+            slug: "graalvm",
+            title: "GraalVM & Native Image — AOT Compilation & Tradeoffs",
+            order: 7, duration: 14, isPremium: true,
+            starterCode:
+`public class Main {
+    // GraalVM can compile this to a native binary with ms startup time
+    // This lesson is conceptual — this code demonstrates what native-compatible code looks like
+    record Config(String host, int port, boolean tls) {
+        static Config defaultConfig() {
+            return new Config("localhost", 8080, false);
+        }
+    }
+
+    public static void main(String[] args) {
+        Config cfg = args.length > 0
+            ? new Config(args[0], Integer.parseInt(args[1]), Boolean.parseBoolean(args[2]))
+            : Config.defaultConfig();
+
+        System.out.println("Host: " + cfg.host());
+        System.out.println("Port: " + cfg.port());
+        System.out.println("TLS:  " + cfg.tls());
+        // Note: reflection-heavy code (like Spring) needs extra GraalVM config
+        System.out.println("Reflection-free: " + !cfg.getClass().isAnonymousClass());
+    }
+}`,
+            expectedOutput: "Host: localhost\nPort: 8080\nTLS:  false\nReflection-free: true",
+          },
+          {
+            slug: "profiling-exercise",
+            title: "Profile & Fix — Finding and Eliminating a Real Hotspot",
+            order: 8, duration: 18, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // A deliberately slow word-frequency counter — profile and optimise
+    static Map<String, Integer> countWordsSlow(String[] words) {
+        Map<String, Integer> freq = new HashMap<>();
+        for (String word : words) {
+            // BUG: containsKey + get = two lookups; use getOrDefault or merge
+            if (freq.containsKey(word)) freq.put(word, freq.get(word) + 1);
+            else freq.put(word, 1);
+        }
+        return freq;
+    }
+
+    // TODO: optimise using Map.merge()
+    static Map<String, Integer> countWordsFast(String[] words) {
+        Map<String, Integer> freq = new HashMap<>();
+        // replace with single-lookup approach
+        for (String word : words) {
+            if (freq.containsKey(word)) freq.put(word, freq.get(word) + 1);
+            else freq.put(word, 1);
+        }
+        return freq;
+    }
+
+    public static void main(String[] args) {
+        String[] words = {"java", "kotlin", "java", "jvm", "kotlin", "java"};
+        Map<String, Integer> slow = countWordsSlow(words);
+        Map<String, Integer> fast = countWordsFast(words);
+        System.out.println(slow.equals(fast)); // same result
+        new TreeMap<>(fast).forEach((k, v) -> System.out.println(k + "=" + v));
+    }
+}`,
+            expectedOutput: "true\njava=3\njvm=1\nkotlin=2",
+          },
+        ],
+      },
+
+      // ── Module 7: Portfolio Capstone ─────────────────────────────────────
+      {
+        slug: "module-7",
+        title: "Portfolio Capstone — Task Management System",
+        order: 7,
+        isPremium: true,
+        lessons: [
+          {
+            slug: "project-design",
+            title: "Part 1 — Design, Requirements & Package Structure",
+            order: 1, duration: 20, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    // Domain model for a mini task-management system
+    enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
+    enum Status   { TODO, IN_PROGRESS, DONE }
+
+    record Task(int id, String title, Priority priority, Status status, String assignee) {
+        // TODO: implement a copy-with-new-status helper
+        Task withStatus(Status s) { return this; } // fix
+    }
+
+    public static void main(String[] args) {
+        Task t = new Task(1, "Fix login bug", Priority.HIGH, Status.TODO, "alice");
+        System.out.println(t.title());
+        System.out.println(t.priority());
+        Task inProgress = t.withStatus(Status.IN_PROGRESS);
+        System.out.println(inProgress.status());
+        System.out.println(inProgress.id()); // same id
+    }
+}`,
+            expectedOutput: "Fix login bug\nHIGH\nIN_PROGRESS\n1",
+          },
+          {
+            slug: "project-data-layer",
+            title: "Part 2 — Generic Repository & Optional-Based Lookups",
+            order: 2, duration: 20, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.function.*;
+public class Main {
+    enum Priority { LOW, MEDIUM, HIGH }
+    enum Status   { TODO, IN_PROGRESS, DONE }
+    record Task(int id, String title, Priority priority, Status status) {}
+
+    static class TaskRepository {
+        private final Map<Integer, Task> store = new HashMap<>();
+        private int nextId = 1;
+
+        public Task save(String title, Priority p) {
+            Task t = new Task(nextId++, title, p, Status.TODO);
+            store.put(t.id(), t);
+            return t;
+        }
+        public Optional<Task> findById(int id) {
+            return Optional.ofNullable(store.get(id));
+        }
+        // TODO: findAll(Predicate<Task>) — return matching tasks sorted by id
+        public List<Task> findAll(Predicate<Task> filter) {
+            return List.of();
+        }
+        public boolean update(Task updated) {
+            if (!store.containsKey(updated.id())) return false;
+            store.put(updated.id(), updated);
+            return true;
+        }
+    }
+
+    public static void main(String[] args) {
+        TaskRepository repo = new TaskRepository();
+        repo.save("Write tests",   Priority.HIGH);
+        repo.save("Update docs",   Priority.LOW);
+        repo.save("Fix crash",     Priority.HIGH);
+        System.out.println(repo.findById(2).map(Task::title).orElse("none"));
+        System.out.println(repo.findById(99).isPresent());
+        repo.findAll(t -> t.priority() == Priority.HIGH)
+            .forEach(t -> System.out.println(t.id() + ": " + t.title()));
+    }
+}`,
+            expectedOutput: "Update docs\nfalse\n1: Write tests\n3: Fix crash",
+          },
+          {
+            slug: "project-business-logic",
+            title: "Part 3 — Stream Pipelines & Functional Rule Evaluation",
+            order: 3, duration: 20, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+import java.util.function.*;
+public class Main {
+    enum Priority { LOW, MEDIUM, HIGH }
+    enum Status   { TODO, IN_PROGRESS, DONE }
+    record Task(int id, String title, Priority priority, Status status, String assignee) {}
+
+    // Business rules expressed as Predicates (Strategy pattern)
+    static final Predicate<Task> OVERDUE    = t -> t.status() != Status.DONE && t.priority() == Priority.HIGH;
+    static final Predicate<Task> UNASSIGNED = t -> t.assignee() == null || t.assignee().isBlank();
+
+    static Map<String, Long> tasksByAssignee(List<Task> tasks) {
+        // TODO: group tasks by assignee, count each
+        return Map.of();
+    }
+
+    public static void main(String[] args) {
+        List<Task> tasks = List.of(
+            new Task(1, "Fix crash",   Priority.HIGH,   Status.TODO,        "alice"),
+            new Task(2, "Write docs",  Priority.LOW,    Status.IN_PROGRESS, "bob"),
+            new Task(3, "Deploy",      Priority.HIGH,   Status.DONE,        "alice"),
+            new Task(4, "Code review", Priority.MEDIUM, Status.TODO,        ""),
+            new Task(5, "Hotfix",      Priority.HIGH,   Status.TODO,        "bob")
+        );
+
+        // Overdue high-priority tasks
+        tasks.stream().filter(OVERDUE).map(Task::title).sorted()
+            .forEach(System.out::println);
+
+        // Unassigned tasks
+        System.out.println(tasks.stream().filter(UNASSIGNED).count());
+
+        // Workload by assignee
+        new TreeMap<>(tasksByAssignee(tasks)).forEach((k, v) ->
+            System.out.println(k.isBlank() ? "(unassigned)" : k + ": " + v));
+    }
+}`,
+            expectedOutput: "Fix crash\nHotfix\n1\n(unassigned): 1\nalice: 2\nbob: 2",
+          },
+          {
+            slug: "project-concurrency",
+            title: "Part 4 — Concurrent Task Processing & CompletableFuture Notifications",
+            order: 4, duration: 20, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+public class Main {
+    enum Priority { LOW, HIGH }
+    record Task(int id, String title, Priority priority) {}
+
+    static class TaskProcessor {
+        private final ExecutorService pool = Executors.newFixedThreadPool(3);
+        private final AtomicInteger processed = new AtomicInteger(0);
+
+        CompletableFuture<String> process(Task task) {
+            return CompletableFuture.supplyAsync(() -> {
+                processed.incrementAndGet();
+                return "DONE: " + task.title();
+            }, pool);
+        }
+
+        int getProcessed() { return processed.get(); }
+        void shutdown()    { pool.shutdown(); }
+    }
+
+    public static void main(String[] args) throws Exception {
+        TaskProcessor processor = new TaskProcessor();
+        List<Task> tasks = List.of(
+            new Task(1, "task-a", Priority.HIGH),
+            new Task(2, "task-b", Priority.LOW),
+            new Task(3, "task-c", Priority.HIGH)
+        );
+
+        // TODO: process all tasks concurrently, collect results
+        List<CompletableFuture<String>> futures = tasks.stream()
+            .map(processor::process)
+            .collect(java.util.stream.Collectors.toList());
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        futures.stream().map(f -> {
+            try { return f.get(); } catch (Exception e) { return "ERROR"; }
+        }).sorted().forEach(System.out::println);
+
+        System.out.println("Processed: " + processor.getProcessed());
+        processor.shutdown();
+    }
+}`,
+            expectedOutput: "DONE: task-a\nDONE: task-b\nDONE: task-c\nProcessed: 3",
+          },
+          {
+            slug: "project-tests",
+            title: "Part 5 — Writing a Full Test Suite",
+            order: 5, duration: 20, isPremium: true,
+            starterCode:
+`import java.util.*;
+public class Main {
+    enum Priority { LOW, HIGH }
+    enum Status   { TODO, DONE }
+    record Task(int id, String title, Priority priority, Status status) {}
+
+    static class TaskService {
+        private final Map<Integer, Task> store = new HashMap<>();
+        private int seq = 1;
+        public Task create(String title, Priority p) {
+            Task t = new Task(seq++, title, p, Status.TODO);
+            store.put(t.id(), t);
+            return t;
+        }
+        public boolean complete(int id) {
+            Task t = store.get(id);
+            if (t == null || t.status() == Status.DONE) return false;
+            store.put(id, new Task(t.id(), t.title(), t.priority(), Status.DONE));
+            return true;
+        }
+        public long countByStatus(Status s) { return store.values().stream().filter(t -> t.status()==s).count(); }
+    }
+
+    // Test harness
+    static int ok = 0, fail = 0;
+    static void test(String name, boolean pass) {
+        System.out.println((pass ? "PASS" : "FAIL") + " " + name); if (pass) ok++; else fail++;
+    }
+    public static void main(String[] args) {
+        TaskService svc = new TaskService();
+        Task t1 = svc.create("Alpha", Priority.HIGH);
+        Task t2 = svc.create("Beta",  Priority.LOW);
+
+        test("create sets TODO",    t1.status() == Status.TODO);
+        test("ids are sequential",  t2.id() == t1.id() + 1);
+        test("complete returns true",  svc.complete(t1.id()));
+        test("complete marks DONE", svc.countByStatus(Status.DONE) == 1);
+        test("double-complete false",  !svc.complete(t1.id()));
+        test("complete unknown false", !svc.complete(999));
+        test("todo count",          svc.countByStatus(Status.TODO) == 1);
+        System.out.println(ok + "/" + (ok + fail) + " passed");
+    }
+}`,
+            expectedOutput: "PASS create sets TODO\nPASS ids are sequential\nPASS complete returns true\nPASS complete marks DONE\nPASS double-complete false\nPASS complete unknown false\nPASS todo count\n7/7 passed",
+          },
+          {
+            slug: "project-polish",
+            title: "Part 6 — Polish, Patterns Review & Performance Check",
+            order: 6, duration: 20, isPremium: true,
+            starterCode:
+`import java.util.*;
+import java.util.stream.*;
+public class Main {
+    enum Priority { LOW, MEDIUM, HIGH }
+    enum Status   { TODO, IN_PROGRESS, DONE }
+    record Task(int id, String title, Priority priority, Status status, String assignee) {}
+
+    // Final integrated demo: repository + streams + patterns + performance check
+    static class TaskRepository {
+        private final Map<Integer, Task> store = new LinkedHashMap<>();
+        private int seq = 1;
+        public Task add(String title, Priority p, String assignee) {
+            Task t = new Task(seq++, title, p, Status.TODO, assignee);
+            store.put(t.id(), t); return t;
+        }
+        public List<Task> all()          { return List.copyOf(store.values()); }
+        public Optional<Task> find(int id) { return Optional.ofNullable(store.get(id)); }
+    }
+
+    public static void main(String[] args) {
+        TaskRepository repo = new TaskRepository();
+        repo.add("Auth service",  Priority.HIGH,   "alice");
+        repo.add("Dashboard UI",  Priority.MEDIUM, "bob");
+        repo.add("DB migrations", Priority.HIGH,   "alice");
+        repo.add("Write tests",   Priority.LOW,    "carol");
+        repo.add("Deploy prod",   Priority.CRITICAL, "alice"); // will show as CRITICAL
+
+        // Summary statistics using streams
+        Map<Priority, Long> byPriority = repo.all().stream()
+            .collect(Collectors.groupingBy(Task::priority, Collectors.counting()));
+        new TreeMap<>(byPriority).forEach((p, c) -> System.out.println(p + ": " + c));
+
+        // Workload check
+        repo.all().stream()
+            .collect(Collectors.groupingBy(Task::assignee, Collectors.counting()))
+            .entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .forEach(e -> System.out.println(e.getKey() + " has " + e.getValue() + " tasks"));
+
+        System.out.println("Total: " + repo.all().size());
+    }
+}`,
+            expectedOutput: "CRITICAL: 1\nHIGH: 2\nLOW: 1\nMEDIUM: 1\nalice has 3 tasks\nbob has 1 tasks\ncarol has 1 tasks\nTotal: 5",
+          },
+        ],
+      },
+    ],
   },
   {
     slug: "kotlin-bridge",
