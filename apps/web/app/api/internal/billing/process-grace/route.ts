@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import type Stripe from "stripe";
+
 import { forceDowngradeSubscription } from "@/lib/billing-grace";
 import { getStripe, requireInternalBillingSyncToken } from "@/lib/stripe";
 
@@ -69,8 +71,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, action: "still_in_grace" });
   }
 
+  if (force && subscription) {
+    const retrySucceeded = await tryOneMoreCharge(stripe, subscription);
+    if (retrySucceeded) {
+      return NextResponse.json({ ok: true, action: "retry_paid" });
+    }
+  }
+
   if (subscription && cancelStripe) {
-    await stripe.subscriptions.cancel(subscription.id, { prorate: false });
+    try {
+      await stripe.subscriptions.cancel(subscription.id, { prorate: false });
+    } catch {
+      // Continue downgrade flow even if Stripe cancellation already happened.
+    }
   }
 
   await forceDowngradeSubscription({
@@ -80,6 +93,25 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ ok: true, action: "canceled_and_downgraded" });
+}
+
+async function tryOneMoreCharge(
+  stripe: ReturnType<typeof getStripe>,
+  subscription: Stripe.Subscription,
+): Promise<boolean> {
+  const latestInvoiceId =
+    typeof subscription.latest_invoice === "string"
+      ? subscription.latest_invoice
+      : subscription.latest_invoice?.id ?? null;
+
+  if (!latestInvoiceId) return false;
+
+  try {
+    const paidInvoice = await stripe.invoices.pay(latestInvoiceId, { off_session: true });
+    return paidInvoice.status === "paid";
+  } catch {
+    return false;
+  }
 }
 
 async function resolveUserIdByStripe(

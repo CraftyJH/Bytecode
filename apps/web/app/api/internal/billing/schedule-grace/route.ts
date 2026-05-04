@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireInternalBillingSyncToken } from "@/lib/stripe";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 interface ScheduleGraceRequest {
   userId?: string;
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
           stripeCustomerId: body.stripeCustomerId ?? null,
           stripeSubscriptionId: body.stripeSubscriptionId ?? null,
           force: true,
+          cancelStripe: true,
         }),
         cache: "no-store",
       });
