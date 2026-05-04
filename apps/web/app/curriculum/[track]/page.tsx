@@ -122,10 +122,7 @@ export default async function TrackPage({ params }: TrackPageProps) {
                           style={{ fontFamily: "var(--font-mono)" }}
                           title={lesson.title}
                         >
-                          <span className="text-accent font-semibold tabular-nums">
-                            {String(lesson.order).padStart(2, "0")}
-                          </span>{" "}
-                          {lesson.title}
+                          {String(lesson.order).padStart(2, "0")} {lesson.title}
                         </a>
                       ))}
                     </div>
