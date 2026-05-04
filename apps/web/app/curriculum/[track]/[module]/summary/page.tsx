@@ -1020,7 +1020,7 @@ export default async function SummaryPage({ params }: SummaryPageProps) {
             >
               <div className="flex items-center gap-3">
                 <span
-                  className="text-xs text-prose-faint w-5 shrink-0"
+                  className="text-xs text-prose font-semibold tabular-nums w-5 shrink-0"
                   style={{ fontFamily: "var(--font-mono)" }}
                 >
                   {String(lesson.order).padStart(2, "0")}
