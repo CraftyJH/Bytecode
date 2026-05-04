@@ -195,6 +195,55 @@ public final class TaskValidation {
 
 Named static predicates are readable at the call site: `TaskValidation.ALL.test(candidate)` reads like English.
 
+<Exercise>
+Build a `TaskValidator` class that composes three `Predicate<Task>` rules: title non-blank, priority between 1 and 5 (inclusive), and status not null. Instead of returning a single boolean, have `validate(Task)` return a `List<String>` of error messages — one message per failed rule. Return an empty list if the task is valid.
+
+```java
+import java.util.*;
+import java.util.function.Predicate;
+
+public class Main {
+    enum TaskStatus { TODO, IN_PROGRESS, DONE }
+
+    record Task(String title, int priority, TaskStatus status) {}
+
+    static class TaskValidator {
+        private record Rule(Predicate<Task> predicate, String message) {}
+
+        private final List<Rule> rules = List.of(
+            // TODO: add rule for non-blank title
+            // TODO: add rule for priority in [1,5]
+            // TODO: add rule for non-null status
+        );
+
+        List<String> validate(Task task) {
+            // TODO: collect messages for each failing rule
+            return List.of();
+        }
+    }
+
+    public static void main(String[] args) {
+        var validator = new TaskValidator();
+
+        var valid = new Task("Fix bug", 3, TaskStatus.TODO);
+        System.out.println("Valid errors: " + validator.validate(valid).size());
+
+        var invalid = new Task("  ", 0, null);
+        List<String> errors = validator.validate(invalid);
+        System.out.println("Invalid errors: " + errors.size());
+        errors.forEach(System.out::println);
+    }
+}
+```
+
+**What to verify:**
+- `Valid errors: 0` is printed for the valid task
+- `Invalid errors: 3` is printed for the task with blank title, priority 0, and null status
+- Three distinct error messages are printed
+
+<Note>Hint: iterate over your rules list and add `rule.message()` to the result list whenever `!rule.predicate().test(task)` is true.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## The TaskService

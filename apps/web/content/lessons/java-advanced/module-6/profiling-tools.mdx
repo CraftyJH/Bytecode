@@ -127,6 +127,48 @@ N = number of processors (or parallelization factor)
 
 If a method takes 5% of total runtime, making it infinitely fast buys you at most a 5.3% overall speedup. Focus profiling effort on the widest flames, not the most interesting code.
 
+<Exercise>
+Calculate the theoretical speedup for a program where 60% of the work is parallelizable using 4 cores. Then write a Java program that prints the result using Amdahl's formula.
+
+```java
+public class Main {
+    /**
+     * Amdahl's Law: speedup = 1 / (S + (1 - S) / N)
+     *
+     * S = sequential fraction (the part that cannot be parallelized)
+     * N = number of processors
+     */
+    public static double amdahlSpeedup(double parallelFraction, int processors) {
+        // TODO: implement the formula
+        // sequential fraction S = 1 - parallelFraction
+        // return 1.0 / (S + (1.0 - S) / processors)
+        return 0;
+    }
+
+    public static void main(String[] args) {
+        double parallelFraction = 0.60; // 60% of work is parallelizable
+        int[] coreCounts = {1, 2, 4, 8, 16, Integer.MAX_VALUE};
+
+        // TODO: For each core count, compute and print the speedup
+        // For Integer.MAX_VALUE cores, use the limit formula: 1.0 / (1 - parallelFraction)
+        // Format: "Cores: 4  -> speedup: 1.82x"
+
+        // TODO: Also compute what fraction would need to be parallelized
+        // to achieve a 3x speedup on 4 cores
+        // Hint: rearrange the formula: 3 = 1 / (S + (1-S)/4)
+        // and solve for S, then print parallelFraction = 1 - S
+    }
+}
+```
+
+**What to verify:**
+- With 60% parallelizable and 4 cores: speedup ≈ 1.82×
+- With infinite cores: max speedup = 1 / (1 - 0.60) = 2.5× (the sequential 40% is the ceiling)
+- The speedup increases with more cores but with diminishing returns
+
+<Note>Hint: the formula for the theoretical maximum (infinite cores) simplifies to `1.0 / sequentialFraction`. No matter how many cores you add, the 40% sequential portion cannot be sped up.</Note>
+</Exercise>
+
 ## async-profiler
 
 [async-profiler](https://github.com/async-profiler/async-profiler) is the industry-standard low-overhead sampling profiler for production JVMs. It uses OS signals and `perf_events` to sample call stacks without modifying bytecode, avoiding the "observer effect."

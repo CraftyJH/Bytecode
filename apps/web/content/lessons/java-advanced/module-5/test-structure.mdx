@@ -202,6 +202,79 @@ class CartServiceTest {
 }
 ```
 
+<Exercise>
+Demonstrate how shared mutable state breaks test isolation — two "tests" that share a counter produce wrong results — then fix it by resetting state before each test.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    // Simulated service with internal state
+    static class Counter {
+        private int count = 0;
+        void increment() { count++; }
+        int getCount()   { return count; }
+    }
+
+    // ---- BROKEN: shared state (shows the isolation problem) ----
+    static Counter sharedCounter = new Counter();
+
+    static void broken_firstTestAddsOne() {
+        sharedCounter.increment();
+        check(sharedCounter.getCount() == 1, "[broken] count is 1 after first increment");
+    }
+
+    static void broken_secondTestAlsoAddsOne() {
+        sharedCounter.increment();
+        // BUG: expects 1, but sharedCounter already has 1 from the previous "test"
+        check(sharedCounter.getCount() == 1, "[broken] count is 1 after fresh increment");
+    }
+
+    // ---- FIXED: reset state before each test ----
+    static Counter counter; // reset in setUp()
+
+    static void setUp() {
+        counter = new Counter(); // fresh instance — equivalent to @BeforeEach
+    }
+
+    static void fixed_firstTestAddsOne() {
+        setUp();
+        counter.increment();
+        check(counter.getCount() == 1, "[fixed] count is 1 after first increment");
+    }
+
+    static void fixed_secondTestAlsoAddsOne() {
+        setUp();
+        counter.increment();
+        check(counter.getCount() == 1, "[fixed] count is 1 after fresh increment");
+    }
+
+    public static void main(String[] args) {
+        System.out.println("-- Broken (shared state) --");
+        broken_firstTestAddsOne();
+        try {
+            broken_secondTestAlsoAddsOne(); // this WILL fail
+        } catch (AssertionError e) {
+            System.out.println("EXPECTED FAILURE: " + e.getMessage());
+        }
+
+        System.out.println("-- Fixed (isolated state) --");
+        fixed_firstTestAddsOne();
+        fixed_secondTestAlsoAddsOne();
+    }
+}
+```
+
+**What to verify:**
+- The broken second test throws an `AssertionError` (demonstrating the isolation problem)
+- Both fixed tests print `PASS:` regardless of execution order
+
+<Note>Hint: the `setUp()` call at the start of each fixed test mirrors exactly what `@BeforeEach` does in JUnit — give every test a clean starting point.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Test doubles taxonomy
