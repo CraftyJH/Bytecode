@@ -104,8 +104,8 @@ private fun AppScreen(
         }
         is AppUiState.LoggedOut -> {
             SignInScreen(
-                loading = false,
-                error = null,
+                loading = state.loading,
+                error = state.error,
                 onSignIn = onSignIn,
             )
         }

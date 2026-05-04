@@ -10,7 +10,10 @@ import dev.bytecode.android.data.model.MobileTrackSummary
 
 sealed interface AppUiState {
     data object Loading : AppUiState
-    data object LoggedOut : AppUiState
+    data class LoggedOut(
+        val loading: Boolean = false,
+        val error: String? = null,
+    ) : AppUiState
     data class LoggedIn(
         val user: BackendUserState,
         val billing: BillingState?,
