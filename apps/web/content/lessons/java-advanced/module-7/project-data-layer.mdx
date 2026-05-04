@@ -152,6 +152,39 @@ public interface Repository<T, ID> {
 
 <Note>`Repository` is an interface, not an abstract class. This keeps the contract pure and allows a concrete repository to implement multiple interfaces (e.g., `Repository<Task, UUID>` and `Closeable`) without conflicting state.</Note>
 
+<Exercise>
+Define a generic `Repository<T, ID>` interface with four methods: `save(T entity)`, `findById(ID id)` returning `Optional<T>`, `findAll()` returning `List<T>`, and `delete(ID id)` returning `boolean`. Do not implement it yet — just verify it compiles with a placeholder implementation in `main`.
+
+```java
+import java.util.*;
+
+public class Main {
+    interface Repository<T, ID> {
+        // TODO: declare save, findById, findAll, delete
+    }
+
+    // Placeholder to confirm the interface compiles
+    static class NoOpRepo implements Repository<String, Integer> {
+        public void save(String entity) {}
+        public Optional<String> findById(Integer id) { return Optional.empty(); }
+        public List<String> findAll() { return List.of(); }
+        public boolean delete(Integer id) { return false; }
+    }
+
+    public static void main(String[] args) {
+        Repository<String, Integer> repo = new NoOpRepo();
+        System.out.println("Interface compiles: " + repo.findAll().size());
+    }
+}
+```
+
+**What to verify:**
+- Prints `Interface compiles: 0` with no compilation errors
+- The `Repository` interface declares all four method signatures
+
+<Note>Hint: remember that `findById` must return `Optional<T>` and `delete` must return `boolean`.</Note>
+</Exercise>
+
 ## Extracting the ID — the `Identifiable` helper
 
 Every entity in our system has a `UUID` id. To avoid duplicating `entity.id()` calls inside `InMemoryRepository`, we define a tiny interface:
@@ -229,6 +262,62 @@ public class InMemoryRepository<T, ID> implements Repository<T, ID> {
 ```
 
 The `idExtractor` `Function<T, ID>` is injected via the constructor — this is the only thing that varies between entity types and it keeps the base class fully generic.
+
+<Exercise>
+Implement an `InMemoryRepository<T, ID>` backed by a `ConcurrentHashMap<ID, T>`. Accept a `Function<T, ID>` id-extractor in the constructor. Implement all four Repository methods. In `main`, test it by saving three `String` items keyed by `Integer`, finding one by id, listing all, and deleting one.
+
+```java
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+public class Main {
+    interface Repository<T, ID> {
+        void save(T entity);
+        Optional<T> findById(ID id);
+        List<T> findAll();
+        boolean delete(ID id);
+    }
+
+    static class InMemoryRepository<T, ID> implements Repository<T, ID> {
+        private final Map<ID, T> store = new ConcurrentHashMap<>();
+        private final Function<T, ID> idExtractor;
+
+        InMemoryRepository(Function<T, ID> idExtractor) {
+            this.idExtractor = idExtractor;
+        }
+
+        // TODO: implement all four methods
+        public void save(T entity) {}
+        public Optional<T> findById(ID id) { return Optional.empty(); }
+        public List<T> findAll() { return List.of(); }
+        public boolean delete(ID id) { return false; }
+    }
+
+    public static void main(String[] args) {
+        // Items are strings; their ID is their length (for demo purposes)
+        var repo = new InMemoryRepository<String, Integer>(String::length);
+        repo.save("hi");
+        repo.save("hello");
+        repo.save("hey");
+
+        System.out.println("findById(5): " + repo.findById(5).orElse("not found"));
+        System.out.println("all count: " + repo.findAll().size());
+
+        repo.delete(2);
+        System.out.println("after delete, count: " + repo.findAll().size());
+    }
+}
+```
+
+**What to verify:**
+- `findById(5): hello` is printed
+- `all count: 3` is printed
+- `after delete, count: 2` is printed
+
+<Note>Hint: `save` should call `store.put(idExtractor.apply(entity), entity)`. `findAll` should return `List.copyOf(store.values())`.</Note>
+</Exercise>
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 
@@ -312,6 +401,76 @@ public class InMemoryTaskRepository extends InMemoryRepository<Task, UUID> {
 ```
 
 `findByAssignee` and `findOverdue` demonstrate composing Optional logic inside a Predicate — a pattern straight from Module 2.
+
+<Exercise>
+Extend `InMemoryRepository<Task, UUID>` to create `InMemoryTaskRepository`. Add `findByStatus(TaskStatus)` using a stream filter, and `findOverdue(LocalDate today)` that returns tasks whose due date is before today and whose status is not `DONE`. Test both methods with a set of sample tasks.
+
+```java
+import java.time.LocalDate;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+public class Main {
+    enum TaskStatus { TODO, IN_PROGRESS, DONE }
+
+    record Task(UUID id, String title, TaskStatus status, LocalDate dueDate) {}
+
+    static class InMemoryRepository<T, ID> {
+        protected final Map<ID, T> store = new ConcurrentHashMap<>();
+        private final Function<T, ID> idExtractor;
+
+        InMemoryRepository(Function<T, ID> idExtractor) { this.idExtractor = idExtractor; }
+
+        void save(T entity) { store.put(idExtractor.apply(entity), entity); }
+        Optional<T> findById(ID id) { return Optional.ofNullable(store.get(id)); }
+        List<T> findAll() { return List.copyOf(store.values()); }
+        boolean delete(ID id) { return store.remove(id) != null; }
+
+        List<T> findWhere(java.util.function.Predicate<T> p) {
+            return store.values().stream().filter(p).collect(Collectors.toList());
+        }
+    }
+
+    static class InMemoryTaskRepository extends InMemoryRepository<Task, UUID> {
+        InMemoryTaskRepository() { super(Task::id); }
+
+        List<Task> findByStatus(TaskStatus status) {
+            // TODO: use findWhere
+            return List.of();
+        }
+
+        List<Task> findOverdue(LocalDate today) {
+            // TODO: filter by dueDate before today and status != DONE
+            return List.of();
+        }
+    }
+
+    public static void main(String[] args) {
+        var repo = new InMemoryTaskRepository();
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        LocalDate tomorrow  = LocalDate.now().plusDays(1);
+
+        repo.save(new Task(UUID.randomUUID(), "Overdue task",   TaskStatus.TODO,        yesterday));
+        repo.save(new Task(UUID.randomUUID(), "Future task",    TaskStatus.IN_PROGRESS, tomorrow));
+        repo.save(new Task(UUID.randomUUID(), "Done overdue",   TaskStatus.DONE,        yesterday));
+        repo.save(new Task(UUID.randomUUID(), "Another TODO",   TaskStatus.TODO,        tomorrow));
+
+        System.out.println("TODO count: " + repo.findByStatus(TaskStatus.TODO).size());
+        System.out.println("Overdue count: " + repo.findOverdue(LocalDate.now()).size());
+        repo.findOverdue(LocalDate.now()).forEach(t -> System.out.println("OVERDUE: " + t.title()));
+    }
+}
+```
+
+**What to verify:**
+- `TODO count: 2` is printed
+- `Overdue count: 1` is printed (the done task does not count as overdue)
+- `OVERDUE: Overdue task` is printed
+
+<Note>Hint: for `findOverdue`, the predicate should check `t.dueDate().isBefore(today) && t.status() != TaskStatus.DONE`.</Note>
+</Exercise>
 
 ## Repositories for Project and User
 

@@ -153,6 +153,41 @@ com.bytecode.tasks
 
 <Note>Everything inside `domain` has **zero dependencies** on other layers. Domain classes import only the JDK. This rule makes the domain independently testable and maximises reuse.</Note>
 
+<Exercise>
+Define a `TaskStatus` enum with four values: `TODO`, `IN_PROGRESS`, `DONE`, and `CANCELLED`. Add a `canTransitionTo(TaskStatus next)` method that enforces the following rules: `TODO` can only move to `IN_PROGRESS`; `IN_PROGRESS` can move to `DONE` or `CANCELLED`; `DONE` and `CANCELLED` are terminal (no outgoing transitions). In `main`, loop over all statuses and print their allowed next states.
+
+```java
+public class Main {
+    enum TaskStatus {
+        TODO, IN_PROGRESS, DONE, CANCELLED;
+
+        public boolean canTransitionTo(TaskStatus next) {
+            // TODO: implement using a switch expression
+            return false;
+        }
+    }
+
+    public static void main(String[] args) {
+        for (TaskStatus from : TaskStatus.values()) {
+            for (TaskStatus to : TaskStatus.values()) {
+                if (from.canTransitionTo(to)) {
+                    System.out.println(from + " -> " + to);
+                }
+            }
+        }
+    }
+}
+```
+
+**What to verify:**
+- `TODO -> IN_PROGRESS` is printed
+- `IN_PROGRESS -> DONE` and `IN_PROGRESS -> CANCELLED` are printed
+- No transitions from `DONE` or `CANCELLED` appear
+- `TODO -> DONE` does NOT appear
+
+<Note>Hint: use a `switch (this)` expression with arrow cases. Each case should return a boolean expression checking the `next` value.</Note>
+</Exercise>
+
 ## Entities vs value objects
 
 Two fundamental categories of domain objects behave very differently:
@@ -302,6 +337,46 @@ public class Project {
 
 <Note>`Collections.unmodifiableList` wraps the internal list before returning it. Callers see a read-only view — they cannot sneak mutations in through the returned reference. This is a lightweight alternative to making a defensive copy on every call.</Note>
 
+<Exercise>
+Define a `Task` as a Java record with four fields: `java.util.UUID id`, `String title`, `TaskStatus status`, and `int priority` (valid range 1–5). Add a compact constructor that throws `IllegalArgumentException` if the title is blank or the priority is outside [1, 5]. In `main`, create one valid task, then try creating one with a blank title — catch and print the exception message.
+
+```java
+import java.util.UUID;
+
+public class Main {
+    enum TaskStatus { TODO, IN_PROGRESS, DONE, CANCELLED }
+
+    record Task(UUID id, String title, TaskStatus status, int priority) {
+        // TODO: add compact constructor validating title and priority
+    }
+
+    public static void main(String[] args) {
+        Task valid = new Task(UUID.randomUUID(), "Write tests", TaskStatus.TODO, 3);
+        System.out.println(valid.title() + " | priority=" + valid.priority());
+
+        try {
+            new Task(UUID.randomUUID(), "  ", TaskStatus.TODO, 3);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught: " + e.getMessage());
+        }
+
+        try {
+            new Task(UUID.randomUUID(), "Deploy", TaskStatus.TODO, 0);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught: " + e.getMessage());
+        }
+    }
+}
+```
+
+**What to verify:**
+- The valid task prints its title and priority without errors
+- The blank-title attempt prints a `Caught:` line
+- The out-of-range priority attempt prints a `Caught:` line
+
+<Note>Hint: inside a compact constructor, assign directly to the record components (no `this.` prefix). Check `title.isBlank()` and `priority < 1 || priority > 5`.</Note>
+</Exercise>
+
 The `User` record is the simplest member of the domain:
 
 ```java
@@ -360,6 +435,56 @@ public class DomainSmoke {
 ```
 
 The entire domain model compiles and runs with zero external dependencies — just the JDK.
+
+<Exercise>
+Define a `Project` class with a `String name`, a private `List<Task>` of tasks, an `addTask(Task)` method, and a `getTasksByStatus(TaskStatus)` method that returns a filtered list. In `main`, add 4 tasks with mixed statuses, then print the count of tasks in each status using your method.
+
+```java
+import java.util.*;
+import java.util.stream.*;
+import java.util.UUID;
+
+public class Main {
+    enum TaskStatus { TODO, IN_PROGRESS, DONE, CANCELLED }
+
+    record Task(UUID id, String title, TaskStatus status, int priority) {}
+
+    static class Project {
+        private final String name;
+        private final List<Task> tasks = new ArrayList<>();
+
+        Project(String name) { this.name = name; }
+
+        void addTask(Task task) {
+            // TODO: add task to the list
+        }
+
+        List<Task> getTasksByStatus(TaskStatus status) {
+            // TODO: return filtered list using streams
+            return Collections.emptyList();
+        }
+    }
+
+    public static void main(String[] args) {
+        Project project = new Project("Capstone");
+        project.addTask(new Task(UUID.randomUUID(), "Design DB",    TaskStatus.DONE,        2));
+        project.addTask(new Task(UUID.randomUUID(), "Write API",    TaskStatus.IN_PROGRESS, 4));
+        project.addTask(new Task(UUID.randomUUID(), "Write tests",  TaskStatus.TODO,        3));
+        project.addTask(new Task(UUID.randomUUID(), "Deploy",       TaskStatus.TODO,        5));
+
+        for (TaskStatus s : TaskStatus.values()) {
+            int count = project.getTasksByStatus(s).size();
+            System.out.println(s + ": " + count);
+        }
+    }
+}
+```
+
+**What to verify:**
+- Output includes `TODO: 2`, `IN_PROGRESS: 1`, `DONE: 1`, and `CANCELLED: 0`
+
+<Note>Hint: in `getTasksByStatus`, use `tasks.stream().filter(t -> t.status() == status).collect(Collectors.toList())`.</Note>
+</Exercise>
 
 ## Try it
 

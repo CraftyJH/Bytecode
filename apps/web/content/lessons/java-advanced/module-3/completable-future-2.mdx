@@ -86,6 +86,43 @@ System.out.println(summary.get());   // e.g. "Alice scored 42"
 
 Both `supplyAsync` calls start immediately and run concurrently. `thenCombine` fires as soon as the *slower* of the two completes.
 
+<Exercise>
+Simulate two async API calls: one fetches a user name (sleeps 100 ms, returns `"Alice"`), the other fetches a score (sleeps 80 ms, returns `42`). Combine the results with `thenCombine` to produce a summary string `"Alice scored 42"`, then print it.
+
+```java
+import java.util.concurrent.CompletableFuture;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        long start = System.currentTimeMillis();
+
+        CompletableFuture<String> userCf = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return "Alice";
+        });
+
+        CompletableFuture<Integer> scoreCf = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(80); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return 42;
+        });
+
+        // TODO: combine userCf and scoreCf with thenCombine to produce "Alice scored 42"
+        String summary = userCf.thenCombine(scoreCf, (name, score) -> name + " scored " + score).get();
+
+        long elapsed = System.currentTimeMillis() - start;
+        System.out.println(summary);
+        System.out.println("Elapsed: ~" + (elapsed / 100 * 100) + " ms");
+    }
+}
+```
+
+**What to verify:**
+- Prints `"Alice scored 42"`
+- Elapsed time is roughly 100 ms (the slower of the two), not 180 ms — confirming the calls ran concurrently
+
+<Note>Hint: `thenCombine(other, (a, b) -> ...)` takes a `BiFunction`. Both futures are already running — `thenCombine` just wires their results together when both finish.</Note>
+</Exercise>
+
 ## allOf — wait for everything
 
 `CompletableFuture.allOf(futures...)` returns a `CompletableFuture<Void>` that completes when *every* input future has completed:
@@ -103,6 +140,47 @@ System.out.println(r1 + " | " + r2 + " | " + r3);
 ```
 
 <Note>`allOf` does not carry individual results — it returns `CompletableFuture<Void>`. After `allOf(...).get()` completes, call `.get()` on each original future to retrieve values. Those `.get()` calls return immediately because all futures are already done.</Note>
+
+<Exercise>
+Start 3 `supplyAsync` tasks that return `"result-A"`, `"result-B"`, and `"result-C"` respectively (each sleeping 50 ms). Use `allOf` to wait until all three are done, then call `join()` on each to retrieve and print all results.
+
+```java
+import java.util.concurrent.CompletableFuture;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        CompletableFuture<String> f1 = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return "result-A";
+        });
+        CompletableFuture<String> f2 = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return "result-B";
+        });
+        CompletableFuture<String> f3 = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return "result-C";
+        });
+
+        // TODO: use allOf to wait for all three futures, then call .get()
+        CompletableFuture.allOf(f1, f2, f3).get();
+
+        // TODO: print each result using join()
+        System.out.println(f1.join());
+        System.out.println(f2.join());
+        System.out.println(f3.join());
+        System.out.println("all done");
+    }
+}
+```
+
+**What to verify:**
+- Prints `"result-A"`, `"result-B"`, `"result-C"` in order
+- Prints `"all done"` last
+- Total time is roughly 50 ms, not 150 ms — all three ran concurrently
+
+<Note>Hint: `allOf` returns `CompletableFuture<Void>` — it holds no results. After `allOf(...).get()`, all original futures are guaranteed done so `join()` returns instantly without blocking.</Note>
+</Exercise>
 
 ## anyOf — take the first result
 

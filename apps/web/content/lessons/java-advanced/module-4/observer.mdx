@@ -189,6 +189,49 @@ public class Main {
 
 <Note>Java's `java.util.Observer` and `java.util.Observable` were **deprecated in Java 9**. They are poorly designed (Observable is a class, not an interface; the update method is weakly typed). Always define your own Observer interface as shown above.</Note>
 
+<Exercise>
+Implement `EventSource` with `subscribe(Observer)`, `unsubscribe(Observer)`, and `notify(String event)` methods. Create 3 subscribers using lambdas. Notify all three, then unsubscribe the second subscriber and notify again — demonstrating that only the remaining active subscribers receive the second event.
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class Main {
+    interface Observer {
+        void onEvent(String event);
+    }
+
+    // TODO: class EventSource
+    //         subscribe(Observer o), unsubscribe(Observer o),
+    //         notify(String event) — iterates a snapshot copy of the list
+
+    public static void main(String[] args) {
+        EventSource source = new EventSource();
+
+        Observer sub1 = e -> System.out.println("Sub1 received: " + e);
+        Observer sub2 = e -> System.out.println("Sub2 received: " + e);
+        Observer sub3 = e -> System.out.println("Sub3 received: " + e);
+
+        source.subscribe(sub1);
+        source.subscribe(sub2);
+        source.subscribe(sub3);
+
+        source.notify("start");   // all 3 receive it
+
+        source.unsubscribe(sub2);
+        source.notify("stop");    // only sub1 and sub3 receive it
+    }
+}
+```
+
+**What to verify:**
+- First `notify("start")` prints three lines (Sub1, Sub2, Sub3 in subscription order)
+- Second `notify("stop")` prints only two lines (Sub1 and Sub3)
+- Sub2 prints nothing after being unsubscribed
+
+<Note>Hint: Iterate over `new ArrayList<>(observers)` (a snapshot) to safely allow unsubscription during notification.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Lambda observers
@@ -230,6 +273,47 @@ Flux.just(180.0, 185.5, 210.0)
     .subscribe(System.out::println);
 // HIGH PRICE: 210.0
 ```
+
+<Exercise>
+Implement `StockTicker` that emits price updates. Subscribe two observers: one prints `"Buy!"` when the new price is lower than the previous price, the other prints `"Sell!"` when the new price is higher. Emit 4 price events and verify both observers react correctly.
+
+```java
+public class Main {
+    interface PriceObserver {
+        void onPriceChange(String ticker, double oldPrice, double newPrice);
+    }
+
+    // TODO: class StockTicker
+    //         holds ticker name and current price
+    //         subscribe(PriceObserver o)
+    //         updatePrice(double newPrice) — notifies all observers with old and new price
+
+    public static void main(String[] args) {
+        StockTicker aapl = new StockTicker("AAPL", 150.0);
+
+        aapl.subscribe((ticker, oldP, newP) -> {
+            if (newP < oldP) System.out.println(ticker + ": Buy!  " + oldP + " -> " + newP);
+        });
+        aapl.subscribe((ticker, oldP, newP) -> {
+            if (newP > oldP) System.out.println(ticker + ": Sell! " + oldP + " -> " + newP);
+        });
+
+        aapl.updatePrice(145.0);  // drop  — Buy!
+        aapl.updatePrice(160.0);  // rise  — Sell!
+        aapl.updatePrice(160.0);  // same  — neither
+        aapl.updatePrice(155.0);  // drop  — Buy!
+    }
+}
+```
+
+**What to verify:**
+- `145.0` update triggers `Buy!` only
+- `160.0` update triggers `Sell!` only
+- Second `160.0` update triggers neither observer
+- Final `155.0` update triggers `Buy!` only
+
+<Note>Hint: Store `currentPrice` as an instance field. In `updatePrice`, save old price, update field, then notify with `(ticker, oldPrice, newPrice)`.</Note>
+</Exercise>
 
 ## Try it
 

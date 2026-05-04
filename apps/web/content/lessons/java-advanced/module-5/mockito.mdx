@@ -86,6 +86,55 @@ when(spyList.size()).thenReturn(99); // only size() is stubbed
 
 Mocks are the everyday tool. Spies are useful when you have a large real object and only want to stub *one* troublesome method without replacing everything.
 
+<Exercise>
+Define a `PaymentGateway` interface with a `charge(double)` method returning `boolean`. Implement a manual stub that always returns `true`. Use it to test that `OrderService.placeOrder()` returns `true` when the gateway succeeds.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    interface PaymentGateway {
+        boolean charge(double amount);
+    }
+
+    // Manual stub — always returns true (no Mockito needed)
+    static class AlwaysSucceedsGateway implements PaymentGateway {
+        @Override
+        public boolean charge(double amount) {
+            return true;
+        }
+    }
+
+    static class OrderService {
+        private final PaymentGateway gateway;
+        OrderService(PaymentGateway gateway) { this.gateway = gateway; }
+
+        boolean placeOrder(double amount) {
+            // TODO: call gateway.charge(amount) and return the result
+            return gateway.charge(amount);
+        }
+    }
+
+    public static void main(String[] args) {
+        PaymentGateway stub = new AlwaysSucceedsGateway();
+        OrderService service = new OrderService(stub);
+
+        check(service.placeOrder(99.99), "placeOrder returns true when gateway succeeds");
+        check(service.placeOrder(0.01),  "placeOrder returns true for minimum amount");
+    }
+}
+```
+
+**What to verify:**
+- Both checks print `PASS:`
+- Replacing the stub with one that returns `false` causes both checks to fail
+
+<Note>Hint: a manual stub is just a class that implements the interface and returns a hardcoded value — no framework needed.</Note>
+</Exercise>
+
 ## Stubbing with when/thenReturn
 
 ```java
@@ -154,6 +203,64 @@ void emailContainsOrderId() {
 ```
 
 Without `ArgumentCaptor` you would have to stub a custom matcher, or worse, expose internal state just to test it. The captor lets you assert on the exact object passed to the collaborator.
+
+<Exercise>
+Write a test that uses a `List<String>` as a capturing fake logger. Verify that after calling a method on the service under test, the correct log message was recorded.
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    interface Logger {
+        void log(String message);
+    }
+
+    // Capturing fake — records every call to log()
+    static class CapturingLogger implements Logger {
+        final List<String> messages = new ArrayList<>();
+        @Override
+        public void log(String message) { messages.add(message); }
+    }
+
+    static class PaymentService {
+        private final Logger logger;
+        PaymentService(Logger logger) { this.logger = logger; }
+
+        void processPayment(double amount) {
+            // TODO: log "Processing payment: <amount>" then do work
+            logger.log("Processing payment: " + amount);
+        }
+    }
+
+    public static void main(String[] args) {
+        CapturingLogger fakeLogger = new CapturingLogger();
+        PaymentService service = new PaymentService(fakeLogger);
+
+        service.processPayment(49.99);
+
+        // Verify exactly one message was logged
+        check(fakeLogger.messages.size() == 1,
+              "exactly one log message recorded");
+
+        // Verify the correct message content
+        check(fakeLogger.messages.get(0).equals("Processing payment: 49.99"),
+              "log message contains amount");
+    }
+}
+```
+
+**What to verify:**
+- Both checks print `PASS:`
+- Changing the log format string in `processPayment` causes the second check to fail
+
+<Note>Hint: the `CapturingLogger` plays the same role as Mockito's `ArgumentCaptor` — it stores what was passed so you can assert on it later.</Note>
+</Exercise>
 
 ## Strict stubs
 

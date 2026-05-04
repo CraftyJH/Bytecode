@@ -234,6 +234,41 @@ logged.listUsers();
 
 Dynamic proxies are the foundation of Spring AOP, JPA lazy-loading, and mocking frameworks like Mockito.
 
+<Exercise>
+Implement `CachingImageProxy` — a virtual proxy for an `Image` interface with a `display()` method. The first call to `display()` must print `"Loading image: <filename>"` followed by `"Displaying: <filename>"`. All subsequent calls must print `"From cache: <filename>"` followed by `"Displaying: <filename>"`. Call `display()` three times and verify the output.
+
+```java
+public class Main {
+    interface Image {
+        void display();
+    }
+
+    // TODO: class RealImage implements Image
+    //         constructor prints "Loading image: <filename>"
+    //         display() prints "Displaying: <filename>"
+
+    // TODO: class CachingImageProxy implements Image
+    //         holds the filename and a RealImage (initially null)
+    //         first display() call: creates RealImage (triggers load), calls display()
+    //         subsequent calls: prints "From cache: <filename>", calls display()
+
+    public static void main(String[] args) {
+        Image img = new CachingImageProxy("photo.jpg");
+        img.display();   // loads + displays
+        img.display();   // from cache + displays
+        img.display();   // from cache + displays
+    }
+}
+```
+
+**What to verify:**
+- First call prints `Loading image: photo.jpg` then `Displaying: photo.jpg`
+- Second and third calls print `From cache: photo.jpg` then `Displaying: photo.jpg`
+- `RealImage` constructor is called exactly once across all three `display()` invocations
+
+<Note>Hint: Check `if (realImage == null)` inside `display()` to decide whether to load or serve from cache.</Note>
+</Exercise>
+
 ## Facade — hiding subsystem complexity
 
 A Facade provides a single method that orchestrates multiple subsystem classes. The caller never needs to know the subsystem exists:
@@ -294,6 +329,40 @@ theater.watchMovie("Inception");
 // Amp on
 // Volume: 8
 ```
+
+<Exercise>
+Build a `HomeTheaterFacade` that wraps `Amplifier`, `Projector`, and `Lights`. `watchMovie(String title)` must turn on the projector, turn on the amp, set volume to 8, and dim the lights to 30%. `endMovie()` must turn off the amp, turn off the projector, and restore full lights. Call both methods from `main`.
+
+```java
+public class Main {
+    // TODO: class Amplifier  — on() "Amp on", setVolume(int) "Volume: <v>", off() "Amp off"
+    // TODO: class Projector  — on() "Projector on", off() "Projector off"
+    // TODO: class Lights     — dim(int pct) "Lights at <pct>%", full() "Lights full"
+
+    // TODO: class HomeTheaterFacade
+    //         constructor accepts Amplifier, Projector, Lights
+    //         watchMovie(String title):
+    //           proj.on(), amp.on(), amp.setVolume(8), lights.dim(30)
+    //           System.out.println("Enjoy: " + title)
+    //         endMovie():
+    //           amp.off(), proj.off(), lights.full()
+    //           System.out.println("Goodbye.")
+
+    public static void main(String[] args) {
+        HomeTheaterFacade theater = new HomeTheaterFacade(
+                new Amplifier(), new Projector(), new Lights());
+        theater.watchMovie("Inception");
+        theater.endMovie();
+    }
+}
+```
+
+**What to verify:**
+- `watchMovie` output (in order): `Projector on`, `Amp on`, `Volume: 8`, `Lights at 30%`, `Enjoy: Inception`
+- `endMovie` output (in order): `Amp off`, `Projector off`, `Lights full`, `Goodbye.`
+
+<Note>Hint: All subsystem classes are injected via the constructor — never use `new Amplifier()` inside the Facade itself.</Note>
+</Exercise>
 
 ## Try it
 

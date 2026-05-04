@@ -72,6 +72,48 @@ Before touching a profiler, commit to this order:
 
 This cycle prevents chasing phantom optimizations and ensures each change can be attributed to a specific improvement.
 
+<Exercise>
+Write a `HotSpot` class with a method that does unnecessary String concatenation in a loop (a known hot path). Time it with `System.nanoTime()`, then rewrite it using `StringBuilder` and compare the elapsed times.
+
+```java
+public class Main {
+    // TODO: Write a method called slowConcat(int n) that:
+    //   - starts with String result = ""
+    //   - loops n times, appending "item-" + i + "," to result using +=
+    //   - returns result
+    // This is intentionally slow — O(n²) string copies
+
+    // TODO: Write a method called fastConcat(int n) that:
+    //   - creates a StringBuilder pre-sized to n * 10
+    //   - loops n times, appending "item-", i, and "," using sb.append()
+    //   - returns sb.toString()
+
+    public static void main(String[] args) {
+        int n = 10_000;
+
+        // TODO: Warm up both methods with a small n (e.g., 100) to avoid
+        // measuring interpreter overhead
+
+        // TODO: Time slowConcat(n) using System.nanoTime()
+        // Print elapsed time in milliseconds
+
+        // TODO: Time fastConcat(n) using System.nanoTime()
+        // Print elapsed time in milliseconds
+
+        // TODO: Print the speedup ratio: slowTime / fastTime
+        // Expected: StringBuilder version is 20–100x faster for n=10_000
+    }
+}
+```
+
+**What to verify:**
+- `slowConcat(10_000)` takes tens of milliseconds (O(n²) copies)
+- `fastConcat(10_000)` takes under 1 ms (O(n) appends)
+- The speedup ratio grows larger as `n` increases
+
+<Note>Hint: if both methods seem equally fast, increase `n` to `50_000` or `100_000`. The O(n²) behavior of String `+=` only becomes obvious at larger input sizes.</Note>
+</Exercise>
+
 ## Amdahl's Law
 
 Even before profiling, Amdahl's Law tells you the ceiling on any optimization:

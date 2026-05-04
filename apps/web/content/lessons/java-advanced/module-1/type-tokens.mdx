@@ -185,6 +185,54 @@ System.out.println(port);  // 5432
 System.out.println(ssl);   // true
 ```
 
+<Exercise>
+Implement `TypedMap.get(Class<T>)` using `type.cast()` so that it performs a checked cast and throws `ClassCastException` immediately on a type mismatch.
+
+```java
+import java.util.*;
+
+public class Main {
+    static class TypedMap {
+        private final Map<Class<?>, Object> store = new HashMap<>();
+
+        public <T> void put(Class<T> type, T value) {
+            store.put(type, value);
+        }
+
+        // TODO: implement get using type.cast()
+        public <T> T get(Class<T> type) {
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        TypedMap map = new TypedMap();
+        map.put(String.class,  "hello");
+        map.put(Integer.class, 42);
+
+        System.out.println(map.get(String.class));          // hello
+        System.out.println(map.get(Integer.class) * 2);    // 84
+
+        try {
+            map.put(Object.class, "sneaky");
+            // deliberate wrong-type lookup to test immediate failure:
+            String s = map.get(String.class);
+            System.out.println(s.toUpperCase());            // HELLO
+        } catch (ClassCastException e) {
+            System.out.println("cast error");
+        }
+    }
+}
+```
+
+**What to verify:**
+- `get(String.class)` returns `"hello"`
+- `get(Integer.class) * 2` prints `84`
+- `type.cast()` provides a checked cast (no silent heap pollution)
+
+<Note>Hint: `return type.cast(store.get(type))` — `Class.cast()` checks the type at runtime and throws `ClassCastException` immediately if it does not match.</Note>
+</Exercise>
+
 ## Real-world use: framework-style API
 
 In frameworks like Jackson and Spring, type tokens power the `readValue` / `getBean` pattern:
@@ -201,6 +249,46 @@ bind(PaymentGateway.class).to(StripeGateway.class);
 ```
 
 All three use `Class<T>` as the key to retrieve or convert to the right type at runtime.
+
+<Exercise>
+Extend `TypedMap` with a `getOrDefault(Class<T>, T defaultVal)` method that returns `defaultVal` when no value is stored for that type.
+
+```java
+import java.util.*;
+
+public class Main {
+    static class TypedMap {
+        private final Map<Class<?>, Object> store = new HashMap<>();
+
+        public <T> void put(Class<T> type, T value) { store.put(type, value); }
+
+        public <T> T get(Class<T> type) { return type.cast(store.get(type)); }
+
+        // TODO: implement getOrDefault
+        public <T> T getOrDefault(Class<T> type, T defaultVal) {
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        TypedMap map = new TypedMap();
+        map.put(String.class,  "production");
+        map.put(Integer.class, 8080);
+
+        System.out.println(map.getOrDefault(String.class,  "dev"));    // production
+        System.out.println(map.getOrDefault(Integer.class, 3000));     // 8080
+        System.out.println(map.getOrDefault(Boolean.class, false));    // false
+        System.out.println(map.getOrDefault(Double.class,  1.0));      // 1.0
+    }
+}
+```
+
+**What to verify:**
+- `String` and `Integer` keys return stored values
+- `Boolean` and `Double` (not stored) return their defaults
+
+<Note>Hint: call `get(type)` first; if the result is `null`, return `defaultVal`.</Note>
+</Exercise>
 
 ## Try it
 

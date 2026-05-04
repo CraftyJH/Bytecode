@@ -83,6 +83,40 @@ Young Generation                  Old Generation     Metaspace
 - **Old generation** — objects that survive enough minor GCs (default age threshold: 15) are promoted here.
 - **Metaspace** — class metadata, static fields, method bytecode. Not part of the heap; grows natively.
 
+<Exercise>
+Write a program that allocates millions of short-lived String objects in a loop (simulating a high-allocation workload), then requests GC and prints free memory before and after. Observe the generational collector reclaiming young-generation garbage.
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Runtime rt = Runtime.getRuntime();
+
+        // TODO: Print free memory before allocation (rt.freeMemory())
+
+        // TODO: Allocate 2_000_000 short-lived String objects in a loop
+        // Hint: new String("item-" + i) inside a for-loop works well
+        // Do NOT store them — let them become immediately eligible for GC
+
+        // TODO: Print free memory after allocation (before GC)
+
+        // TODO: Call System.gc() and Thread.sleep(200) to give GC a chance to run
+
+        // TODO: Print free memory after GC
+
+        // TODO: Compute and print how many MB were reclaimed
+        // Hint: (afterGC - beforeGC) / (1024 * 1024)
+    }
+}
+```
+
+**What to verify:**
+- Free memory drops significantly after the allocation loop
+- After `System.gc()` free memory recovers (young gen is collected)
+- The reclaimed amount is close to the total allocated — most objects were already dead
+
+<Note>Hint: `System.gc()` is only a hint but most JVMs honor it in test scenarios. If free memory does not recover, try `-Xms64m -Xmx64m` to create more GC pressure.</Note>
+</Exercise>
+
 ## GC roots and reachability
 
 The GC does not track which objects are dead — it finds the live ones. Starting from **GC roots** (stack frames, static fields, JNI handles, active threads), it traces every reference. Anything not reachable is garbage.
@@ -162,6 +196,55 @@ Sample log output to decode:
 ```
 
 Key fields: `Young` = minor GC, `before→after(heap total)`, pause duration in ms. A pause above your SLA target is worth investigating.
+
+<Exercise>
+Add the correct JVM flags to enable unified GC logging for the program below, then read the sample log output and annotate what each field means.
+
+```java
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        // Run this program with GC logging enabled.
+        // TODO: Add the correct -Xlog flag to your launch command.
+        // The flag should: log all GC events, write to gc.log,
+        // include time and uptime decorators, and rotate after 5 files of 10m each.
+        //
+        // Correct flag:
+        // java -Xlog:gc*:file=gc.log:time,uptime:filecount=5,filesize=10m Main
+
+        byte[] data;
+        for (int i = 0; i < 20; i++) {
+            // Allocate 10 MB per iteration to trigger minor GCs
+            data = new byte[10 * 1024 * 1024];
+            Thread.sleep(50);
+        }
+        System.out.println("Done — check gc.log");
+    }
+}
+
+/*
+ * TODO: Annotate the sample GC log below. For each line, add a comment
+ * explaining what every field means.
+ *
+ * Sample output to annotate:
+ *
+ * [0.312s][info][gc] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 24M->8M(64M) 6.231ms
+ *   ^timestamp   ^event# ^type              ^reason                   ^before->after(heap) ^pause
+ *
+ * [0.891s][info][gc] GC(3) Pause Young (Normal) (G1 Evacuation Pause) 48M->9M(64M) 7.814ms
+ * // TODO: annotate this line
+ *
+ * [1.204s][info][gc] GC(5) Pause Full (System.gc()) 61M->10M(64M) 52.003ms
+ * // TODO: annotate this line and explain why the pause is much longer
+ */
+```
+
+**What to verify:**
+- The `-Xlog:gc*` flag produces a `gc.log` file with structured output
+- You can identify minor GC events (Pause Young) vs full GC events (Pause Full)
+- You understand the `before→after(total)` heap sizes and pause duration fields
+
+<Note>Hint: `Pause Young` means only the young generation was collected (fast). `Pause Full` means the entire heap was collected (slow). A full GC triggered by `System.gc()` is typically 5–50× slower than a minor GC.</Note>
+</Exercise>
 
 ## Try it
 

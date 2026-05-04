@@ -104,6 +104,34 @@ CompletableFuture.supplyAsync(() -> computeResult())
     .thenAccept(s -> System.out.println("Result: " + s));
 ```
 
+<Exercise>
+Build a `CompletableFuture` chain: start with `supplyAsync` returning `"hello world"`, apply `thenApply` to uppercase it, apply another `thenApply` to append `"!"`, then `thenAccept` to print the final string. Block with `get()` at the end.
+
+```java
+import java.util.concurrent.CompletableFuture;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        CompletableFuture<Void> pipeline = CompletableFuture
+            .supplyAsync(() -> "hello world")
+            // TODO: thenApply — convert to uppercase
+            // TODO: thenApply — append "!"
+            // TODO: thenAccept — print the result
+            ;
+
+        pipeline.get();
+        System.out.println("pipeline complete");
+    }
+}
+```
+
+**What to verify:**
+- Prints `"HELLO WORLD!"` (from thenAccept)
+- Prints `"pipeline complete"` afterwards
+
+<Note>Hint: chain `.thenApply(String::toUpperCase)` then `.thenApply(s -> s + "!")` then `.thenAccept(System.out::println)`.</Note>
+</Exercise>
+
 ## thenRun — running after completion
 
 `thenRun(runnable)` executes after the previous stage but does not receive the result:
@@ -152,6 +180,34 @@ System.out.println(safe.get());   // "data" or "default-data"
 ```
 
 `exceptionally` only fires if the pipeline completed exceptionally; otherwise it passes the value through unchanged.
+
+<Exercise>
+Create a `CompletableFuture` whose `supplyAsync` supplier always throws a `RuntimeException`. Recover from the failure using `exceptionally` to return the string `"default"`. Print the recovered value.
+
+```java
+import java.util.concurrent.CompletableFuture;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        CompletableFuture<String> cf = CompletableFuture
+            .supplyAsync(() -> {
+                throw new RuntimeException("something went wrong");
+            })
+            // TODO: use exceptionally to return "default" when an exception occurs
+            ;
+
+        String result = cf.get();
+        System.out.println("Result: " + result);
+    }
+}
+```
+
+**What to verify:**
+- Prints `"Result: default"` — no exception propagates to the caller
+- The program exits normally
+
+<Note>Hint: `.exceptionally(ex -> "default")` — the lambda receives the `Throwable` and returns a fallback value of the same type as the `CompletableFuture`.</Note>
+</Exercise>
 
 <Note>`thenApply` callbacks run on the thread that completed the previous stage (often a pool thread or even the calling thread if the stage already completed). For long-running callbacks use `thenApplyAsync` to ensure they run on a pool thread and don't block the completing thread.</Note>
 

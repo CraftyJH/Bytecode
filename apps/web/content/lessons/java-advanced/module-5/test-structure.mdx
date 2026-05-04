@@ -89,6 +89,59 @@ void shouldThrowInsufficientFunds_whenBalanceIsTooLow() { }
 
 Both are self-documenting. The name serves as a failing-test error message: if `shouldThrowInsufficientFunds_whenBalanceIsTooLow` fails, you immediately know the precondition and the expected outcome without opening the method.
 
+<Exercise>
+Take three poorly named test stubs and rename them to the `should_when_given` convention, then write a proper assertion for each scenario.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    // --- production code under test ---
+    static int abs(int n)           { return n < 0 ? -n : n; }
+    static boolean isEmpty(String s) { return s == null || s.isEmpty(); }
+    static double half(double d)    { return d / 2.0; }
+
+    // Poorly named originals (do not delete — compare before/after):
+    // void test1()      { }
+    // void testFoo()    { }
+    // void checkStuff() { }
+
+    // --- renamed and implemented below ---
+
+    // was: test1
+    static void shouldReturnPositive_whenAbsCalledWithNegative() {
+        check(abs(-7) == 7, "abs(-7) == 7");
+    }
+
+    // was: testFoo
+    static void shouldReturnTrue_whenIsEmptyCalledWithNullString() {
+        check(isEmpty(null), "isEmpty(null) == true");
+    }
+
+    // was: checkStuff
+    static void shouldReturnHalf_whenHalfCalledWithEvenNumber() {
+        check(half(8.0) == 4.0, "half(8.0) == 4.0");
+    }
+
+    public static void main(String[] args) {
+        shouldReturnPositive_whenAbsCalledWithNegative();
+        shouldReturnTrue_whenIsEmptyCalledWithNullString();
+        shouldReturnHalf_whenHalfCalledWithEvenNumber();
+        System.out.println("All naming-convention checks passed.");
+    }
+}
+```
+
+**What to verify:**
+- All 3 method names follow the `should_when` pattern and read as a sentence
+- All checks print `PASS:`
+
+<Note>Hint: read the method name aloud — if it doesn't describe the precondition and the expected outcome without opening the body, rename it.</Note>
+</Exercise>
+
 ## The single-assertion guideline
 
 The *one assertion per test* guideline is frequently misunderstood. It does not mean one `assertEquals` call — it means one *logical scenario*. `assertAll` groups related assertions on the same object into one conceptual assertion:

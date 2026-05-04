@@ -90,6 +90,47 @@ void withdrawNegativeAmountThrowsIllegalArgument() {
 
 The third argument to `assertThrows` (not used above) is a message supplier — it prints a description when the assertion itself fails (i.e., when no exception is thrown at all), not when the exception has the wrong message.
 
+<Exercise>
+Implement `safeDivide(int, int)` that throws `ArithmeticException` with the message `"Division by zero"` when the divisor is 0. Write two checks: one for the happy path, and one that verifies both the exception type and the exact message.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    static int safeDivide(int numerator, int denominator) {
+        // TODO: throw ArithmeticException("Division by zero") when denominator == 0
+        if (denominator == 0) throw new ArithmeticException("Division by zero");
+        return numerator / denominator;
+    }
+
+    public static void main(String[] args) {
+        // Check 1: happy path — no exception thrown
+        check(safeDivide(10, 2) == 5, "safeDivide(10, 2) == 5");
+
+        // Check 2: exception type AND message
+        ArithmeticException caught = null;
+        try {
+            safeDivide(10, 0);
+        } catch (ArithmeticException e) {
+            caught = e;
+        }
+        check(caught != null, "safeDivide(10, 0) throws ArithmeticException");
+        check("Division by zero".equals(caught != null ? caught.getMessage() : ""),
+              "exception message is \"Division by zero\"");
+    }
+}
+```
+
+**What to verify:**
+- All 3 checks print `PASS:`
+- Changing the exception message to `"divide by zero"` causes the third check to fail
+
+<Note>Hint: capture the thrown exception in a local variable so you can inspect `getMessage()` — the same pattern `assertThrows` uses by returning the exception.</Note>
+</Exercise>
+
 ## assertThrowsExactly
 
 ```java
@@ -150,6 +191,49 @@ void ageValidationBoundaries(int age, boolean valid) {
     assertEquals(valid, Person.isValidAge(age));
 }
 ```
+
+<Exercise>
+Implement `clamp(int value, int lo, int hi)` that constrains `value` to the range `[lo, hi]`. Test it at exactly 5 boundary points: below `lo`, at `lo`, between `lo` and `hi`, at `hi`, and above `hi`.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    static int clamp(int value, int lo, int hi) {
+        // TODO: return lo if value < lo, hi if value > hi, else value
+        if (value < lo) return lo;
+        if (value > hi) return hi;
+        return value;
+    }
+
+    public static void main(String[] args) {
+        // Boundary 1: below lo — should return lo
+        check(clamp(0, 5, 10) == 5,  "clamp(0,  5, 10) == 5  (below lo)");
+
+        // Boundary 2: at lo — should return lo exactly
+        check(clamp(5, 5, 10) == 5,  "clamp(5,  5, 10) == 5  (at lo)");
+
+        // Boundary 3: between lo and hi — should return value unchanged
+        check(clamp(7, 5, 10) == 7,  "clamp(7,  5, 10) == 7  (between)");
+
+        // Boundary 4: at hi — should return hi exactly
+        check(clamp(10, 5, 10) == 10, "clamp(10, 5, 10) == 10 (at hi)");
+
+        // Boundary 5: above hi — should return hi
+        check(clamp(15, 5, 10) == 10, "clamp(15, 5, 10) == 10 (above hi)");
+    }
+}
+```
+
+**What to verify:**
+- All 5 checks print `PASS:`
+- Removing the `value < lo` guard causes the first check to fail
+
+<Note>Hint: a common off-by-one mistake is using `<` instead of `<=` (or vice-versa) — boundaries 2 and 4 catch exactly that kind of bug.</Note>
+</Exercise>
 
 ## Equivalence partitioning
 

@@ -149,6 +149,50 @@ The `@SuppressWarnings("unchecked")` on `emit` is safe because `on` enforces the
 
 <Note>The single-handler-per-type design is intentional for simplicity. The multi-subscriber variant (next section) stores a `List<Consumer<?>>` per type — the bus delivers to all registered handlers.</Note>
 
+<Exercise>
+Implement `EventBus.on(Class<T>, Consumer<T>)` that stores the handler in a `Map<Class<?>, Consumer<?>>`. A second registration for the same type should replace the first.
+
+```java
+import java.util.*;
+import java.util.function.Consumer;
+
+public class Main {
+    static class EventBus {
+        private final Map<Class<?>, Consumer<?>> handlers = new HashMap<>();
+
+        // TODO: implement on(Class<T> eventType, Consumer<T> handler)
+        @SuppressWarnings("unchecked")
+        public <T> void on(Class<T> eventType, Consumer<T> handler) {
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> void emit(T event) {
+            Consumer<T> h = (Consumer<T>) handlers.get(event.getClass());
+            if (h != null) h.accept(event);
+        }
+    }
+
+    record Ping(String msg) {}
+
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+        bus.on(Ping.class, e -> System.out.println("first: "  + e.msg()));
+        bus.emit(new Ping("hello"));   // first: hello
+
+        // Replace handler
+        bus.on(Ping.class, e -> System.out.println("second: " + e.msg()));
+        bus.emit(new Ping("world"));   // second: world
+    }
+}
+```
+
+**What to verify:**
+- First `emit` triggers `first: hello`
+- After re-registration, second `emit` triggers `second: world`
+
+<Note>Hint: `handlers.put(eventType, handler)` is all you need — `Map.put` replaces an existing entry for the same key.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Supporting multiple subscribers per event type
@@ -186,6 +230,50 @@ public class EventBus {
 ```
 
 `computeIfAbsent` creates the list on first registration and returns the (possibly new) list for immediate `.add(handler)`. This is the `HashMap` grouping pattern from lesson 6.
+
+<Exercise>
+Implement `EventBus.emit(T event)` that looks up handlers by `event.getClass()` and dispatches the event to every registered `Consumer`.
+
+```java
+import java.util.*;
+import java.util.function.Consumer;
+
+public class Main {
+    static class EventBus {
+        private final Map<Class<?>, List<Consumer<?>>> handlers = new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        public <T> void on(Class<T> type, Consumer<T> handler) {
+            handlers.computeIfAbsent(type, k -> new ArrayList<>()).add(handler);
+        }
+
+        // TODO: implement emit — look up handlers by event.getClass() and invoke each
+        @SuppressWarnings("unchecked")
+        public <T> void emit(T event) {
+        }
+    }
+
+    record Login(String user) {}
+    record Logout(String user) {}
+
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+        bus.on(Login.class,  e -> System.out.println("Login:  " + e.user()));
+        bus.on(Login.class,  e -> System.out.println("Audit:  " + e.user()));
+        bus.on(Logout.class, e -> System.out.println("Logout: " + e.user()));
+
+        bus.emit(new Login("Alice"));
+        bus.emit(new Logout("Bob"));
+    }
+}
+```
+
+**What to verify:**
+- `Login("Alice")` triggers two handlers: `Login: Alice` and `Audit: Alice`
+- `Logout("Bob")` triggers one handler: `Logout: Bob`
+
+<Note>Hint: `handlers.get(event.getClass())` returns the list; iterate it and cast each `Consumer<?>` to `Consumer<T>` before calling `accept(event)`.</Note>
+</Exercise>
 
 ## Defining event types
 
@@ -299,6 +387,60 @@ public class Main {
     }
 }
 ```
+
+<Exercise>
+Extend `EventBus` with `onAny(Consumer<Object>)` — a wildcard handler that receives **every** emitted event regardless of its type. Multiple `onAny` handlers should all fire.
+
+```java
+import java.util.*;
+import java.util.function.Consumer;
+
+public class Main {
+    static class EventBus {
+        private final Map<Class<?>, List<Consumer<?>>> handlers = new HashMap<>();
+        private final List<Consumer<Object>> anyHandlers = new ArrayList<>();
+
+        @SuppressWarnings("unchecked")
+        public <T> void on(Class<T> type, Consumer<T> handler) {
+            handlers.computeIfAbsent(type, k -> new ArrayList<>()).add(handler);
+        }
+
+        // TODO: implement onAny(Consumer<Object> handler)
+        public void onAny(Consumer<Object> handler) {
+        }
+
+        // TODO: update emit to also call every onAny handler
+        @SuppressWarnings("unchecked")
+        public <T> void emit(T event) {
+            List<Consumer<?>> list = handlers.get(event.getClass());
+            if (list != null) list.forEach(h -> ((Consumer<T>) h).accept(event));
+            // call anyHandlers here
+        }
+    }
+
+    record UserCreated(String id) {}
+    record OrderPlaced(String id) {}
+
+    public static void main(String[] args) {
+        EventBus bus = new EventBus();
+
+        bus.onAny(e -> System.out.println("[ANY] " + e.getClass().getSimpleName()));
+        bus.on(UserCreated.class, e -> System.out.println("User: " + e.id()));
+        bus.on(OrderPlaced.class, e -> System.out.println("Order: " + e.id()));
+
+        bus.emit(new UserCreated("u1"));
+        bus.emit(new OrderPlaced("o1"));
+    }
+}
+```
+
+**What to verify:**
+- `UserCreated` fires `[ANY] UserCreated` and `User: u1`
+- `OrderPlaced` fires `[ANY] OrderPlaced` and `Order: o1`
+- `onAny` fires for every event regardless of type
+
+<Note>Hint: store `onAny` handlers in a separate `List<Consumer<Object>>`; at the end of `emit`, iterate that list and call `handler.accept((Object) event)`.</Note>
+</Exercise>
 
 ## End-of-lesson quiz
 

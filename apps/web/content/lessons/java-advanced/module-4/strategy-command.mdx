@@ -172,6 +172,45 @@ System.out.println(names);  // [Charlie, Bob, Alice]
 
 <Note>The `Comparator`, `Predicate`, `Function`, and `Runnable` interfaces in `java.util.function` are all Strategy interfaces. Java's Stream API is essentially Strategy applied pervasively — every lambda you pass to `map`, `filter`, or `sorted` is a pluggable algorithm.</Note>
 
+<Exercise>
+Implement `SortContext` that wraps a pluggable `Comparator<Integer>` strategy. Test it with three strategies: ascending order, descending order, and absolute-value order (so `-5` sorts before `3`). Print the sorted list after each strategy swap.
+
+```java
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.ArrayList;
+
+public class Main {
+    // TODO: class SortContext
+    //         constructor accepts Comparator<Integer> strategy
+    //         setStrategy(Comparator<Integer>) — swaps the strategy at runtime
+    //         sort(List<Integer>) — returns a new sorted list using the current strategy
+
+    public static void main(String[] args) {
+        List<Integer> numbers = Arrays.asList(3, -5, 1, -2, 4);
+
+        SortContext ctx = new SortContext(Comparator.naturalOrder());
+        System.out.println(ctx.sort(numbers));  // ascending
+
+        ctx.setStrategy(Comparator.reverseOrder());
+        System.out.println(ctx.sort(numbers));  // descending
+
+        ctx.setStrategy(Comparator.comparingInt(Math::abs));
+        System.out.println(ctx.sort(numbers));  // by absolute value
+    }
+}
+```
+
+**What to verify:**
+- Ascending: `[-5, -2, 1, 3, 4]`
+- Descending: `[4, 3, 1, -2, -5]`
+- Absolute value: `[1, -2, 3, 4, -5]`
+- The original `numbers` list is not mutated
+
+<Note>Hint: Inside `sort()`, copy the list into a new `ArrayList`, call `list.sort(strategy)`, and return it.</Note>
+</Exercise>
+
 <Quiz data={quizzes.midLesson} label="quick check" />
 
 ## Command pattern

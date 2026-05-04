@@ -103,6 +103,51 @@ Key atomic operations:
 
 <Note>`ConcurrentHashMap` does not allow `null` keys or `null` values. A `null` value is used internally to signal "key absent", so allowing nulls would be ambiguous. If you need null support, use a sentinel object instead.</Note>
 
+<Exercise>
+Use a `ConcurrentHashMap` to count word frequencies. Split a fixed word list into 4 equal chunks. Start 4 threads, each processing its own chunk and merging counts into the shared map using `merge()`. Print the final frequency of each word.
+
+```java
+import java.util.concurrent.ConcurrentHashMap;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        String[] words = {
+            "java", "thread", "java", "lock", "thread", "java",
+            "lock", "java", "thread", "lock", "java", "thread",
+            "lock", "lock", "java", "thread", "java", "lock",
+            "thread", "java", "lock", "thread", "java", "lock"
+        };
+
+        ConcurrentHashMap<String, Integer> freq = new ConcurrentHashMap<>();
+        int chunkSize = words.length / 4;
+        Thread[] threads = new Thread[4];
+
+        for (int t = 0; t < 4; t++) {
+            final int start = t * chunkSize;
+            final int end   = start + chunkSize;
+            threads[t] = new Thread(() -> {
+                for (int i = start; i < end; i++) {
+                    // TODO: use freq.merge(word, 1, Integer::sum) to count
+                    freq.merge(words[i], 1, Integer::sum);
+                }
+            });
+        }
+
+        for (Thread t : threads) t.start();
+        for (Thread t : threads) t.join();
+
+        freq.forEach((word, count) -> System.out.println(word + ": " + count));
+    }
+}
+```
+
+**What to verify:**
+- Each word (`"java"`, `"thread"`, `"lock"`) appears with its correct count (counts should sum to 24)
+- No `ConcurrentModificationException` is thrown
+
+<Note>Hint: `merge(key, 1, Integer::sum)` atomically adds 1 to the existing count, or inserts 1 if the key is absent. This is equivalent to `compute` but more concise for counting.</Note>
+</Exercise>
+
 ## CopyOnWriteArrayList
 
 `CopyOnWriteArrayList` is ideal for collections that are read far more often than written:
@@ -150,6 +195,56 @@ String task = queue.take();
 | `add(e)` / `remove()` | Throws exception |
 
 `LinkedBlockingQueue` is unbounded (or optionally bounded); `ArrayBlockingQueue` is always bounded, which adds back-pressure that prevents unbounded queue growth.
+
+<Exercise>
+Implement a producer-consumer pair. The producer puts 5 strings (`"item-1"` through `"item-5"`) into an `ArrayBlockingQueue<String>` with capacity 2. The consumer takes from the queue and prints each item. The small capacity should cause the producer to block naturally when the queue is full.
+
+```java
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        BlockingQueue<String> queue = new ArrayBlockingQueue<>(2);
+
+        Thread producer = new Thread(() -> {
+            try {
+                for (int i = 1; i <= 5; i++) {
+                    String item = "item-" + i;
+                    queue.put(item);   // blocks when queue is full
+                    System.out.println("Produced: " + item);
+                }
+                queue.put("DONE");   // poison pill
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        Thread consumer = new Thread(() -> {
+            try {
+                while (true) {
+                    String item = queue.take();   // blocks when queue is empty
+                    if ("DONE".equals(item)) break;
+                    System.out.println("Consumed: " + item);
+                    Thread.sleep(80);   // consumer is slower than producer
+                }
+                System.out.println("Consumer done");
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        producer.start();
+        consumer.start();
+        producer.join();
+        consumer.join();
+    }
+}
+```
+
+**What to verify:**
+- All 5 items are produced and consumed
+- `"Consumer done"` is printed at the end
+- The producer occasionally prints ahead of the consumer, but the lines interleave — output order may vary, demonstrating back-pressure
+
+<Note>Hint: with capacity 2 and a slow consumer, the producer blocks on `put()` after item 2 or 3, waiting for the consumer to `take()` before it can add more. This is back-pressure in action.</Note>
+</Exercise>
 
 <Quiz data={quizzes.midLesson} label="quick check" />
 

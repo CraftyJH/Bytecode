@@ -107,6 +107,40 @@ void example() {
 
 Because the stack is per-thread, local variables are inherently thread-safe — no other thread can see them. Heap objects are shared, which is where thread safety concerns begin.
 
+<Exercise>
+Write a program that demonstrates where each kind of variable lives. Print the values of a local `int`, an object reference (and the heap object it points to), and a `static` field. Add comments to every variable declaration explaining whether it lives on the stack, heap, or metaspace.
+
+```java
+public class Main {
+    // TODO: Declare a static int field called CONSTANT with value 100
+    // Add a comment: where does this field live?
+
+    public static void main(String[] args) {
+        // TODO: Declare a local int variable x = 42
+        // Add a comment: where does x live?
+
+        // TODO: Declare a local String variable s = new String("hello")
+        // Add a comment: where does the reference 's' live?
+        // Add a second comment: where does the String object itself live?
+
+        // TODO: Declare a local int[] array = {1, 2, 3}
+        // Add a comment: where does the reference live? where does the array data live?
+
+        // TODO: Print x, s, array[0], and CONSTANT
+        // Then explain in a comment why no other thread can see x or s
+        // but another thread COULD see a mutation to array[0] or CONSTANT
+    }
+}
+```
+
+**What to verify:**
+- Local primitives (`int x`) and references (`String s`, `int[] array`) live on the stack — thread-private
+- The actual objects they reference (`new String(...)`, `new int[]`) live on the heap — shared
+- The `static` field lives in metaspace — shared across all threads and class instances
+
+<Note>Hint: the key insight is that the *reference variable* is on the stack but the *object it points to* is on the heap. Two threads with different local reference variables can still share the same heap object if the references point to the same address.</Note>
+</Exercise>
+
 ## The happens-before relation
 
 The JMM defines when one action is **guaranteed to be visible** to another. Two actions have a happens-before (HB) relationship if:
@@ -118,6 +152,60 @@ The JMM defines when one action is **guaranteed to be visible** to another. Two 
 5. **Thread.join()** — all actions in thread `t` HB the return from `t.join()`.
 
 Without a HB relationship, the JMM allows the JIT or CPU to reorder, cache, or delay writes in ways that make other threads read stale data.
+
+<Exercise>
+Implement a visibility bug demo, then fix it with `volatile`. Thread A sets `ready = true` after writing a result; Thread B spins on `!ready` and then reads the result. First run the broken version (no `volatile`) and observe it may hang. Then fix it.
+
+```java
+public class Main {
+    // TODO: Declare a static boolean field called 'ready', initialized to false
+    // First version: plain field (no volatile) — document that this may hang
+    static boolean ready = false;
+
+    // TODO: Declare a static int field called 'result', initialized to 0
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread writer = new Thread(() -> {
+            // TODO: Set result = 42
+            // TODO: Set ready = true
+        });
+
+        Thread reader = new Thread(() -> {
+            // TODO: Spin while !ready (busy-wait loop)
+            // TODO: After the loop, print result
+            // Expected: prints 42. Without volatile, may loop forever or print 0.
+        });
+
+        reader.start();
+        writer.start();
+        writer.join();
+        reader.join(3000); // wait up to 3 seconds
+
+        // TODO: If reader is still alive after 3 seconds, print a warning
+        // that the visibility bug caused the reader to never see the flag change
+    }
+}
+
+/*
+ * TODO: Once you observe the hang (or inconsistent output), change the
+ * field declarations to:
+ *   static volatile boolean ready = false;
+ *   static volatile int result = 0;
+ * Run again and confirm the reader always terminates and prints 42.
+ *
+ * Explain in a comment WHY volatile fixes this:
+ * the volatile write to 'ready' establishes a happens-before edge,
+ * which also guarantees that the write to 'result' is visible.
+ */
+```
+
+**What to verify:**
+- Without `volatile`, the reader thread may spin forever (the JIT hoists `ready` into a register)
+- With `volatile boolean ready`, the reader always terminates and prints `42`
+- Running with `-server` makes the bug more reliably reproducible
+
+<Note>Hint: to force the JIT to reproduce the bug, run with `java -server Main`. The C2 compiler is more aggressive about caching non-volatile fields in registers than the interpreter.</Note>
+</Exercise>
 
 <Note>Happens-before is transitive. If A HB B and B HB C, then A HB C. This is how `synchronized` blocks create a complete memory fence: the unlock of one monitor HB the lock of the same monitor on any thread.</Note>
 

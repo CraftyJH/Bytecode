@@ -81,6 +81,48 @@ void isBlankReturnsTrueForWhitespaceAndEmpty(String input) {
 
 `@ValueSource` supports `ints`, `longs`, `doubles`, `strings`, `chars`, `booleans`, `bytes`, `shorts`, and `classes`. Each element triggers one test invocation with its own result line in the report.
 
+<Exercise>
+Write a loop-based parameterized test for `isPalindrome(String)` — test it against the inputs "racecar", "hello", "madam", and "world", asserting the correct expected result for each.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    static boolean isPalindrome(String s) {
+        // TODO: return true if s reads the same forwards and backwards
+        String rev = new StringBuilder(s).reverse().toString();
+        return s.equals(rev);
+    }
+
+    public static void main(String[] args) {
+        // Each row: {input, expectedResult}
+        Object[][] cases = {
+            {"racecar", true},
+            {"hello",   false},
+            {"madam",   true},
+            {"world",   false},
+        };
+
+        for (Object[] c : cases) {
+            String input    = (String)  c[0];
+            boolean expected = (boolean) c[1];
+            check(isPalindrome(input) == expected,
+                  "isPalindrome(\"" + input + "\") == " + expected);
+        }
+    }
+}
+```
+
+**What to verify:**
+- All 4 checks print `PASS:`
+- Replacing the implementation body with `return true` causes both `false`-expected cases to throw `AssertionError`
+
+<Note>Hint: a palindrome reads identically forwards and backwards — reverse the string and compare with the original.</Note>
+</Exercise>
+
 ## @CsvSource — multiple arguments per row
 
 When the test needs both an input and an expected value, `@CsvSource` maps comma-separated columns to method parameters:
@@ -101,6 +143,54 @@ void toUpperCase(String input, String expected) {
 The optional `name` attribute uses `{0}`, `{1}` placeholders for the arguments, giving each run a readable display name in the IDE.
 
 <Note>Use single quotes inside @CsvSource strings to represent empty strings or strings containing commas: `"'hello, world', 11"` — the outer double-quotes are Java string delimiters; the inner single-quotes are CSV quoting.</Note>
+
+<Exercise>
+Test a `divide(int, int)` method with multiple input/expected pairs using a 2-D array loop — the CSV-source equivalent without the framework.
+
+```java
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    static int divide(int numerator, int denominator) {
+        // TODO: implement integer division; throw ArithmeticException for denominator == 0
+        if (denominator == 0) throw new ArithmeticException("Division by zero");
+        return numerator / denominator;
+    }
+
+    public static void main(String[] args) {
+        // {numerator, denominator, expected}
+        int[][] cases = {
+            {10,  2,  5},
+            {9,   3,  3},
+            {7,   1,  7},
+            {-6,  2, -3},
+            {0,   5,  0},
+        };
+
+        for (int[] c : cases) {
+            int result = divide(c[0], c[1]);
+            check(result == c[2],
+                  "divide(" + c[0] + ", " + c[1] + ") == " + c[2]
+                  + " (got " + result + ")");
+        }
+
+        // Extra: verify divide-by-zero throws
+        boolean threw = false;
+        try { divide(1, 0); } catch (ArithmeticException e) { threw = true; }
+        check(threw, "divide(1, 0) throws ArithmeticException");
+    }
+}
+```
+
+**What to verify:**
+- All 6 checks print `PASS:`
+- Swapping the implementation to `return numerator * denominator` fails every case immediately
+
+<Note>Hint: integer division in Java truncates toward zero — `divide(7, 2)` returns `3`, not `3.5`.</Note>
+</Exercise>
 
 ## @MethodSource — factory methods for complex inputs
 

@@ -96,6 +96,37 @@ Callable<Integer> computePi = () -> {
 };
 ```
 
+<Exercise>
+Submit a `Callable<Integer>` that computes the sum of integers from 1 to 100. Call `get()` on the returned `Future` and print the result.
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        ExecutorService exec = Executors.newSingleThreadExecutor();
+
+        // TODO: submit a Callable<Integer> that returns the sum 1+2+...+100
+        Future<Integer> future = exec.submit(() -> {
+            int sum = 0;
+            for (int i = 1; i <= 100; i++) sum += i;
+            return sum;
+        });
+
+        // TODO: call future.get() and print the result
+        System.out.println("Sum 1..100 = " + future.get());
+
+        exec.shutdown();
+    }
+}
+```
+
+**What to verify:**
+- Prints `"Sum 1..100 = 5050"`
+
+<Note>Hint: the sum of 1 to n is n*(n+1)/2, so the expected answer is 100*101/2 = 5050.</Note>
+</Exercise>
+
 ## Submitting a Callable and getting a Future
 
 ```java
@@ -129,6 +160,48 @@ future.cancel(true);               // attempt to cancel; true = interrupt if run
 ```
 
 <Note>`future.get()` with no timeout will block forever if the task never completes (e.g. it's stuck in an infinite loop or waiting for I/O that never arrives). Always prefer `get(timeout, unit)` in production code and handle `TimeoutException` by cancelling the future or logging a warning.</Note>
+
+<Exercise>
+Submit a slow `Callable` that sleeps for 5 seconds. After 100 ms, cancel it by calling `cancel(true)`. Then check `isCancelled()` to confirm the cancellation succeeded.
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        ExecutorService exec = Executors.newSingleThreadExecutor();
+
+        Future<String> slowTask = exec.submit(() -> {
+            try {
+                Thread.sleep(5000);   // simulate long work
+                return "completed";
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return "interrupted";
+            }
+        });
+
+        // Let the task start, then cancel it
+        Thread.sleep(100);
+        // TODO: cancel the future with interrupt=true
+        boolean cancelled = slowTask.cancel(true);
+
+        System.out.println("cancel() returned: " + cancelled);
+        System.out.println("isCancelled: " + slowTask.isCancelled());
+
+        exec.shutdown();
+        exec.awaitTermination(1, TimeUnit.SECONDS);
+    }
+}
+```
+
+**What to verify:**
+- `"cancel() returned: true"` is printed
+- `"isCancelled: true"` is printed
+- The program exits quickly (well under 5 seconds)
+
+<Note>Hint: `cancel(true)` sends an interrupt signal to the running thread. The task must handle `InterruptedException` for the interrupt to take effect and for `isCancelled()` to return `true`.</Note>
+</Exercise>
 
 ## Handling ExecutionException
 

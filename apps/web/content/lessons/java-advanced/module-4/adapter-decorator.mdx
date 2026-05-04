@@ -140,6 +140,39 @@ public class LegacyPrinterClassAdapter extends LegacyPrinter implements ModernPr
 
 <Note>Prefer **object adapter** in Java. Class adapter locks you into a specific adaptee class. Object adapter works with any subclass of the adaptee and can be easier to mock in tests.</Note>
 
+<Exercise>
+Write an `XmlReader` class with a `readXml()` method. Write a `JsonReader` interface with a `readJson()` method. Write `XmlToJsonAdapter` that implements `JsonReader` and wraps an `XmlReader`, translating the `readJson()` call into a `readXml()` call. Test all three paths from `main`.
+
+```java
+public class Main {
+    // TODO: class XmlReader  — readXml() prints "Reading data as XML"
+    //                          and returns a String like "<data>hello</data>"
+
+    // TODO: interface JsonReader — readJson() returns String
+
+    // TODO: class XmlToJsonAdapter implements JsonReader
+    //         holds an XmlReader, translates readJson() -> readXml(),
+    //         wraps the XML string in a JSON-like string, e.g.:
+    //         {"data": "<data>hello</data>"}
+
+    public static void main(String[] args) {
+        XmlReader xml = new XmlReader();
+        System.out.println(xml.readXml());
+
+        JsonReader adapter = new XmlToJsonAdapter(xml);
+        System.out.println(adapter.readJson());
+    }
+}
+```
+
+**What to verify:**
+- First print: `<data>hello</data>` (raw XML output)
+- Second print: a JSON-formatted string wrapping the XML value
+- `main` holds `adapter` as a `JsonReader` reference — not as `XmlToJsonAdapter`
+
+<Note>Hint: The adapter's `readJson()` calls `xmlReader.readXml()` internally, then formats the result as JSON.</Note>
+</Exercise>
+
 ## Decorator — building on `java.io`
 
 The `java.io` package is the most-used Decorator in the JDK. Every stream class shares the `InputStream`/`OutputStream` interface, and each wrapper adds one feature:
@@ -212,6 +245,41 @@ System.out.println(pipeline.process("  hello world  "));
 ```
 
 <Quiz data={quizzes.midLesson} label="quick check" />
+
+<Exercise>
+Write a `Coffee` interface with `cost()` (returns `double`) and `description()` (returns `String`). Implement `SimpleCoffee`. Then implement `MilkDecorator` and `SugarDecorator`, each adding to the cost and appending to the description. Build a coffee with both decorators and print the final cost and description.
+
+```java
+public class Main {
+    // TODO: interface Coffee — cost() : double, description() : String
+
+    // TODO: class SimpleCoffee implements Coffee
+    //         cost() returns 1.0, description() returns "Coffee"
+
+    // TODO: abstract class CoffeeDecorator implements Coffee
+    //         holds a Coffee wrapped field
+
+    // TODO: class MilkDecorator extends CoffeeDecorator
+    //         adds 0.25 to cost, appends ", Milk" to description
+
+    // TODO: class SugarDecorator extends CoffeeDecorator
+    //         adds 0.10 to cost, appends ", Sugar" to description
+
+    public static void main(String[] args) {
+        Coffee coffee = new SugarDecorator(new MilkDecorator(new SimpleCoffee()));
+        System.out.printf("%.2f%n", coffee.cost());
+        System.out.println(coffee.description());
+    }
+}
+```
+
+**What to verify:**
+- Cost prints `1.35` (1.00 + 0.25 + 0.10)
+- Description prints `Coffee, Milk, Sugar`
+- Decorators can be applied in any order without new subclasses
+
+<Note>Hint: Each decorator's `cost()` returns `wrapped.cost() + ownAddition` and `description()` returns `wrapped.description() + ", Xxx"`.</Note>
+</Exercise>
 
 ## When Decorator beats subclassing
 
