@@ -1,0 +1,314 @@
+export const meta = {
+  title: "Capstone: Concurrency Patterns",
+  duration: 18,
+  order: 12,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "cp-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "In a multi-stage pipeline pattern using BlockingQueues, what happens if Stage 2 is much slower than Stage 1?",
+    options: [
+      { text: "Stage 1 drops items to keep up with its own pace.", correct: false, feedback: "Stage 1 does not drop items. BlockingQueue.put() blocks when the queue between stages is full." },
+      { text: "The bounded queue between Stage 1 and Stage 2 fills up, causing Stage 1 to block — providing natural back-pressure.", correct: true, feedback: "Correct. This is the key benefit of bounded BlockingQueues in pipelines: a slow downstream stage creates back-pressure that regulates the upstream stage, preventing unbounded memory growth." },
+      { text: "Stage 2 spawns additional threads automatically to keep up.", correct: false, feedback: "Thread spawning doesn't happen automatically. You would need to explicitly add more consumer threads for Stage 2." },
+      { text: "Items accumulate in an unbounded heap until an OutOfMemoryError occurs.", correct: false, feedback: "That would happen with an *unbounded* queue. A bounded BlockingQueue provides back-pressure instead." },
+    ],
+    explanation: "Bounded `BlockingQueue` instances between pipeline stages provide **back-pressure**: when a downstream stage is slow, the queue fills and `put()` blocks the upstream stage. This propagates the slowdown upstream, regulating the whole pipeline at the speed of its slowest stage. This is much safer than unbounded queues, which can cause `OutOfMemoryError` under sustained load.",
+  },
+  endQ1: {
+    id: "cp-end-1",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "You need to shut down a multi-stage pipeline cleanly. Which technique signals worker threads to stop without forcibly interrupting them?",
+    options: [
+      { text: "Call Thread.stop() on each worker thread.", correct: false, feedback: "Thread.stop() is deprecated and unsafe — it releases all monitors the thread holds, potentially leaving shared data in an inconsistent state." },
+      { text: "Set a volatile boolean flag that workers check in their loop.", correct: false, feedback: "A flag alone is not enough for blocking workers — a thread blocked in queue.take() won't check the flag until it unblocks." },
+      { text: "Insert a sentinel 'poison pill' object into the queue; each worker stops when it dequeues the pill.", correct: true, feedback: "Correct. The poison pill is the idiomatic way to signal blocking consumers to terminate. It works through the queue's own blocking mechanism without needing external interrupts." },
+      { text: "Call executorService.shutdownNow() and ignore the returned list.", correct: false, feedback: "shutdownNow() interrupts running tasks and returns unstarted ones. Ignoring the returned list loses those tasks. It's useful but not the same as graceful shutdown." },
+    ],
+    explanation: "A **poison pill** is a sentinel value (e.g. a special constant or a `null` check) placed in the queue by the producer when it has no more work. Each consumer, upon seeing the pill, re-inserts it (so the next consumer also stops) and exits. This is the cleanest way to shut down a blocking consumer pipeline without interrupting threads.",
+  },
+  endQ2: {
+    id: "cp-end-2",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Main {
+    static AtomicInteger processed = new AtomicInteger(0);
+
+    public static void main(String[] args) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        for (int i = 0; i < 6; i++) {
+            pool.submit(() -> processed.incrementAndGet());
+        }
+        pool.shutdown();
+        pool.awaitTermination(5, TimeUnit.SECONDS);
+        System.out.println(processed.get());
+    }
+}`,
+    expectedOutput: "6",
+    explanation: "Six tasks are submitted; each atomically increments `processed`. The pool shuts down and the main thread waits up to 5 seconds for completion. Since each task is trivial, all 6 complete well within 5 seconds. `processed.get()` returns 6.",
+  },
+  endQ3: {
+    id: "cp-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `ConcurrentHashMap<String, List<Runnable>> listeners = new ConcurrentHashMap<>();
+
+public void subscribe(String event, Runnable handler) {
+    listeners.computeIfAbsent(event, k -> new ArrayList<>()).add(handler);  // bug
+}
+
+public void publish(String event) {
+    List<Runnable> handlers = listeners.get(event);
+    if (handlers != null) handlers.forEach(Runnable::run);
+}`,
+    buggyLine: 4,
+    issue: "`computeIfAbsent` creates the list atomically, but `ArrayList` itself is not thread-safe. Concurrent calls to `subscribe` for the same event will race on the `ArrayList.add()` call, causing data corruption.",
+    explanation: "Use a thread-safe list: `listeners.computeIfAbsent(event, k -> new CopyOnWriteArrayList<>())`. `CopyOnWriteArrayList` is ideal here — subscriptions are infrequent, but `publish` iterates the list frequently and must never see a `ConcurrentModificationException`.",
+  },
+};
+
+Every pattern and primitive covered in this module — threads, locks, atomics, executors, futures, concurrent collections — exists to solve real architectural problems. This capstone lesson ties them together by examining four foundational concurrency patterns that appear repeatedly in production Java: **thread-per-request**, **worker pool**, **pipeline**, and **publish-subscribe**. Understanding these patterns lets you design concurrent systems correctly from the first sketch, rather than bolting on thread-safety as an afterthought. The lesson closes with graceful shutdown — often overlooked but essential for production correctness.
+
+## Pattern 1: Thread-per-request
+
+The simplest model: dedicate one thread to each incoming request for its entire lifecycle. Code is easy to read and debug because each request's logic executes sequentially top-to-bottom.
+
+```java
+// Classic servlet-container style (Tomcat does this)
+ExecutorService requestPool = Executors.newFixedThreadPool(200);
+
+server.onRequest(request -> {
+    requestPool.submit(() -> {
+        User user     = db.findUser(request.userId());        // blocks
+        List<Order> o = db.findOrders(request.userId());      // blocks
+        respond(formatResponse(user, o));
+    });
+});
+```
+
+With **virtual threads** (lesson 11), replace the fixed pool with `newVirtualThreadPerTaskExecutor()` and scale to thousands of concurrent requests at minimal memory cost.
+
+**When to use:** Simple CRUD services, internal tools, any workload where each task is independent and the number of concurrent tasks is bounded.
+
+## Pattern 2: Worker pool
+
+A fixed number of worker threads draw tasks from a shared queue. Producers submit tasks without knowing which worker will handle them:
+
+```java
+import java.util.concurrent.*;
+
+public class WorkerPool {
+    private final ExecutorService pool;
+    private final BlockingQueue<Runnable> queue;
+
+    public WorkerPool(int workers) {
+        // Custom ThreadPoolExecutor with a bounded queue and CallerRunsPolicy back-pressure
+        queue = new ArrayBlockingQueue<>(100);
+        pool  = new ThreadPoolExecutor(workers, workers, 0L, TimeUnit.MILLISECONDS,
+                    queue, new ThreadPoolExecutor.CallerRunsPolicy());
+    }
+
+    public void submit(Runnable task) { pool.execute(task); }
+
+    public void shutdown() throws InterruptedException {
+        pool.shutdown();
+        pool.awaitTermination(30, TimeUnit.SECONDS);
+    }
+}
+```
+
+`CallerRunsPolicy` makes the submitting thread run the task itself when the queue is full — natural back-pressure without dropping work.
+
+<Note>Avoid `Executors.newFixedThreadPool` when you need back-pressure: its internal `LinkedBlockingQueue` is unbounded and will happily queue millions of tasks until you hit `OutOfMemoryError`. Build `ThreadPoolExecutor` directly with a bounded `ArrayBlockingQueue` and an explicit rejection policy.</Note>
+
+## Pattern 3: Pipeline
+
+Work flows through independent stages connected by bounded queues. Each stage runs on its own thread (or pool), transforming items and passing them forward:
+
+```java
+import java.util.concurrent.*;
+
+public class Pipeline {
+    private static final String DONE = "__DONE__";
+
+    public static void main(String[] args) throws InterruptedException {
+        BlockingQueue<String> raw       = new ArrayBlockingQueue<>(10);
+        BlockingQueue<String> processed = new ArrayBlockingQueue<>(10);
+        BlockingQueue<String> output    = new ArrayBlockingQueue<>(10);
+
+        // Stage 0: Producer
+        Thread producer = new Thread(() -> {
+            try {
+                for (int i = 1; i <= 5; i++) {
+                    raw.put("msg-" + i);
+                    System.out.println("[Producer] sent msg-" + i);
+                }
+                raw.put(DONE);
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        // Stage 1: Transform (add prefix)
+        Thread stage1 = new Thread(() -> {
+            try {
+                while (true) {
+                    String item = raw.take();
+                    if (DONE.equals(item)) { processed.put(DONE); break; }
+                    String transformed = "STAGE1[" + item.toUpperCase() + "]";
+                    processed.put(transformed);
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        // Stage 2: Enrich (add timestamp)
+        Thread stage2 = new Thread(() -> {
+            try {
+                while (true) {
+                    String item = processed.take();
+                    if (DONE.equals(item)) { output.put(DONE); break; }
+                    output.put(item + "@" + System.currentTimeMillis());
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        // Consumer
+        Thread consumer = new Thread(() -> {
+            try {
+                while (true) {
+                    String item = output.take();
+                    if (DONE.equals(item)) break;
+                    System.out.println("[Consumer] " + item);
+                }
+                System.out.println("[Consumer] finished");
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        producer.start(); stage1.start(); stage2.start(); consumer.start();
+        producer.join();  stage1.join();  stage2.join();  consumer.join();
+    }
+}
+```
+
+The bounded queues provide back-pressure: if a stage is slow, the queue upstream fills and pauses the previous stage — the whole pipeline throttles naturally.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Pattern 4: Publish-subscribe with ConcurrentHashMap
+
+Decouple event producers from consumers by maintaining a registry of listeners per event type:
+
+```java
+import java.util.List;
+import java.util.concurrent.*;
+
+public class EventBus {
+    private final ConcurrentHashMap<String, CopyOnWriteArrayList<Runnable>> listeners =
+        new ConcurrentHashMap<>();
+
+    public void subscribe(String event, Runnable handler) {
+        listeners.computeIfAbsent(event, k -> new CopyOnWriteArrayList<>()).add(handler);
+    }
+
+    public void unsubscribe(String event, Runnable handler) {
+        listeners.computeIfPresent(event, (k, list) -> { list.remove(handler); return list; });
+    }
+
+    public void publish(String event) {
+        List<Runnable> handlers = listeners.get(event);
+        if (handlers != null) handlers.forEach(Runnable::run);
+    }
+}
+```
+
+`CopyOnWriteArrayList` ensures that iterating the handler list in `publish` is safe even if another thread is adding a subscriber at the same time.
+
+## Graceful shutdown
+
+A well-behaved concurrent application shuts down cleanly — finishing in-flight work, releasing resources, and not leaving background threads to die with errors:
+
+```java
+public class Application {
+    private final ExecutorService pool = Executors.newFixedThreadPool(4);
+    private volatile boolean running   = true;
+
+    public void start() {
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+        while (running) {
+            pool.submit(this::processNextItem);
+        }
+    }
+
+    private void shutdown() {
+        System.out.println("Shutting down…");
+        running = false;
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                List<Runnable> dropped = pool.shutdownNow();
+                System.err.println("Forced shutdown; dropped " + dropped.size() + " tasks");
+            }
+        } catch (InterruptedException e) {
+            pool.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("Shutdown complete");
+    }
+}
+```
+
+The pattern: `shutdown()` → `awaitTermination(timeout)` → `shutdownNow()` as a last resort.
+
+## Try it
+
+Build the three-stage pipeline from pattern 3 and observe back-pressure in action. Then modify Stage 2 to add a 100 ms sleep simulating slow processing. Notice how the producer's output slows — the bounded queues propagate the pressure upstream:
+
+```java
+// In stage2, add:
+Thread.sleep(100);
+// before output.put(...)
+```
+
+With a queue capacity of 2 items, the producer will block after placing only 2 items in `raw`, waiting for Stage 1 and Stage 2 to work through them. You'll see interleaved "sent" and "Consumer" lines rather than all "sent" before all "Consumer".
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using unbounded queues in pipelines** — `LinkedBlockingQueue` without a capacity grows without limit. Under sustained load it causes `OutOfMemoryError`. Always choose a capacity and handle back-pressure explicitly.
+- **Skipping graceful shutdown** — threads left running after the application "stops" can corrupt shared state, exhaust resources, or delay JVM exit. Always provide a `shutdown()` path.
+- **Using ArrayList in concurrent publish-subscribe** — a plain `ArrayList` in the listener registry throws `ConcurrentModificationException` if a subscriber is added while an event is being published. Use `CopyOnWriteArrayList`.
+- **Blocking threads in short-lived tasks** — submitting a task to a pool and immediately calling `.get()` on its `Future` negates the pool's benefit. Chain with `thenAccept` / `CompletableFuture` instead.
+
+## Module recap
+
+You have now completed Module 3: Concurrency. Here is what you have learned:
+
+- **Threads & Runnable** — the fundamental unit of concurrency; `start()` vs `run()`, daemon threads, lifecycle.
+- **Synchronisation** — `synchronized` provides mutual exclusion and visibility; both reads and writes need protection.
+- **volatile & Atomics** — `volatile` solves visibility; `AtomicInteger`/`AtomicReference` add lock-free compound operations.
+- **Deadlock** — four Coffman conditions; prevent with consistent lock ordering or `tryLock` with timeout.
+- **Executor framework** — `ExecutorService` decouples task submission from thread management; always shut down cleanly.
+- **Callable & Future** — return typed results from background tasks; `get()` surfaces exceptions via `ExecutionException`.
+- **CompletableFuture (Part 1)** — non-blocking async pipelines with `supplyAsync`, `thenApply`, `thenCompose`, `exceptionally`.
+- **CompletableFuture (Part 2)** — combining futures with `thenCombine`, `allOf`, `anyOf`; unified error handling with `handle`.
+- **Thread-safe collections** — `ConcurrentHashMap`, `CopyOnWriteArrayList`, `BlockingQueue` for correct concurrent data structures.
+- **ReentrantLock & Conditions** — explicit locking with `tryLock`, `ReadWriteLock` for read-heavy workloads, `Condition` for fine-grained signalling.
+- **Virtual threads** — JVM-managed lightweight threads (Java 21) for scalable I/O-bound concurrency without reactive complexity.
+- **Concurrency patterns** — thread-per-request, worker pool, pipeline with back-pressure, publish-subscribe, graceful shutdown.
+
+Concurrency is hard. The tools are mature, the primitives are well-documented, but the bugs are subtle and timing-dependent. The most important habit is to minimise shared mutable state: the less data crosses thread boundaries, the less there is to get wrong. When sharing is necessary, choose the highest-level safe abstraction available — `BlockingQueue` over hand-rolled producer-consumer, `ConcurrentHashMap` over a synchronised `HashMap`, `CompletableFuture` over manually joined threads. Write tests that exercise code under concurrent load using tools like `jcstress` or simple multi-thread stress tests. And always read thread dumps when production concurrency issues arise — the JVM tells you exactly which thread holds which lock.
