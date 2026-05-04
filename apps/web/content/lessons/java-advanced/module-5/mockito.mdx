@@ -1,0 +1,230 @@
+export const meta = {
+  title: "Mockito — Mocking Dependencies",
+  duration: 15,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "mk-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the key difference between a Mockito mock and a Mockito spy?",
+    options: [
+      { text: "Mocks are for interfaces; spies are for concrete classes.", correct: false, feedback: "Mockito can mock both interfaces and concrete classes. The distinction between mock and spy is not about the type being mocked." },
+      { text: "A mock replaces all behaviour with no-ops by default; a spy wraps a real object and delegates to real methods unless stubbed.", correct: true, feedback: "Correct — mock() creates a complete substitute where every method returns a default (null, 0, false, empty collection). spy() wraps a real instance so unstubbed calls go through to the real implementation." },
+      { text: "A spy records interactions; a mock does not.", correct: false, feedback: "Both mocks and spies record interactions — you can call verify() on either." },
+      { text: "Mocks can only be created with @Mock; spies require spy().", correct: false, feedback: "Both can be created programmatically (mock()/spy()) or via annotations (@Mock/@Spy)." },
+    ],
+    explanation: "mock() replaces the entire class — all methods return safe defaults and nothing runs. spy() wraps a real object — real logic runs unless you explicitly stub a method. Use mocks for external dependencies; use spies sparingly, mainly for partial stubbing of legacy code you cannot refactor.",
+  },
+  endQ1: {
+    id: "mk-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What does `verify(emailSender).send(any(Email.class))` assert?",
+    options: [
+      { text: "That `emailSender.send()` will be called in the future.", correct: false, feedback: "verify() is retrospective — it checks what already happened during the test, not a future expectation." },
+      { text: "That `emailSender.send()` was called exactly once with any Email argument.", correct: true, feedback: "Correct — verify() by default checks for exactly one invocation. The any(Email.class) matcher accepts any non-null Email instance." },
+      { text: "That `emailSender.send()` returned a non-null value.", correct: false, feedback: "verify() checks invocation count and argument matching, not the return value." },
+      { text: "That `emailSender` is not null.", correct: false, feedback: "verify() would throw a NullPointerException if passed null, not assert non-nullness." },
+    ],
+    explanation: "verify(mock).method(args) asserts that the method was called with those arguments. The default is exactly once. Use verify(mock, times(n)), never(), or atLeastOnce() to vary the expected call count.",
+  },
+  endQ2: {
+    id: "mk-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the stubbing so that gateway.charge() returns true for any amount greater than zero:",
+    code: `when(gateway.charge(___Double.class))
+    .thenReturn(true);`,
+    correctAnswers: ["any"],
+    caseSensitive: true,
+    explanation: "any(Double.class) is an argument matcher that accepts any non-null Double. For primitives you can use anyDouble(). Mixing matchers and raw values in one when() call requires all arguments to use matchers — use eq(value) for fixed values alongside any().",
+  },
+  endQ3: {
+    id: "mk-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `@ExtendWith(MockitoExtension.class)
+class OrderServiceTest {
+
+    @Mock PaymentGateway gateway;
+    @InjectMocks OrderService service;
+
+    @Test
+    void chargeIsCalledOnSubmit() {
+        when(gateway.charge(100.0)).thenReturn(true);
+        service.submit(new Order(100.0));
+        verify(gateway).charge(100.0);
+        when(gateway.charge(50.0)).thenReturn(false);  // line 12
+    }
+}`,
+    buggyLine: 12,
+    issue: "Stubbing after verification (or after the code under test has run) is a Mockito strict-stubbing violation. The stub on line 12 is defined but never actually used by the test, triggering an UnnecessaryStubbingException with MockitoExtension.",
+    explanation: "With MockitoExtension, Mockito enforces strict stubs: every stub must be used by the test. Defining `when(gateway.charge(50.0)).thenReturn(false)` after `service.submit()` means it can never be exercised in this test — Mockito fails the test with UnnecessaryStubbingException. Move stubs to before the action, or remove unused ones.",
+  },
+};
+
+A unit test is supposed to test *one unit* in isolation. But most classes depend on other classes — services talk to repositories, services call external APIs, controllers delegate to services. Wiring up all those real dependencies in every test makes tests slow, flaky, and tightly coupled to the entire call graph. Mockito solves this by letting you replace any dependency with a programmable stand-in.
+
+## mock() vs spy()
+
+```java
+// mock() — creates a complete substitute. All methods return safe defaults.
+PaymentGateway gateway = mock(PaymentGateway.class);
+// gateway.charge(100.0) returns false (default boolean)
+// gateway.getTransactionId() returns null (default reference)
+
+// spy() — wraps a real object. Real methods run unless explicitly stubbed.
+List<String> realList = new ArrayList<>();
+List<String> spyList = spy(realList);
+spyList.add("hello");           // real add() is called
+when(spyList.size()).thenReturn(99); // only size() is stubbed
+```
+
+Mocks are the everyday tool. Spies are useful when you have a large real object and only want to stub *one* troublesome method without replacing everything.
+
+## Stubbing with when/thenReturn
+
+```java
+PaymentGateway gateway = mock(PaymentGateway.class);
+
+// Stub a return value
+when(gateway.charge(100.0)).thenReturn(true);
+
+// Stub to throw an exception
+when(gateway.charge(-1.0)).thenThrow(new IllegalArgumentException("Negative amount"));
+
+// Stub with argument matchers
+when(gateway.charge(anyDouble())).thenReturn(true);
+```
+
+`thenReturn`, `thenThrow`, and `thenAnswer` can be chained: the first call returns the first value, subsequent calls return the last one. `when(mock.method()).thenReturn(1).thenReturn(2)` returns 1 on the first call and 2 on every call after that.
+
+<Note>Never stub `void` methods with `when(...).thenReturn(...)` — void methods have nothing to return. Use `doThrow(ex).when(mock).voidMethod()` or simply leave them unstubbed (void methods are no-ops on mocks by default).</Note>
+
+## @Mock and @InjectMocks
+
+Declaring mocks as fields and using `@InjectMocks` is cleaner than calling `mock()` manually, especially when a class has several dependencies:
+
+```java
+@ExtendWith(MockitoExtension.class)
+class OrderServiceTest {
+
+    @Mock PaymentGateway paymentGateway;
+    @Mock EmailSender emailSender;
+    @InjectMocks OrderService orderService;  // Mockito creates this and injects the mocks above
+
+    @Test
+    void successfulOrderChargesAndSendsEmail() {
+        when(paymentGateway.charge(150.0)).thenReturn(true);
+
+        orderService.submit(new Order(150.0, "alice@example.com"));
+
+        verify(paymentGateway).charge(150.0);
+        verify(emailSender).send(any(Email.class));
+    }
+}
+```
+
+`@InjectMocks` tries constructor injection first, then setter injection, then field injection. Constructor injection is the most explicit and the most testable — prefer it in production code.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## verify() and ArgumentCaptor
+
+`verify()` checks that a method was called with certain arguments. When you need to inspect *what* was passed (e.g., the content of the email), use `ArgumentCaptor`:
+
+```java
+@Captor ArgumentCaptor<Email> emailCaptor;
+
+@Test
+void emailContainsOrderId() {
+    when(paymentGateway.charge(anyDouble())).thenReturn(true);
+    orderService.submit(new Order(75.0, "bob@example.com"));
+
+    verify(emailSender).send(emailCaptor.capture());
+    Email sent = emailCaptor.getValue();
+
+    assertEquals("bob@example.com", sent.getTo());
+    assertTrue(sent.getSubject().contains("Order confirmed"));
+}
+```
+
+Without `ArgumentCaptor` you would have to stub a custom matcher, or worse, expose internal state just to test it. The captor lets you assert on the exact object passed to the collaborator.
+
+## Strict stubs
+
+`MockitoExtension` (the JUnit 5 integration) enables *strict stubbing* by default. This means:
+
+- **Unused stubs fail the test** — if you stub a method that is never actually called, Mockito throws `UnnecessaryStubbingException`. This catches dead test code.
+- **Argument mismatch detection** — if stubbed with `when(x.m(1))` but called with `x.m(2)`, the stub doesn't apply and Mockito reports the inconsistency clearly.
+
+## When NOT to mock
+
+Mockito is a tool, not a mandate. Do not mock:
+
+- **Value objects** — `Money`, `Address`, `LocalDate`. Use the real thing; they have no side effects.
+- **The class under test** — mocking the SUT defeats the purpose of the test.
+- **Simple collaborators** — if a helper does a trivial calculation with no I/O, instantiate it for real.
+- **Everything** — a test that mocks five objects and asserts only on mock interactions is testing your Mockito configuration, not your logic.
+
+## Try it
+
+Given these interfaces and service:
+
+```java
+interface PaymentGateway { boolean charge(double amount); }
+interface EmailSender { void send(Email email); }
+
+class OrderService {
+    private final PaymentGateway gateway;
+    private final EmailSender emailSender;
+
+    public OrderService(PaymentGateway gateway, EmailSender emailSender) {
+        this.gateway = gateway;
+        this.emailSender = emailSender;
+    }
+
+    public boolean submit(Order order) {
+        boolean paid = gateway.charge(order.getAmount());
+        if (paid) emailSender.send(new Email(order.getEmail(), "Order confirmed", "..."));
+        return paid;
+    }
+}
+```
+
+Write three tests:
+1. Successful payment — verify both `charge` and `send` are called
+2. Failed payment — verify `send` is **never** called (`verify(emailSender, never()).send(any())`)
+3. Use `ArgumentCaptor` to assert the email's recipient address equals the order's email
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Calling real methods on a mock** — `spy()` delegates to the real method; `mock()` does not. Accidentally using `spy()` when you wanted `mock()` can cause unexpected side effects during test setup.
+- **Mixing argument matchers and raw values** — `when(m.method(anyInt(), "hello"))` is a compile-time valid but runtime-invalid mix. Once you use a matcher for one argument, all arguments in that call must use matchers (`eq("hello")` for the fixed value).
+- **Stubbing after execution** — placing `when(...)` after the method under test has already run creates unused stubs and never affects the already-completed call. Always stub before the action (Act) step.
+- **Over-verifying** — asserting every method call on every mock is brittle. Verify only the interactions that matter for the behaviour being tested; leave incidental internal calls unverified.
+
+## Recap
+
+- **mock()** creates a full substitute with no-op defaults; **spy()** wraps a real object
+- **when(...).thenReturn(...)** stubs return values; use **doThrow/doAnswer** for void methods
+- **@Mock + @InjectMocks** wire up the test class cleanly via `@ExtendWith(MockitoExtension.class)`
+- **verify()** asserts invocation count and arguments; **ArgumentCaptor** captures what was passed
+- Strict stubbing (default with MockitoExtension) fails on unused stubs — keeps test code clean
+- Do not mock value objects, simple helpers, or the class under test
+
+**Up next:** Testing exceptions and edge cases — asserting on both type and message, boundary values, and equivalence partitioning.

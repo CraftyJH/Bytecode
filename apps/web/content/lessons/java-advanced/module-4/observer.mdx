@@ -1,0 +1,287 @@
+export const meta = {
+  title: "Observer — Event-Driven Design",
+  duration: 14,
+  order: 6,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "obs-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    interface Observer { void update(String event, Object data); }
+
+    static class EventSource {
+        private final List<Observer> observers = new ArrayList<>();
+        void subscribe(Observer o)   { observers.add(o); }
+        void unsubscribe(Observer o) { observers.remove(o); }
+
+        void emit(String event, Object data) {
+            for (Observer o : observers) o.update(event, data);
+        }
+    }
+
+    public static void main(String[] args) {
+        EventSource source = new EventSource();
+
+        Observer a = (e, d) -> System.out.println("A got " + e + ": " + d);
+        Observer b = (e, d) -> System.out.println("B got " + e + ": " + d);
+
+        source.subscribe(a);
+        source.subscribe(b);
+        source.emit("click", "button1");
+
+        source.unsubscribe(a);
+        source.emit("hover", "menu");
+    }
+}`,
+    expectedOutput: "A got click: button1\nB got click: button1\nB got hover: menu",
+    explanation: "Both A and B are subscribed for the first `emit`. After `unsubscribe(a)`, only B receives the second event. The notification loop iterates in subscription order, so A always prints before B.",
+  },
+  endQ1: {
+    id: "obs-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Why was `java.util.Observer` deprecated in Java 9?",
+    options: [
+      { text: "It did not support lambda expressions.", correct: false, feedback: "The deprecation was not about lambda compatibility. You could use lambdas with it via anonymous classes or adapters." },
+      { text: "It passed the changed value as a generic Object, was not serializable, and lacked support for threading or event ordering guarantees.", correct: true, feedback: "Correct. The JDK team deprecated it because `Observable`/`Observer` were poorly designed: weak typing, no way to observe without subclassing `Observable`, and no concurrency model." },
+      { text: "It was replaced by `java.beans.PropertyChangeListener` as the standard.", correct: false, feedback: "`PropertyChangeListener` is the beans convention, but it's not the 'replacement' for `java.util.Observer`. The recommendation is to use custom event interfaces or reactive libraries." },
+      { text: "It caused memory leaks in all programs.", correct: false, feedback: "Memory leaks (from unsubscribed observers) are a concern but not the stated reason for deprecation." },
+    ],
+    explanation: "`java.util.Observable`/`Observer` were deprecated in Java 9 (JDK-8154801) because `Observable` is a class (not an interface), so a class can only be an observable if it extends `Observable` — preventing it from extending anything else. The typed, interface-based custom observer shown in this lesson is the preferred pattern.",
+  },
+  endQ2: {
+    id: "obs-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "To avoid a ConcurrentModificationException when an observer unsubscribes itself during notification, the notify loop should iterate over a ___.",
+    code: `void notifyAll(String event) {
+    for (Observer o : new ___(observers)) {
+        o.update(event);
+    }
+}`,
+    correctAnswers: ["ArrayList", "java.util.ArrayList", "CopyOnWriteArrayList", "java.util.concurrent.CopyOnWriteArrayList"],
+    caseSensitive: true,
+    explanation: "If an observer calls `unsubscribe()` inside its `update()` method, it modifies `observers` while the loop is iterating over it — throwing `ConcurrentModificationException`. Iterating over `new ArrayList<>(observers)` (a snapshot copy) or using `CopyOnWriteArrayList` avoids this because the loop works on a safe copy.",
+  },
+  endQ3: {
+    id: "obs-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "How do reactive streams (e.g., Project Reactor's Flux) improve on the basic Observer pattern?",
+    options: [
+      { text: "Reactive streams use inheritance instead of interfaces.", correct: false, feedback: "Reactive streams are interface-based. Inheritance is not their distinguishing feature." },
+      { text: "Reactive streams add back-pressure, error propagation, and composable operators like map/filter/flatMap.", correct: true, feedback: "Correct. Basic Observer has no mechanism to slow a fast publisher, no standard error channel, and no combinators. Reactive streams address all three shortcomings." },
+      { text: "Reactive streams notify observers synchronously in the calling thread.", correct: false, feedback: "Reactive streams explicitly support scheduling on different threads (schedulers). Synchronous notification is a property of the basic Observer pattern." },
+      { text: "Reactive streams are limited to UI event handling.", correct: false, feedback: "Reactive streams (RxJava, Reactor, Akka Streams) are general-purpose and widely used in server-side Java for HTTP, database, and messaging pipelines." },
+    ],
+    explanation: "Basic Observer has three weaknesses: no back-pressure (a slow subscriber gets overwhelmed), errors propagate out-of-band or not at all, and the notification loop is just a `for` loop with no composition. Reactive streams provide `onNext`, `onError`, `onComplete`, back-pressure via `Subscription.request(n)`, and rich operator chains.",
+  },
+};
+
+Modern software is event-driven. A button click, a stock price change, a sensor reading, a new message in a queue — in each case, one object produces a change and an unknown number of other objects need to react. Hard-coding these relationships produces tightly coupled, brittle code. The **Observer pattern** formalises the publish-subscribe relationship: a *subject* maintains a list of *observers* and notifies them automatically when its state changes, without knowing who those observers are.
+
+## The Observer interfaces
+
+```java
+// Observer — the subscriber interface
+public interface Observer {
+    void update(String event, Object data);
+}
+
+// Subject — the event source
+public interface Subject {
+    void subscribe(Observer o);
+    void unsubscribe(Observer o);
+    void notifyObservers(String event, Object data);
+}
+```
+
+## EventSource — maintaining the observer list
+
+```java
+import java.util.*;
+
+public class EventSource implements Subject {
+    private final List<Observer> observers = new ArrayList<>();
+
+    @Override
+    public void subscribe(Observer o) {
+        observers.add(o);
+    }
+
+    @Override
+    public void unsubscribe(Observer o) {
+        observers.remove(o);
+    }
+
+    @Override
+    public void notifyObservers(String event, Object data) {
+        // Iterate over a snapshot to allow safe unsubscription during notification
+        for (Observer o : new ArrayList<>(observers)) {
+            o.update(event, data);
+        }
+    }
+}
+```
+
+## Concrete subject and observers
+
+```java
+public class StockMarket extends EventSource {
+    private String ticker;
+    private double price;
+
+    public StockMarket(String ticker, double price) {
+        this.ticker = ticker;
+        this.price  = price;
+    }
+
+    public void updatePrice(double newPrice) {
+        double oldPrice = this.price;
+        this.price = newPrice;
+        notifyObservers("PRICE_CHANGE", ticker + " " + oldPrice + " -> " + newPrice);
+    }
+}
+
+// Observer implementations
+public class AlertService implements Observer {
+    private final double threshold;
+
+    public AlertService(double threshold) { this.threshold = threshold; }
+
+    @Override
+    public void update(String event, Object data) {
+        System.out.println("AlertService [" + event + "]: " + data);
+    }
+}
+
+public class AuditLogger implements Observer {
+    @Override
+    public void update(String event, Object data) {
+        System.out.println("AUDIT | " + event + " | " + data);
+    }
+}
+```
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        StockMarket aapl = new StockMarket("AAPL", 180.00);
+
+        aapl.subscribe(new AlertService(200.00));
+        aapl.subscribe(new AuditLogger());
+
+        aapl.updatePrice(185.50);
+        aapl.updatePrice(210.00);
+    }
+}
+// AlertService [PRICE_CHANGE]: AAPL 180.0 -> 185.5
+// AUDIT | PRICE_CHANGE | AAPL 180.0 -> 185.5
+// AlertService [PRICE_CHANGE]: AAPL 185.5 -> 210.0
+// AUDIT | PRICE_CHANGE | AAPL 185.5 -> 210.0
+```
+
+<Note>Java's `java.util.Observer` and `java.util.Observable` were **deprecated in Java 9**. They are poorly designed (Observable is a class, not an interface; the update method is weakly typed). Always define your own Observer interface as shown above.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Lambda observers
+
+Because `Observer` is a functional interface (one abstract method), observers can be expressed as lambdas:
+
+```java
+StockMarket tsla = new StockMarket("TSLA", 250.00);
+
+// Lambda observer — no boilerplate class needed
+tsla.subscribe((event, data) -> System.out.println("Dashboard: " + data));
+tsla.subscribe((event, data) -> {
+    if (event.equals("PRICE_CHANGE")) {
+        System.out.println("SMS alert sent for: " + data);
+    }
+});
+
+tsla.updatePrice(265.00);
+// Dashboard: TSLA 250.0 -> 265.0
+// SMS alert sent for: TSLA 250.0 -> 265.0
+```
+
+## Comparison to reactive streams
+
+The basic Observer pattern has three gaps that reactive libraries address:
+
+| | Basic Observer | Reactive Streams (Reactor/RxJava) |
+|---|---|---|
+| Back-pressure | None — slow observers get overwhelmed | `Subscription.request(n)` lets subscribers control rate |
+| Error handling | Out-of-band | `onError(Throwable)` built into the protocol |
+| Composition | Manual loops | `map`, `filter`, `flatMap`, `zip`, ... |
+| Threading | Synchronous | Configurable schedulers |
+
+```java
+// Reactor Flux — reactive equivalent of our Observer
+Flux.just(180.0, 185.5, 210.0)
+    .filter(p -> p > 200)
+    .map(p -> "HIGH PRICE: " + p)
+    .subscribe(System.out::println);
+// HIGH PRICE: 210.0
+```
+
+## Try it
+
+Build a `StockMarket` that emits price updates to multiple `Subscriber` implementations:
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        StockMarket market = new StockMarket("GOOG", 140.00);
+
+        Observer priceDisplay = (e, d) -> System.out.println("[DISPLAY] " + d);
+        Observer riskEngine   = (e, d) -> System.out.println("[RISK]    " + d);
+        Observer auditLog     = (e, d) -> System.out.println("[AUDIT]   " + d);
+
+        market.subscribe(priceDisplay);
+        market.subscribe(riskEngine);
+        market.subscribe(auditLog);
+
+        market.updatePrice(142.50);
+
+        // Unsubscribe risk engine — no longer interested
+        market.unsubscribe(riskEngine);
+        market.updatePrice(138.00);
+
+        // Expected: first update notifies all 3; second update notifies 2
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting to unsubscribe** — long-lived subjects holding references to short-lived observers prevent garbage collection. Always provide `unsubscribe` and call it when the observer is no longer needed.
+- **Modifying the observer list during notification** — iterating the list while a callback calls `subscribe`/`unsubscribe` throws `ConcurrentModificationException`. Iterate over a copy.
+- **Using `java.util.Observable`** — it's deprecated and class-based. Define your own interface.
+- **Ordering assumptions** — observers are notified in subscription order, but do not design logic that depends on which observer runs first.
+
+## Recap
+
+- Observer defines a **one-to-many** relationship: one subject, many observers, decoupled through an interface
+- The subject maintains a **subscriber list** and iterates it on each `notifyObservers` call
+- **Lambdas** work as observers when the interface has a single abstract method
+- `java.util.Observer` is **deprecated** — use a custom typed interface
+- Reactive streams (Reactor, RxJava) extend Observer with **back-pressure**, **error channels**, and **composable operators**
+
+**Up next:** Strategy & Command — two behavioral patterns that turn algorithms and requests into first-class objects, enabling undo queues and pluggable logic.

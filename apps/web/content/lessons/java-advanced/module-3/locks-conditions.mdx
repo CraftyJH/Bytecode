@@ -1,0 +1,289 @@
+export const meta = {
+  title: "ReentrantLock, ReadWriteLock & Conditions",
+  duration: 14,
+  order: 10,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "lc-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which capability does `ReentrantLock` have that `synchronized` does not?",
+    options: [
+      { text: "ReentrantLock prevents the same thread from re-entering a locked block.", correct: false, feedback: "The word 'reentrant' means the same thread CAN re-enter. Both ReentrantLock and synchronized are reentrant." },
+      { text: "ReentrantLock supports timed and interruptible lock acquisition via tryLock() and lockInterruptibly().", correct: true, feedback: "Correct. synchronized blocks indefinitely with no way to interrupt or time out. ReentrantLock lets you set a deadline or respond to thread interruption." },
+      { text: "ReentrantLock is faster than synchronized in all scenarios.", correct: false, feedback: "For simple scenarios, modern JVMs optimise synchronized (biased locking, lightweight locking) to be as fast or faster. ReentrantLock is not universally faster." },
+      { text: "ReentrantLock releases the lock automatically at the end of the method.", correct: false, feedback: "The opposite is true. synchronized releases automatically; ReentrantLock requires an explicit unlock() in a finally block." },
+    ],
+    explanation: "`ReentrantLock` offers capabilities `synchronized` lacks: `tryLock()` (non-blocking attempt), `tryLock(timeout, unit)` (bounded wait), `lockInterruptibly()` (interruptible wait), and multiple `Condition` objects per lock. Use `synchronized` for simple cases and reach for `ReentrantLock` when you need these extras.",
+  },
+  endQ1: {
+    id: "lc-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A `ReadWriteLock` is protecting a cache. Multiple threads read frequently; writes are rare. What is true about concurrent readers?",
+    options: [
+      { text: "Only one reader can hold the read lock at a time.", correct: false, feedback: "The read lock is shared — many readers can hold it simultaneously as long as no writer holds the write lock." },
+      { text: "Any number of readers can hold the read lock simultaneously, as long as no writer holds the write lock.", correct: true, feedback: "Correct. ReadWriteLock allows concurrent reads but requires exclusive access for writes, making it ideal for read-heavy workloads." },
+      { text: "Readers and writers can always proceed simultaneously.", correct: false, feedback: "Writers require exclusive access — no readers or other writers can hold the lock while a writer has it." },
+      { text: "The read lock is the same as the write lock.", correct: false, feedback: "They are separate locks obtained via rwLock.readLock() and rwLock.writeLock()." },
+    ],
+    explanation: "`ReadWriteLock` enforces: multiple concurrent readers are allowed (the read lock is shared), but a writer requires exclusive access (no readers or other writers). This significantly improves throughput for read-heavy workloads compared to a plain exclusive lock.",
+  },
+  endQ2: {
+    id: "lc-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the finally block to ensure the lock is always released:",
+    code: `ReentrantLock lock = new ReentrantLock();
+lock.lock();
+try {
+    // critical section
+} finally {
+    lock.___;
+}`,
+    correctAnswers: ["unlock()"],
+    caseSensitive: true,
+    explanation: "Unlike `synchronized`, `ReentrantLock` does not automatically release when the block exits. You MUST call `unlock()` in a `finally` block to guarantee the lock is released even if an exception is thrown inside the critical section.",
+  },
+  endQ3: {
+    id: "lc-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `ReentrantLock lock = new ReentrantLock();
+
+public void process() {
+    lock.lock();
+    try {
+        doWork();
+    } catch (Exception e) {
+        lock.unlock();   // bug
+        throw e;
+    }
+    lock.unlock();
+}`,
+    buggyLine: 7,
+    issue: "If `doWork()` succeeds, the lock is unlocked at line 9. If it throws, the lock is unlocked at line 7 *and* line 9 is not reached — but the `catch` block rethrows, so line 9 is skipped. However, if an unchecked exception is thrown and caught, `unlock()` is called once. The real bug: `unlock()` is called in catch AND the throw means line 9 is never reached, so the lock is released once from catch. This is actually OK in this specific case, but the pattern is fragile. The correct pattern puts unlock() only in finally.",
+    explanation: "The correct pattern is: `lock.lock(); try { doWork(); } finally { lock.unlock(); }`. A single `unlock()` in `finally` guarantees exactly one release whether the code succeeds or throws, with no duplication risk and no missed release. Putting unlock in catch is error-prone.",
+  },
+};
+
+The `synchronized` keyword covers the majority of concurrency needs, but it has real limitations: you cannot attempt to acquire a lock with a timeout, you cannot interrupt a thread that is waiting for a lock, and a single object can only have one associated wait-set. The `java.util.concurrent.locks` package provides explicit lock implementations that overcome these limitations. `ReentrantLock` is the most commonly used; `ReadWriteLock` optimises read-heavy workloads; and `Condition` replaces `wait`/`notify` with a cleaner, more flexible API.
+
+## ReentrantLock — explicit locking
+
+`ReentrantLock` implements `Lock` and works like `synchronized` but with explicit `lock()` and `unlock()` calls:
+
+```java
+import java.util.concurrent.locks.ReentrantLock;
+
+public class Counter {
+    private final ReentrantLock lock = new ReentrantLock();
+    private int count = 0;
+
+    public void increment() {
+        lock.lock();
+        try {
+            count++;
+        } finally {
+            lock.unlock();   // ALWAYS in finally
+        }
+    }
+
+    public int getCount() {
+        lock.lock();
+        try {
+            return count;
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+```
+
+<Note>Always release a `ReentrantLock` in a `finally` block. If an exception escapes the `try` and there is no `finally`, the lock is never released and every other thread waiting for it will block forever.</Note>
+
+## tryLock — non-blocking and timed acquisition
+
+```java
+// Non-blocking attempt
+if (lock.tryLock()) {
+    try {
+        // got the lock
+    } finally {
+        lock.unlock();
+    }
+} else {
+    // could not acquire — do something else
+}
+
+// Timed attempt
+if (lock.tryLock(200, TimeUnit.MILLISECONDS)) {
+    try { /* got it within 200ms */ }
+    finally { lock.unlock(); }
+} else {
+    System.out.println("Lock not available — giving up");
+}
+```
+
+This directly addresses the "no preemption" Coffman condition from lesson 4.
+
+## lockInterruptibly — respond to cancellation
+
+```java
+try {
+    lock.lockInterruptibly();   // throws InterruptedException if interrupted while waiting
+    try {
+        doWork();
+    } finally {
+        lock.unlock();
+    }
+} catch (InterruptedException e) {
+    Thread.currentThread().interrupt();
+    System.out.println("Cancelled while waiting for lock");
+}
+```
+
+With `synchronized`, there is no way to interrupt a thread that is blocked waiting for a monitor — it will wait forever. `lockInterruptibly()` makes locks responsive to cancellation.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## ReadWriteLock — maximising read throughput
+
+For data structures that are read far more often than written, `ReadWriteLock` provides two separate locks: a shared *read* lock (multiple holders) and an exclusive *write* lock (one holder, no readers):
+
+```java
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+public class Cache {
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Map<String, String> map = new HashMap<>();
+
+    public String get(String key) {
+        rwLock.readLock().lock();     // shared — many threads can read simultaneously
+        try {
+            return map.get(key);
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    public void put(String key, String value) {
+        rwLock.writeLock().lock();    // exclusive — all readers and writers blocked
+        try {
+            map.put(key, value);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+}
+```
+
+## Condition — structured wait/signal
+
+A `Condition` provides `await()` (releases the lock and waits) and `signal()` / `signalAll()` (wakes waiters). Unlike `Object.wait()`/`notify()`, you can create multiple `Condition` objects for the same lock:
+
+```java
+import java.util.concurrent.locks.*;
+
+public class BoundedBuffer<T> {
+    private final ReentrantLock lock  = new ReentrantLock();
+    private final Condition notFull  = lock.newCondition();
+    private final Condition notEmpty = lock.newCondition();
+    private final Object[]  buffer;
+    private int head, tail, count;
+
+    public BoundedBuffer(int capacity) { buffer = new Object[capacity]; }
+
+    public void put(T item) throws InterruptedException {
+        lock.lock();
+        try {
+            while (count == buffer.length) notFull.await();  // wait for space
+            buffer[tail] = item;
+            tail = (tail + 1) % buffer.length;
+            count++;
+            notEmpty.signal();   // wake a waiting consumer
+        } finally { lock.unlock(); }
+    }
+
+    @SuppressWarnings("unchecked")
+    public T take() throws InterruptedException {
+        lock.lock();
+        try {
+            while (count == 0) notEmpty.await();  // wait for an item
+            T item = (T) buffer[head];
+            head = (head + 1) % buffer.length;
+            count--;
+            notFull.signal();   // wake a waiting producer
+            return item;
+        } finally { lock.unlock(); }
+    }
+}
+```
+
+The two `Condition` objects mean producers only wake consumers and consumers only wake producers — no spurious wake-ups of the wrong party.
+
+## Try it
+
+Implement the bounded buffer above, create a producer and consumer, and verify items flow correctly:
+
+```java
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        BoundedBuffer<Integer> buf = new BoundedBuffer<>(3);
+
+        Thread producer = new Thread(() -> {
+            try {
+                for (int i = 1; i <= 6; i++) {
+                    buf.put(i);
+                    System.out.println("Put:  " + i);
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        Thread consumer = new Thread(() -> {
+            try {
+                for (int i = 0; i < 6; i++) {
+                    int v = buf.take();
+                    System.out.println("Took: " + v);
+                    Thread.sleep(80);
+                }
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        producer.start();
+        consumer.start();
+        producer.join();
+        consumer.join();
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting `unlock()` in a finally block** — an exception in the critical section that isn't caught will leave the lock acquired forever.
+- **Calling `await()` without a loop** — spurious wake-ups can occur; always re-check the condition in a `while` loop, not an `if`.
+- **Acquiring the read lock inside a write-locked section without upgrading** — `ReentrantReadWriteLock` does not support lock upgrading (read → write). Attempting it deadlocks. Always upgrade by releasing the read lock first.
+- **Using `ReentrantLock` when `synchronized` suffices** — `ReentrantLock` adds code complexity. Use it only when you need `tryLock`, `lockInterruptibly`, or multiple `Condition` objects.
+
+## Recap
+
+- `ReentrantLock.lock()`/`unlock()` gives manual control; always release in `finally`. It adds `tryLock()` and `lockInterruptibly()` over `synchronized`.
+- `ReadWriteLock` allows concurrent reads (shared read lock) and exclusive writes, ideal for read-heavy caches.
+- `Condition` (from `lock.newCondition()`) replaces `wait`/`notify` with named, per-lock wait-sets, enabling multiple distinct waiting conditions.
+- Prefer `synchronized` for simple use cases; escalate to `ReentrantLock` only when you need its extra capabilities.
+
+**Up next:** Lesson 11 introduces virtual threads (Project Loom) — a JVM-level innovation that makes thousands of concurrent threads practical without the memory overhead of platform threads.

@@ -1,0 +1,285 @@
+export const meta = {
+  title: "Deadlock — Detection and Avoidance",
+  duration: 14,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "dl-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which of the four Coffman conditions, if eliminated, would *always* prevent deadlock?",
+    options: [
+      { text: "Mutual exclusion — resources cannot be shared.", correct: false, feedback: "Eliminating mutual exclusion is usually impossible for inherently exclusive resources like locks or write access." },
+      { text: "Hold and wait — a thread holds one resource while waiting for another.", correct: true, feedback: "Correct. If you ensure a thread acquires *all* needed locks before proceeding (or releases held locks before waiting), the cycle cannot form. Lock ordering also achieves this indirectly." },
+      { text: "No preemption — locks cannot be taken away.", correct: false, feedback: "Preemptive lock revocation is complex and can cause inconsistency. tryLock with a timeout is the practical Java approximation." },
+      { text: "Circular wait — a cycle of dependencies exists.", correct: false, feedback: "While breaking circular wait (via lock ordering) is the most common practical strategy, it is one of several approaches, not uniquely sufficient on its own." },
+    ],
+    explanation: "All four Coffman conditions must hold simultaneously for a deadlock to occur. Breaking *any one* of them is sufficient. In practice, eliminating **circular wait** via consistent lock ordering is the most commonly applied strategy in Java.",
+  },
+  endQ1: {
+    id: "dl-end-1",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `import java.util.concurrent.locks.ReentrantLock;
+
+public class Main {
+    static ReentrantLock lockA = new ReentrantLock();
+    static ReentrantLock lockB = new ReentrantLock();
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread t = new Thread(() -> {
+            lockA.lock();
+            try {
+                boolean got = lockB.tryLock();
+                System.out.println("Got lockB: " + got);
+            } finally {
+                lockA.unlock();
+            }
+        });
+
+        lockB.lock();   // main holds lockB
+        t.start();
+        Thread.sleep(50);
+        lockB.unlock(); // now release
+        t.join();
+    }
+}`,
+    expectedOutput: "Got lockB: true",
+    explanation: "Main holds lockB, starts the thread, sleeps 50 ms, then releases lockB. The child thread calls `tryLock()` on lockB. Because `tryLock()` without a timeout returns immediately — if it cannot acquire, it returns false. However, since main holds lockB only for ~50ms and the thread starts slightly after, by the time tryLock is called lockB may still be held. This is timing-dependent, but in the typical execution main releases lockB before tryLock is called, so the thread gets it and prints `Got lockB: true`.",
+  },
+  endQ2: {
+    id: "dl-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the safe transfer method so it always acquires locks in a consistent order based on System.identityHashCode:",
+    code: `void transfer(Account from, Account to, int amount) {
+    Account first  = System.identityHashCode(from) < System.identityHashCode(to) ? from : ___;
+    Account second = first == from ? to : ___;
+    synchronized (first) {
+        synchronized (second) {
+            from.balance -= amount;
+            to.balance   += amount;
+        }
+    }
+}`,
+    correctAnswers: ["to, from"],
+    caseSensitive: false,
+    explanation: "By ordering the two locks consistently (lower hash code first), every thread acquires them in the same order, breaking the circular-wait condition and preventing deadlock.",
+  },
+  endQ3: {
+    id: "dl-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class Transfer {
+    void moveAtoB(Account a, Account b, int amt) {
+        synchronized (a) {
+            synchronized (b) { a.balance -= amt; b.balance += amt; }
+        }
+    }
+
+    void moveBtoA(Account a, Account b, int amt) {
+        synchronized (b) {                        // bug here
+            synchronized (a) { b.balance -= amt; a.balance += amt; }
+        }
+    }
+}`,
+    buggyLine: 9,
+    issue: "`moveAtoB` acquires lock(a) then lock(b); `moveBtoA` acquires lock(b) then lock(a). When called concurrently on the same pair of accounts, they deadlock.",
+    explanation: "Thread 1 holds lock(a) waiting for lock(b); Thread 2 holds lock(b) waiting for lock(a) — a classic deadlock cycle. Fix: always acquire locks in the same global order (e.g. based on account ID or identity hash code), in both methods.",
+  },
+};
+
+Deadlock is the silent killer of concurrent applications. Unlike a crash, a deadlocked program doesn't throw an exception — it simply stops making progress. Threads sit blocked forever, CPU usage drops to zero, and the only sign something is wrong is that your application stops responding. Deadlocks have caused high-profile production outages and are notoriously hard to reproduce in tests because they depend on precise thread scheduling timing. Understanding the conditions that cause them, and the patterns that prevent them, is one of the most valuable skills in concurrent programming.
+
+## The four Coffman conditions
+
+A deadlock can only occur when all four of these conditions hold simultaneously:
+
+1. **Mutual exclusion** — at least one resource is held in a non-shareable mode (e.g. a lock).
+2. **Hold and wait** — a thread holding a resource is waiting to acquire another resource held by another thread.
+3. **No preemption** — resources cannot be forcibly taken away; a thread must release them voluntarily.
+4. **Circular wait** — there exists a cycle of threads, each waiting for a resource held by the next.
+
+Breaking *any one* of these conditions prevents deadlock.
+
+## Classic two-lock deadlock
+
+The canonical example involves two threads and two locks, each wanting them in opposite order:
+
+```java
+Object lockA = new Object();
+Object lockB = new Object();
+
+Thread t1 = new Thread(() -> {
+    synchronized (lockA) {
+        Thread.sleep(10);         // yields to let t2 grab lockB
+        synchronized (lockB) {
+            System.out.println("T1 done");
+        }
+    }
+});
+
+Thread t2 = new Thread(() -> {
+    synchronized (lockB) {
+        Thread.sleep(10);         // yields to let t1 grab lockA
+        synchronized (lockA) {
+            System.out.println("T2 done");
+        }
+    }
+});
+
+t1.start();
+t2.start();
+// Neither thread ever prints anything — both wait forever
+```
+
+Thread 1 holds `lockA` and waits for `lockB`; Thread 2 holds `lockB` and waits for `lockA`. Circular wait achieved — deadlock.
+
+<Note>Deadlocks often don't manifest in development because there's no contention. They appear suddenly in production under load, when timing finally aligns. Always reason about lock ordering before shipping concurrent code.</Note>
+
+## Avoidance strategy 1: consistent lock ordering
+
+The most reliable prevention is a global ordering rule: always acquire multiple locks in the same order, everywhere in the codebase. A common technique for `BankAccount` transfers is to order by account ID:
+
+```java
+public class BankAccount {
+    private final long id;
+    private int balance;
+
+    public BankAccount(long id, int balance) {
+        this.id      = id;
+        this.balance = balance;
+    }
+
+    public static void transfer(BankAccount from, BankAccount to, int amount) {
+        // Always lock the lower ID first — consistent global ordering
+        BankAccount first  = from.id < to.id ? from : to;
+        BankAccount second = first == from    ? to   : from;
+
+        synchronized (first) {
+            synchronized (second) {
+                from.balance -= amount;
+                to.balance   += amount;
+            }
+        }
+    }
+}
+```
+
+No matter which direction money flows, both threads acquire the same account's lock first — circular wait is impossible.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Avoidance strategy 2: tryLock with timeout
+
+`ReentrantLock.tryLock(timeout, unit)` attempts to acquire a lock but gives up after the specified time, returning `false` rather than blocking forever:
+
+```java
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class SafeTransfer {
+    private final ReentrantLock lock = new ReentrantLock();
+
+    public boolean transfer(SafeTransfer other, int amount)
+            throws InterruptedException {
+        if (this.lock.tryLock(50, TimeUnit.MILLISECONDS)) {
+            try {
+                if (other.lock.tryLock(50, TimeUnit.MILLISECONDS)) {
+                    try {
+                        // perform transfer
+                        return true;
+                    } finally {
+                        other.lock.unlock();
+                    }
+                }
+            } finally {
+                this.lock.unlock();
+            }
+        }
+        return false;  // caller should retry
+    }
+}
+```
+
+If `tryLock` times out, release all held locks and retry (or back off). This breaks the "no preemption" condition — threads voluntarily give up locks they couldn't pair.
+
+## Reading a thread dump
+
+When you suspect a deadlock in production, generate a thread dump with `kill -3 <pid>` (Linux/macOS) or `jstack <pid>`. Look for sections like:
+
+```
+"Thread-1" BLOCKED on object@5f4da5c3 owned by "Thread-0"
+"Thread-0" BLOCKED on object@4a7484dd owned by "Thread-1"
+Found 1 deadlock.
+```
+
+JConsole and VisualVM also detect deadlocks graphically. Modern JVMs print a deadlock summary at the end of a thread dump automatically.
+
+## Try it
+
+Implement a safe `BankAccount.transfer()` using consistent lock ordering, then launch two threads transferring in opposite directions simultaneously. Confirm neither deadlocks:
+
+```java
+public class Main {
+    static class Account {
+        final int id;
+        int balance;
+        Account(int id, int balance) { this.id = id; this.balance = balance; }
+
+        static void transfer(Account from, Account to, int amount) {
+            Account first  = from.id < to.id ? from : to;
+            Account second = first == from   ? to   : from;
+            synchronized (first) {
+                synchronized (second) {
+                    from.balance -= amount;
+                    to.balance   += amount;
+                }
+            }
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        Account alice = new Account(1, 1000);
+        Account bob   = new Account(2, 1000);
+
+        Thread t1 = new Thread(() -> { for (int i = 0; i < 500; i++) Account.transfer(alice, bob, 1); });
+        Thread t2 = new Thread(() -> { for (int i = 0; i < 500; i++) Account.transfer(bob, alice, 1); });
+
+        t1.start(); t2.start();
+        t1.join();  t2.join();
+
+        System.out.println("Alice: " + alice.balance);  // 1000
+        System.out.println("Bob:   " + bob.balance);    // 1000
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Inconsistent lock ordering across methods** — `methodA` locks (a, b) and `methodB` locks (b, a). Even a single such inconsistency in a codebase can produce deadlock under the right timing.
+- **Holding locks during I/O or external calls** — if you call a remote API while holding a lock and the call blocks, every other thread needing that lock is stuck too. Keep critical sections as short as possible.
+- **Ignoring the `false` return from `tryLock`** — if you don't check the return value you may proceed without the lock, leading to data corruption rather than deadlock.
+- **Assuming deadlocks won't happen in tests** — they often don't, because thread scheduling in tests is more uniform. Stress-test concurrent code with tools like `jcstress` or simply run with more threads.
+
+## Recap
+
+- A deadlock requires all four Coffman conditions: mutual exclusion, hold-and-wait, no preemption, circular wait.
+- **Consistent lock ordering** is the most practical prevention: every code path that acquires the same two locks must acquire them in the same order.
+- `ReentrantLock.tryLock(timeout)` lets threads abandon lock attempts rather than waiting forever, breaking the no-preemption condition.
+- Thread dumps (`jstack`) identify deadlocks in production and show which thread owns which lock.
+
+**Up next:** Lesson 5 introduces the Executor framework — a higher-level abstraction that manages thread pools so you don't have to create and manage raw threads manually.

@@ -1,0 +1,383 @@
+export const meta = {
+  title: "Capstone Part 2 — Generic Repository Layer",
+  duration: 18,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "dl-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is the primary benefit of a generic `Repository<T, ID>` interface over writing a separate, concrete `TaskRepository` interface with its own save/findById/findAll methods?",
+    options: [
+      {
+        text: "Generic repositories run faster because they avoid boxing.",
+        correct: false,
+        feedback: "Generics are a compile-time feature; they have no effect on boxing behaviour at runtime.",
+      },
+      {
+        text: "A single generic interface, implemented once, serves every entity type — adding a `ProjectRepository` requires zero new boilerplate CRUD code.",
+        correct: true,
+        feedback: "Correct! The `InMemoryRepository<T, ID>` base class provides all CRUD logic. A new entity repository just extends it and adds domain-specific query methods.",
+      },
+      {
+        text: "Generic repositories automatically persist data to a database.",
+        correct: false,
+        feedback: "The in-memory implementation stores data in a `ConcurrentHashMap`. Database persistence would require a separate adapter — generics do not add that.",
+      },
+      {
+        text: "Generic repositories prevent two threads from writing simultaneously.",
+        correct: false,
+        feedback: "`ConcurrentHashMap` handles concurrent access safely, but that is a property of the collection, not of generics.",
+      },
+    ],
+    explanation: "The **Repository pattern** abstracts persistence behind an interface. Making that interface generic means the CRUD contract is written once, and every concrete repository inherits it. Domain-specific finders (`findByStatus`, `findByPriority`) are then added only where needed, without duplicating the shared operations.",
+  },
+  endQ1: {
+    id: "dl-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+class InMemoryRepo<T, ID> {
+    protected final Map<ID, T> store = new ConcurrentHashMap<>();
+
+    public void save(ID id, T entity) { store.put(id, entity); }
+
+    public Optional<T> findById(ID id) {
+        return Optional.ofNullable(store.get(id));
+    }
+
+    public List<T> findWhere(Predicate<T> p) {
+        return store.values().stream().filter(p).collect(Collectors.toList());
+    }
+}
+
+record Item(String name, int qty) {}
+
+public class Main {
+    public static void main(String[] args) {
+        var repo = new InMemoryRepo<Item, String>();
+        repo.save("a", new Item("apple", 5));
+        repo.save("b", new Item("banana", 2));
+        repo.save("c", new Item("cherry", 8));
+
+        List<Item> plenty = repo.findWhere(i -> i.qty() > 3);
+        plenty.stream()
+              .sorted(Comparator.comparing(Item::name))
+              .forEach(i -> System.out.println(i.name()));
+    }
+}`,
+    expectedOutput: "apple\ncherry",
+    explanation: "`findWhere` filters entries where `qty > 3`. That matches `apple` (5) and `cherry` (8). Sorting alphabetically by name gives `apple` then `cherry`.",
+  },
+  endQ2: {
+    id: "dl-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the `findByStatus` method in `InMemoryTaskRepository` using the inherited `findWhere` method:",
+    code: `public class InMemoryTaskRepository extends InMemoryRepository<Task, UUID> {
+
+    public List<Task> findByStatus(TaskStatus status) {
+        return findWhere(___ -> ___.status() == status);
+    }
+
+    public List<Task> findByPriority(Priority priority) {
+        return findWhere(t -> t.priority() == priority);
+    }
+}`,
+    correctAnswers: ["t", "t"],
+    caseSensitive: false,
+    explanation: "`findWhere` accepts a `Predicate<Task>`. Using a lambda `t -> t.status() == status` passes a predicate that compares each task's status to the argument. Any single-letter variable name is fine — `t` is idiomatic for Task.",
+  },
+  endQ3: {
+    id: "dl-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class InMemoryRepository<T, ID> {
+    private final Map<ID, T> store = new HashMap<>();
+
+    public void save(T entity, ID id) { store.put(id, entity); }
+
+    public Optional<T> findById(ID id) {
+        return Optional.ofNullable(store.get(id));
+    }
+
+    public boolean delete(ID id) {
+        return store.remove(id) != null;
+    }
+
+    public List<T> findAll() {
+        return new ArrayList<>(store.values());
+    }
+}`,
+    buggyLine: 2,
+    issue: "`HashMap` is not thread-safe. If two threads call `save` concurrently, the map can corrupt its internal structure. Replace `new HashMap<>()` with `new ConcurrentHashMap<>()` to make the repository safe for concurrent access.",
+    explanation: "`ConcurrentHashMap` provides the same `Map` contract but uses lock striping internally, allowing concurrent reads and a fine-grained lock on writes. Since the Task Management System will later add background threads and async notifications, thread safety must be built in from the start.",
+  },
+};
+
+In Part 1 we built a domain model that compiles cleanly and enforces its own invariants. Now we need somewhere to store and retrieve domain objects. In a production system that would be a database; in our capstone it will be an **in-memory repository** backed by a `ConcurrentHashMap`. The design pattern is the same either way: the service layer talks to a `Repository<T, ID>` interface, and the concrete storage strategy can be swapped without touching the service code.
+
+This lesson also applies everything from Module 1 (generic classes), Module 2 (streams and functional interfaces), and a taste of Module 4 (concurrency-safe collections). Watch how those pieces snap together.
+
+## The Repository pattern
+
+The Repository pattern, popularised by Domain-Driven Design, places a collection-like interface between domain logic and storage. The service layer treats the repository as if it were a smart, queryable in-memory collection — it does not need to know whether the underlying store is a `HashMap`, a PostgreSQL database, or a remote REST API.
+
+The simplest possible repository interface:
+
+```java
+package com.bytecode.tasks.repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Predicate;
+
+public interface Repository<T, ID> {
+    void         save(T entity);
+    Optional<T>  findById(ID id);
+    List<T>      findAll();
+    boolean      delete(ID id);
+    List<T>      findWhere(Predicate<T> predicate);
+}
+```
+
+`T` is the entity type (`Task`, `Project`, `User`). `ID` is the identifier type (we use `UUID` for all three). `findWhere(Predicate<T>)` is the functional escape hatch: callers compose any filter they need without us adding dozens of `findByXxx` overloads to the interface.
+
+<Note>`Repository` is an interface, not an abstract class. This keeps the contract pure and allows a concrete repository to implement multiple interfaces (e.g., `Repository<Task, UUID>` and `Closeable`) without conflicting state.</Note>
+
+## Extracting the ID — the `Identifiable` helper
+
+Every entity in our system has a `UUID` id. To avoid duplicating `entity.id()` calls inside `InMemoryRepository`, we define a tiny interface:
+
+```java
+package com.bytecode.tasks.domain;
+
+import java.util.UUID;
+
+public interface Identifiable {
+    UUID id();
+}
+```
+
+Our `Task` record and `User` record already declare `id()` as a component accessor — they satisfy this interface without changing a line. `Project` needs a small tweak:
+
+```java
+// Project now implements Identifiable
+public class Project implements Identifiable { ... }
+```
+
+## The generic in-memory base class
+
+Now we write `InMemoryRepository<T, ID>` once. Every concrete repository inherits CRUD for free:
+
+```java
+package com.bytecode.tasks.repository;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+public class InMemoryRepository<T, ID> implements Repository<T, ID> {
+
+    protected final Map<ID, T> store = new ConcurrentHashMap<>();
+    private final Function<T, ID> idExtractor;
+
+    public InMemoryRepository(Function<T, ID> idExtractor) {
+        this.idExtractor = idExtractor;
+    }
+
+    @Override
+    public void save(T entity) {
+        store.put(idExtractor.apply(entity), entity);
+    }
+
+    @Override
+    public Optional<T> findById(ID id) {
+        return Optional.ofNullable(store.get(id));
+    }
+
+    @Override
+    public List<T> findAll() {
+        return List.copyOf(store.values());   // immutable snapshot
+    }
+
+    @Override
+    public boolean delete(ID id) {
+        return store.remove(id) != null;
+    }
+
+    @Override
+    public List<T> findWhere(Predicate<T> predicate) {
+        return store.values().stream()
+                    .filter(predicate)
+                    .collect(Collectors.toUnmodifiableList());
+    }
+
+    public long count() {
+        return store.size();
+    }
+}
+```
+
+The `idExtractor` `Function<T, ID>` is injected via the constructor — this is the only thing that varies between entity types and it keeps the base class fully generic.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Pagination — a practical addition
+
+Real systems never load every entity in one shot. A lightweight pagination helper keeps responses bounded:
+
+```java
+package com.bytecode.tasks.repository;
+
+import java.util.List;
+
+public record Page<T>(List<T> content, int pageNumber, int pageSize, long totalElements) {
+
+    public int totalPages() {
+        return (int) Math.ceil((double) totalElements / pageSize);
+    }
+
+    public boolean hasNext() {
+        return pageNumber < totalPages() - 1;
+    }
+}
+```
+
+And we add a `findPage` method to `InMemoryRepository`:
+
+```java
+public Page<T> findPage(int pageNumber, int pageSize) {
+    List<T> all = List.copyOf(store.values());
+    long total  = all.size();
+    List<T> content = all.stream()
+            .skip((long) pageNumber * pageSize)
+            .limit(pageSize)
+            .collect(Collectors.toUnmodifiableList());
+    return new Page<>(content, pageNumber, pageSize, total);
+}
+```
+
+<Note>In-memory pagination is deterministic only if the iteration order of the underlying collection is stable. `ConcurrentHashMap` does not guarantee insertion order. In production you would sort before paginating; here it is fine for the capstone.</Note>
+
+## The concrete task repository
+
+`InMemoryTaskRepository` extends the base class and adds domain-specific convenience queries:
+
+```java
+package com.bytecode.tasks.repository;
+
+import com.bytecode.tasks.domain.*;
+
+import java.util.List;
+import java.util.UUID;
+
+public class InMemoryTaskRepository extends InMemoryRepository<Task, UUID> {
+
+    public InMemoryTaskRepository() {
+        super(Task::id);   // id extractor: Task::id
+    }
+
+    public List<Task> findByStatus(TaskStatus status) {
+        return findWhere(t -> t.status() == status);
+    }
+
+    public List<Task> findByPriority(Priority priority) {
+        return findWhere(t -> t.priority() == priority);
+    }
+
+    public List<Task> findByAssignee(String assigneeId) {
+        return findWhere(t -> t.assigneeId()
+                               .map(a -> a.equals(assigneeId))
+                               .orElse(false));
+    }
+
+    public List<Task> findOverdue(java.time.LocalDate today) {
+        return findWhere(t ->
+            t.dueDate()
+             .map(d -> d.isBefore(today) && t.status() != TaskStatus.DONE)
+             .orElse(false)
+        );
+    }
+}
+```
+
+`findByAssignee` and `findOverdue` demonstrate composing Optional logic inside a Predicate — a pattern straight from Module 2.
+
+## Repositories for Project and User
+
+Adding repositories for the other entities is now trivial:
+
+```java
+public class InMemoryProjectRepository extends InMemoryRepository<Project, UUID> {
+    public InMemoryProjectRepository() { super(Project::getId); }
+
+    public List<Project> findByOwner(String ownerId) {
+        return findWhere(p -> p.getOwnerId().equals(ownerId));
+    }
+}
+
+public class InMemoryUserRepository extends InMemoryRepository<User, UUID> {
+    public InMemoryUserRepository() { super(User::id); }
+
+    public Optional<User> findByUsername(String username) {
+        return store.values().stream()
+                    .filter(u -> u.username().equals(username))
+                    .findFirst();
+    }
+}
+```
+
+Both classes are roughly ten lines. Without the generic base class each would be fifty.
+
+## Try it
+
+Build the full repository layer step by step:
+
+1. Define the `Repository<T, ID>` interface exactly as shown.
+2. Implement `InMemoryRepository<T, ID>` using `ConcurrentHashMap`. Pass the id extractor as a constructor argument.
+3. Extend it with `InMemoryTaskRepository`, adding `findByStatus`, `findByPriority`, `findByAssignee`, and `findOverdue`.
+4. Write a `main` method that:
+   - Creates five `Task` objects with different statuses and priorities.
+   - Saves them all via `save`.
+   - Calls `findByStatus(TaskStatus.TODO)` and prints how many results come back.
+   - Calls `findByPriority(Priority.HIGH)` and prints the titles.
+   - Calls `delete` on one task id and verifies `count()` decrements.
+
+Stretch goal: Add a `findPage(int page, int size)` method to the base class. Write a `main` snippet that saves 25 tasks and pages through them three at a time, printing the title of each page's first element.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **HashMap instead of ConcurrentHashMap** — `HashMap` is not thread-safe. When background threads (introduced in Part 4) start reading and writing the repository simultaneously, a `HashMap` can silently corrupt its internal hash table. Use `ConcurrentHashMap` from day one.
+- **Returning a live internal list** — `new ArrayList<>(store.values())` creates a snapshot, but returning `store.values()` directly exposes the map's live key-set view. Use `List.copyOf()` or `.collect(Collectors.toUnmodifiableList())` to prevent callers from mutating the internal state.
+- **One massive repository interface** — adding every query method to `Repository<T, ID>` forces every implementation to stub out methods it does not need. Keep the interface minimal (CRUD + `findWhere`) and add domain-specific methods only to the concrete class.
+- **Forgetting the id extractor** — without a `Function<T, ID>` the base class cannot know which field is the identifier. Avoid reflection-based magic; an explicit lambda like `Task::id` is clear, fast, and refactoring-safe.
+
+## Recap
+
+- The **Repository pattern** decouples service logic from storage strategy; the service calls an interface, not a concrete class.
+- A generic `Repository<T, ID>` interface with `findWhere(Predicate<T>)` covers the vast majority of query needs without bloating the interface.
+- `InMemoryRepository<T, ID>` provides all CRUD logic once; concrete repositories extend it and add only domain-specific finders.
+- `ConcurrentHashMap` is the correct backing store for an in-memory repository that will be accessed from multiple threads.
+- Pagination is a first-class concern — always limit unbounded `findAll` calls.
+
+**Up next: Part 3** — the service layer, where business rules, validation pipelines, and functional patterns turn the domain and repository into a working application.

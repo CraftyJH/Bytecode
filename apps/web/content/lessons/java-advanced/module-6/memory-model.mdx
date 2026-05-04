@@ -1,0 +1,267 @@
+export const meta = {
+  title: "Java Memory Model — Happens-Before & Visibility",
+  duration: 14,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "jmm-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which of the following establishes a **happens-before** relationship?",
+    options: [
+      { text: "Two threads reading from the same non-volatile field at the same time.", correct: false, feedback: "Concurrent reads of a non-volatile field establish no happens-before relationship. Both threads may read stale cached values." },
+      { text: "A write to a `volatile` field in thread A followed by a read of that same field in thread B.", correct: true, feedback: "Correct. The JMM guarantees that a volatile write happens-before every subsequent volatile read of the same variable, flushing all preceding writes to main memory." },
+      { text: "Thread A finishing a `Thread.sleep(100)` call.", correct: false, feedback: "`Thread.sleep` only pauses the current thread; it establishes no visibility guarantee about memory written by other threads." },
+      { text: "Two methods in the same class executing sequentially in different threads.", correct: false, feedback: "Sequential program order within a single thread establishes happens-before within that thread only, not across threads." },
+    ],
+    explanation: "The JMM happens-before rules include: program order within a thread, monitor unlock → lock, volatile write → volatile read, thread start, and thread join. Only these guarantee visibility across threads.",
+  },
+  endQ1: {
+    id: "jmm-end-1",
+    type: "predict_output",
+    difficulty: "hard",
+    code: `public class VisibilityDemo {
+    static boolean ready = false;
+    static int value = 0;
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread writer = new Thread(() -> {
+            value = 42;
+            ready = true;
+        });
+        Thread reader = new Thread(() -> {
+            while (!ready) { /* spin */ }
+            System.out.println(value);
+        });
+        reader.start();
+        writer.start();
+        writer.join();
+        reader.join();
+    }
+}`,
+    expectedOutput: "42 (but the program may hang or print 0 — behaviour is undefined without volatile)",
+    explanation: "Because `ready` and `value` are plain fields, the JMM permits the JIT or CPU to reorder the writes, cache them in registers, or delay flushing to main memory. The reader may spin forever (never seeing `ready = true`) or see `ready = true` but `value = 0`. Declaring both `volatile` fixes visibility.",
+  },
+  endQ2: {
+    id: "jmm-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Singleton {
+    private static Singleton instance;
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        if (instance == null) {                    // bug here
+            synchronized (Singleton.class) {
+                if (instance == null) {
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}`,
+    buggyLine: 7,
+    issue: "The first `if (instance == null)` check is outside `synchronized`, so it can read a partially constructed object. Without `volatile`, the JMM allows `instance` to be visible to other threads before the constructor has finished executing.",
+    explanation: "The double-checked locking idiom is only safe when `instance` is declared `volatile`. Without `volatile`, the JIT can reorder the write to `instance` before the constructor body completes. Adding `private static volatile Singleton instance;` fixes the bug.",
+  },
+  endQ3: {
+    id: "jmm-end-3",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which memory area stores local variables and method call frames?",
+    options: [
+      { text: "Heap", correct: false, feedback: "The heap stores object instances. Local primitive variables and object references live on the stack." },
+      { text: "Metaspace", correct: false, feedback: "Metaspace stores class metadata (field/method descriptors, bytecode). It is not where local variables live." },
+      { text: "Stack", correct: true, feedback: "Correct. Each thread has its own stack. Each method invocation gets a stack frame holding its local variables, operand stack, and return address." },
+      { text: "Code cache", correct: false, feedback: "The code cache stores JIT-compiled native code, not local variables." },
+    ],
+    explanation: "The JVM stack is per-thread and holds frames for each active method call. Stack allocation is thread-local and extremely fast. When a method returns, its frame is popped and locals are instantly reclaimed — no GC needed.",
+  },
+};
+
+Concurrency bugs are among the hardest defects to reproduce and diagnose. A variable that appears correct in testing flips to a stale value under production load. A supposedly safe singleton initialization hands out a half-constructed object. These are not race conditions in the traditional sense — they are **visibility** and **ordering** failures rooted in the Java Memory Model. Understanding the JMM turns these mysteries into predictable, fixable patterns.
+
+## Stack vs heap vs metaspace
+
+Before reasoning about thread visibility, understand where data lives:
+
+| Area | Per-thread? | Stores | GC'd? |
+|------|------------|--------|-------|
+| Stack | Yes (one per thread) | Local variables, method frames, return addresses | No (popped on method return) |
+| Heap | Shared | Object instances, arrays | Yes |
+| Metaspace | Shared | Class metadata, static fields, interned strings | On class unload |
+| Code cache | Shared | JIT-compiled native code | On deoptimization |
+
+```java
+void example() {
+    int x = 5;                      // x lives on the stack
+    String s = new String("hello"); // the String object lives on the heap;
+                                    // the reference 's' lives on the stack
+}
+```
+
+Because the stack is per-thread, local variables are inherently thread-safe — no other thread can see them. Heap objects are shared, which is where thread safety concerns begin.
+
+## The happens-before relation
+
+The JMM defines when one action is **guaranteed to be visible** to another. Two actions have a happens-before (HB) relationship if:
+
+1. **Program order** — within a single thread, each statement HB the next.
+2. **Monitor unlock → lock** — an `unlock` HB every subsequent `lock` of the same monitor.
+3. **Volatile write → volatile read** — a write to a `volatile` field HB every subsequent read of that field.
+4. **Thread.start()** — all actions before `t.start()` HB all actions inside thread `t`.
+5. **Thread.join()** — all actions in thread `t` HB the return from `t.join()`.
+
+Without a HB relationship, the JMM allows the JIT or CPU to reorder, cache, or delay writes in ways that make other threads read stale data.
+
+<Note>Happens-before is transitive. If A HB B and B HB C, then A HB C. This is how `synchronized` blocks create a complete memory fence: the unlock of one monitor HB the lock of the same monitor on any thread.</Note>
+
+## `volatile` — visibility without mutual exclusion
+
+Declaring a field `volatile` does two things:
+
+1. Reads always go to main memory (no register/cache read).
+2. Writes are immediately flushed to main memory and establish a HB edge for any subsequent read.
+
+```java
+public class StopFlag {
+    private volatile boolean stopped = false;  // <-- volatile is essential
+
+    public void stop()  { stopped = true; }
+    public boolean isStopped() { return stopped; }
+
+    public void runWorker() {
+        while (!isStopped()) {
+            doWork();
+        }
+    }
+}
+```
+
+Without `volatile`, the JIT may hoist `stopped` into a register and the worker loop never terminates — even after another thread calls `stop()`.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## `synchronized` — mutual exclusion + visibility
+
+`synchronized` gives you both: only one thread can hold the monitor, **and** entering the block flushes all stale caches and exiting flushes all writes to main memory.
+
+```java
+public class Counter {
+    private int count = 0;
+
+    public synchronized void increment() { count++; }
+    public synchronized int  get()       { return count; }
+}
+```
+
+`count++` is not atomic — it is read-modify-write. Without synchronization, two threads can both read `0`, both compute `1`, and both write `1`, losing one increment. `synchronized` prevents this.
+
+## `final` fields and safe publication
+
+A field declared `final` is guaranteed to be visible to all threads **once the constructor completes**, even without synchronization, as long as the object reference itself is safely published:
+
+```java
+public class ImmutablePoint {
+    public final int x;
+    public final int y;
+
+    public ImmutablePoint(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+```
+
+Any thread that obtains a reference to a fully constructed `ImmutablePoint` will always see the correct `x` and `y` values. This is why immutable objects are inherently thread-safe.
+
+## Data races and reordering
+
+A **data race** occurs when two threads access the same memory location, at least one access is a write, and there is no happens-before between them. Under a data race the JMM provides almost no guarantees.
+
+```java
+// DATA RACE — do not do this
+class Broken {
+    int x = 0;
+    boolean ready = false;
+
+    void writer() {
+        x = 42;      // (1)
+        ready = true; // (2)
+    }
+
+    void reader() {
+        if (ready) {   // (3)
+            // May print 0! JIT may reorder (1) and (2), or reader's CPU
+            // may observe (2) before (1) due to store buffer reordering.
+            System.out.println(x);
+        }
+    }
+}
+```
+
+Fix by declaring `ready` as `volatile` (which also prevents the reordering) or by synchronizing both methods.
+
+## Try it
+
+Reproduce and then fix a visibility bug:
+
+```java
+// Step 1: Run this — it may loop forever on some JVMs
+public class VisibilityBug {
+    static boolean running = true;  // NOT volatile
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread worker = new Thread(() -> {
+            long count = 0;
+            while (running) count++;
+            System.out.println("Stopped after " + count + " iterations");
+        });
+        worker.start();
+        Thread.sleep(100);
+        running = false;  // worker may never see this
+        worker.join(2000);
+        if (worker.isAlive()) System.out.println("Worker never saw the flag change!");
+    }
+}
+```
+
+```java
+// Step 2: Fix — add volatile
+static volatile boolean running = true;
+```
+
+Run both versions with `-server` (forces C2 JIT) to make the bug more reproducible. The volatile version terminates reliably; the non-volatile version may hang.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using `volatile` for compound actions** — `volatile` guarantees visibility but not atomicity. `count++` on a volatile field is still a race. Use `AtomicInteger` or `synchronized` for read-modify-write.
+- **Skipping `volatile` in double-checked locking** — the classic Singleton DCL bug. The field must be `volatile` or the pattern is broken on the JMM.
+- **Assuming `System.out.println` synchronizes memory** — it does (PrintStream uses synchronized internally), but relying on this is fragile and misleading. Use explicit `volatile` or `synchronized`.
+- **Confusing stack vs heap visibility** — local variables are always thread-private (stack). Only heap objects need synchronization. Don't add unnecessary synchronization to code that only uses local state.
+
+## Recap
+
+- The **stack** is per-thread (no sharing); the **heap** and **metaspace** are shared (requires care).
+- **Happens-before** relationships (volatile write/read, monitor unlock/lock, thread start/join) are the JMM's guarantees for visibility.
+- `volatile` ensures visibility and prevents reordering; it does **not** provide mutual exclusion.
+- `synchronized` provides both mutual exclusion and full memory visibility.
+- `final` fields of a properly published object are safely visible to all threads.
+- **Data races** yield undefined behavior under the JMM — do not rely on "it works in testing."
+
+**Up next:** Profiling — finding real bottlenecks with async-profiler, JFR, and flame graphs.

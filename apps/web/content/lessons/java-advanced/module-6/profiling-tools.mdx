@@ -1,0 +1,231 @@
+export const meta = {
+  title: "Profiling — Finding Real Bottlenecks",
+  duration: 13,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "prof-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What does a CPU flame graph show?",
+    options: [
+      { text: "The amount of memory allocated by each method.", correct: false, feedback: "That would be an allocation flame graph. CPU flame graphs show where the CPU is spending time, not memory." },
+      { text: "The call stack sampled over time, where the width of each frame represents the proportion of time spent in that method.", correct: true, feedback: "Correct. A flame graph aggregates thousands of stack samples. Wide frames are hot — they (or their callees) consume significant CPU time." },
+      { text: "The number of times each method was called.", correct: false, feedback: "Call counts come from instrumentation profilers. A flame graph shows time proportion, not invocation frequency." },
+      { text: "The GC pause durations over a time window.", correct: false, feedback: "GC pauses appear in GC logs or JFR GC events, not in a CPU flame graph." },
+    ],
+    explanation: "Flame graphs stack sampled call frames bottom-up. The x-axis represents the cumulative sample count (not time order). Wide frames at the top are the immediate consumers of CPU; wide frames lower down represent expensive call trees. The widest bar across the whole graph is your primary optimization target.",
+  },
+  endQ1: {
+    id: "prof-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which profiling approach has the lowest overhead and is safest to run in production?",
+    options: [
+      { text: "Instrumentation profiling (byte-buddy / AspectJ)", correct: false, feedback: "Instrumentation adds code to every method entry/exit, introducing measurable overhead and potentially changing timing characteristics." },
+      { text: "Async sampling with async-profiler or JFR", correct: true, feedback: "Correct. Sampling profilers interrupt threads at a low rate (e.g., 100 Hz) and record the call stack. Overhead is typically below 2%, making them safe for production." },
+      { text: "Adding `System.currentTimeMillis()` calls around suspect code", correct: false, feedback: "Manual timing is intrusive, error-prone, and only tells you about the code you already suspect — not about unexpected hot spots." },
+      { text: "Running the application under a debugger with step-through enabled", correct: false, feedback: "Debugging disables JIT and serializes execution, making performance measurements completely unrepresentative of production." },
+    ],
+    explanation: "Sampling profilers like async-profiler and JFR periodically capture call stacks without modifying bytecode. This keeps overhead minimal and avoids the 'observer effect' where the measurement itself changes the behavior.",
+  },
+  endQ2: {
+    id: "prof-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the async-profiler command to profile a running JVM process (PID 12345) for 30 seconds and produce a flame graph HTML file:",
+    code: `./profiler.sh -d 30 -f flamegraph.html ___ 12345`,
+    correctAnswers: ["-o flamegraph", "--output flamegraph"],
+    caseSensitive: false,
+    explanation: "`-d` sets duration in seconds, `-f` sets the output filename, and the PID is the last argument. For HTML flame graphs you also need `-o flamegraph` or `--output flamegraph` to select the output format. The resulting file opens directly in a browser.",
+  },
+  endQ3: {
+    id: "prof-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Amdahl's Law states that the maximum speedup from parallelizing a program is limited by its sequential fraction. If 20% of a program is sequential, what is the theoretical maximum speedup with infinite CPUs?",
+    options: [
+      { text: "5×", correct: true, feedback: "Correct. Amdahl's Law: max speedup = 1 / S, where S is the sequential fraction. With S = 0.2, max speedup = 1 / 0.2 = 5×, regardless of how many cores you add." },
+      { text: "Unlimited", correct: false, feedback: "The sequential fraction forms a hard ceiling. Even infinite parallelism cannot speed up the 20% that must run serially." },
+      { text: "10×", correct: false, feedback: "10× would require a sequential fraction of 10% (1 / 0.10 = 10). With 20% sequential the cap is 5×." },
+      { text: "80×", correct: false, feedback: "That would be the speedup of the parallel portion alone. Amdahl's Law accounts for the sequential fraction that always remains." },
+    ],
+    explanation: "Amdahl's Law: speedup = 1 / (S + (1-S)/N), where S is the sequential fraction and N is the number of processors. As N → ∞ this simplifies to 1/S. Always find and reduce the sequential bottleneck before adding parallelism.",
+  },
+};
+
+Performance optimization without profiling is guesswork. Developers routinely optimize code that runs 0.1% of the time while missing the loop that dominates 80% of CPU time. Real production profiles reveal surprises: the bottleneck is rarely where intuition points. This lesson covers the tools — async-profiler, Java Flight Recorder, and VisualVM — and the methodology to find real bottlenecks before spending time optimizing anything.
+
+## Profiling methodology first
+
+Before touching a profiler, commit to this order:
+
+1. **Define the problem** — what is slow? Latency? Throughput? Memory? Have a measurable goal.
+2. **Reproduce it** — under realistic load, not a single request in isolation.
+3. **Profile** — capture data. Don't guess.
+4. **Analyze** — find the hottest frame. Apply Amdahl's Law to estimate the maximum benefit.
+5. **Fix one thing** — change the identified bottleneck only.
+6. **Measure again** — did it improve? Did anything regress?
+
+This cycle prevents chasing phantom optimizations and ensures each change can be attributed to a specific improvement.
+
+## Amdahl's Law
+
+Even before profiling, Amdahl's Law tells you the ceiling on any optimization:
+
+```
+Speedup = 1 / (S + (1 - S) / N)
+
+S = sequential fraction of the program
+N = number of processors (or parallelization factor)
+```
+
+If a method takes 5% of total runtime, making it infinitely fast buys you at most a 5.3% overall speedup. Focus profiling effort on the widest flames, not the most interesting code.
+
+## async-profiler
+
+[async-profiler](https://github.com/async-profiler/async-profiler) is the industry-standard low-overhead sampling profiler for production JVMs. It uses OS signals and `perf_events` to sample call stacks without modifying bytecode, avoiding the "observer effect."
+
+```bash
+# Attach to a running JVM process for 30 seconds
+./profiler.sh -d 30 -f cpu-profile.html -o flamegraph 12345
+
+# Start at JVM launch (profile from the beginning including startup)
+java -agentpath:/path/to/libasyncProfiler.so=start,event=cpu,file=profile.html -jar myapp.jar
+
+# Profile memory allocation instead of CPU
+./profiler.sh -d 30 -e alloc -f alloc.html 12345
+```
+
+The output is an interactive HTML flame graph you open in any browser.
+
+<Note>async-profiler can miss frames in very short methods that the JIT has inlined. Use `-XX:+PreserveFramePointer` to improve frame accuracy when you need precise stack traces for inlined code.</Note>
+
+## Java Flight Recorder (JFR)
+
+JFR is built into the JDK (no external agent needed). It records a rich stream of JVM events — GC, JIT, locks, exceptions, I/O — with very low overhead (~1%):
+
+```bash
+# Start a 60-second recording
+java -XX:StartFlightRecording=duration=60s,filename=app.jfr -jar myapp.jar
+
+# Or start recording on a running process
+jcmd 12345 JFR.start duration=60s filename=app.jfr
+
+# Analyze with JDK Mission Control (JMC)
+jmc app.jfr
+```
+
+JFR is especially useful for diagnosing lock contention, classloading bottlenecks, and unexpected allocations that are hard to spot with CPU profiling alone.
+
+## VisualVM
+
+VisualVM provides a GUI that combines CPU profiling, heap analysis, and thread monitoring. It's best suited for development and pre-production environments:
+
+```bash
+# Launch VisualVM (bundled in JDK or downloadable separately)
+jvisualvm
+
+# Or as a standalone download
+visualvm --jdkhome /path/to/jdk
+```
+
+Connect to a local or remote JVM, then switch to the **Sampler** tab for low-overhead profiling or **Profiler** for instrumentation. The **Heap Dump** feature is invaluable for diagnosing memory leaks.
+
+## CPU vs allocation profiling
+
+| Profile type | What you find | Best tool |
+|-------------|--------------|-----------|
+| CPU sampling | Where the CPU is executing | async-profiler, JFR |
+| Allocation | Which code allocates most | async-profiler (`-e alloc`), JFR |
+| Lock contention | Which monitors cause thread blocking | JFR, async-profiler (`-e lock`) |
+| Wall-clock | Where threads spend time (including I/O/sleep) | async-profiler (`-e wall`) |
+
+Always start with CPU profiling. If the hot method is GC, switch to allocation profiling to find the source.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Reading a flame graph
+
+```
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ main (100%)
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ processRequests (98%)
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░ parseJson (71%)    ← wide = hot
+          ▓▓▓▓▓▓▓▓▓▓ serializeResponse (27%)
+▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░ ObjectMapper.readValue (65%)
+```
+
+Rules for reading flame graphs:
+- **Width = time** — wider frames consume more CPU.
+- **Height = call depth** — tall stacks are deep call chains but not necessarily slow.
+- **Color is irrelevant** (in most tools — it's just visual variety).
+- **Optimize the widest leaf** — the topmost wide frame is where CPU is actually burning.
+
+## Try it
+
+Write this intentional hot path and then identify the bottleneck conceptually:
+
+```java
+public class HotPath {
+    public static String buildReport(int n) {
+        String result = "";  // <-- performance trap
+        for (int i = 0; i < n; i++) {
+            result += "Line " + i + "\n";  // creates n intermediate String objects
+        }
+        return result;
+    }
+
+    public static void main(String[] args) {
+        long start = System.nanoTime();
+        String report = buildReport(10_000);
+        long elapsed = System.nanoTime() - start;
+        System.out.println("Length: " + report.length());
+        System.out.printf("Time: %.2f ms%n", elapsed / 1e6);
+    }
+}
+```
+
+If you profiled this with async-profiler, the flame graph would show the wide frames at `String.concat` / `AbstractStringBuilder.append` / `Arrays.copyOf` — the O(n²) string copying. The fix:
+
+```java
+public static String buildReport(int n) {
+    StringBuilder sb = new StringBuilder(n * 12); // pre-size
+    for (int i = 0; i < n; i++) {
+        sb.append("Line ").append(i).append('\n');
+    }
+    return sb.toString();
+}
+```
+
+After the fix, `buildReport(10_000)` drops from ~40 ms to under 1 ms. Run both and confirm with `System.nanoTime()`.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Profiling without realistic load** — a profiler on an idle or lightly loaded JVM shows nothing useful. Generate production-representative traffic before collecting profiles.
+- **Trusting the first hot method** — sometimes the top method is slow because its caller calls it a million times unnecessarily. Read both the flame width and the call count together.
+- **Using an instrumentation profiler in production** — instrumentation adds overhead to every method call and can change timing enough to hide the real bottleneck (Heisenbug). Use sampling (async-profiler, JFR) in production.
+- **Optimizing before profiling** — "obvious" bottlenecks are often wrong. The JIT already handles many classic micro-optimizations. Profile first, always.
+
+## Recap
+
+- Follow the **measure → analyze → fix → measure** cycle. Never optimize without data.
+- **async-profiler** is the go-to low-overhead CPU and allocation profiler for production JVMs.
+- **JFR** captures rich JVM event data (GC, locks, I/O) with ~1% overhead.
+- **VisualVM** is a GUI tool suited for development profiling and heap analysis.
+- **Flame graphs** visualize stack samples: width = CPU time, optimize the widest leaf frame.
+- **Amdahl's Law** caps optimization benefit; find the dominant bottleneck first.
+
+**Up next:** Benchmarking with JMH — how to write microbenchmarks that the JIT can't fool.

@@ -1,0 +1,325 @@
+export const meta = {
+  title: "Iterator & Template Method",
+  duration: 13,
+  order: 8,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "it-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.Iterator;
+import java.util.NoSuchElementException;
+
+public class Main {
+    static class CountDown implements Iterable<Integer> {
+        private final int start;
+        CountDown(int start) { this.start = start; }
+
+        public Iterator<Integer> iterator() {
+            return new Iterator<>() {
+                int current = start;
+                public boolean hasNext() { return current > 0; }
+                public Integer next() {
+                    if (!hasNext()) throw new NoSuchElementException();
+                    return current--;
+                }
+            };
+        }
+    }
+
+    public static void main(String[] args) {
+        for (int n : new CountDown(3)) {
+            System.out.println(n);
+        }
+    }
+}`,
+    expectedOutput: "3\n2\n1",
+    explanation: "The for-each loop calls `iterator()` once, then repeatedly calls `hasNext()` (true for 3, 2, 1) and `next()` (returns and decrements `current`). When `current` reaches 0, `hasNext()` returns false and the loop ends.",
+  },
+  endQ1: {
+    id: "it-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What two methods must a class implement to support Java's for-each loop?",
+    options: [
+      { text: "`forEach(Consumer)` and `stream()`.", correct: false, feedback: "Those are useful utility methods but are not required for for-each. `forEach` is a default method on `Iterable` — it doesn't need to be implemented." },
+      { text: "`Iterable<T>` with `iterator()`, and `Iterator<T>` with `hasNext()` and `next()`.", correct: true, feedback: "Correct! For-each compiles to: `Iterator<T> it = obj.iterator(); while (it.hasNext()) { T e = it.next(); ... }`. So `obj` must implement `Iterable`, returning an `Iterator`." },
+      { text: "`size()` and `get(int index)`.", correct: false, feedback: "Those are the `List` indexed-access methods. For-each requires `Iterable`, not indexed access." },
+      { text: "`Comparable<T>` and `Comparator<T>`.", correct: false, feedback: "Those are for ordering, not iteration." },
+    ],
+    explanation: "Java's enhanced for loop is syntax sugar for the Iterator protocol. Your class implements `Iterable<T>` (one method: `iterator()`), which returns an `Iterator<T>` (two required methods: `hasNext()` and `next()`). `remove()` has a default no-op implementation since Java 8.",
+  },
+  endQ2: {
+    id: "it-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public abstract class ReportGenerator {
+    public void generateReport() {
+        fetchData();
+        processData();
+        formatOutput();
+        sendReport();
+    }
+
+    protected abstract void fetchData();
+    protected abstract void processData();
+
+    protected void formatOutput() {         // bug here
+        System.out.println("Default HTML format");
+    }
+
+    protected abstract void sendReport();
+}`,
+    buggyLine: 1,
+    issue: "The template method `generateReport()` is not declared `final`, allowing subclasses to override the algorithm skeleton itself.",
+    explanation: "The Template Method pattern requires the template method to be `final`. If subclasses can override `generateReport()`, they can replace the whole algorithm, defeating the purpose. Hook and abstract methods (`fetchData`, `processData`, `sendReport`) should be overridable; the skeleton (`generateReport`) must not be.",
+  },
+  endQ3: {
+    id: "it-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "In the Template Method pattern, a method that subclasses MAY override (but don't have to) is called a ___.",
+    code: `public abstract class DataProcessor {
+    public final void process() {
+        readData();
+        processData();
+        writeData();
+        onComplete();   // subclasses may override this — it's a ___
+    }
+
+    protected void onComplete() { /* default: do nothing */ }
+    protected abstract void readData();
+    protected abstract void processData();
+    protected abstract void writeData();
+}`,
+    correctAnswers: ["hook", "hook method"],
+    caseSensitive: false,
+    explanation: "A **hook method** (or just 'hook') is a concrete method with a default (often empty) body that subclasses can optionally override to extend or customise the algorithm at a specific point. Abstract methods are mandatory overrides; hooks are optional extension points.",
+  },
+};
+
+Two patterns power a huge amount of Java library code without anyone noticing. The **Iterator** pattern provides a uniform way to traverse any collection without exposing its internal structure — it is why every Java collection works in a for-each loop. The **Template Method** pattern lets an abstract class define the skeleton of an algorithm while allowing subclasses to fill in the variable steps — it is the backbone of frameworks like JUnit, Servlet, and Spring Batch.
+
+## java.util.Iterator
+
+The Iterator pattern separates traversal logic from the collection that holds the data:
+
+```java
+public interface Iterator<E> {
+    boolean hasNext();
+    E next();
+    default void remove() { throw new UnsupportedOperationException(); }
+}
+```
+
+To support for-each, a class implements `Iterable<T>`:
+
+```java
+public interface Iterable<T> {
+    Iterator<T> iterator();
+}
+```
+
+The for-each loop compiles to:
+
+```java
+// This for-each:
+for (String s : myCollection) { ... }
+
+// Is identical to:
+Iterator<String> it = myCollection.iterator();
+while (it.hasNext()) {
+    String s = it.next();
+    ...
+}
+```
+
+## Implementing Iterable — Range
+
+```java
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+
+public class Range implements Iterable<Integer> {
+    private final int start;
+    private final int end;   // exclusive
+
+    public Range(int start, int end) {
+        this.start = start;
+        this.end   = end;
+    }
+
+    @Override
+    public Iterator<Integer> iterator() {
+        return new Iterator<>() {
+            int current = start;
+
+            @Override
+            public boolean hasNext() {
+                return current < end;
+            }
+
+            @Override
+            public Integer next() {
+                if (!hasNext()) throw new NoSuchElementException();
+                return current++;
+            }
+        };
+    }
+}
+```
+
+```java
+Range r = new Range(1, 6);
+
+for (int n : r) {
+    System.out.print(n + " ");
+}
+// 1 2 3 4 5
+
+// Works with Stream.of / Collections that accept Iterable
+import java.util.stream.StreamSupport;
+StreamSupport.stream(r.spliterator(), false)
+             .filter(n -> n % 2 == 0)
+             .forEach(System.out::println);
+// 2
+// 4
+```
+
+<Note>Each call to `iterator()` creates a fresh `Iterator` starting at `start`. This means you can iterate the same `Range` multiple times — in multiple for-each loops or in nested loops — without them interfering.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Template Method pattern
+
+Template Method defines the **skeleton of an algorithm** in a `final` method of an abstract class. Abstract (or hook) methods represent the variable steps that subclasses customise:
+
+```java
+public abstract class DataProcessor {
+    // Template method — final, defines the algorithm skeleton
+    public final void process() {
+        readData();
+        processData();
+        writeData();
+        onComplete();  // hook — optional override
+    }
+
+    protected abstract void readData();
+    protected abstract void processData();
+    protected abstract void writeData();
+
+    // Hook with default implementation
+    protected void onComplete() {
+        System.out.println("Processing complete.");
+    }
+}
+```
+
+Two concrete implementations that differ only in their steps:
+
+```java
+public class CsvDataProcessor extends DataProcessor {
+    @Override protected void readData()    { System.out.println("Reading CSV file"); }
+    @Override protected void processData() { System.out.println("Parsing CSV rows"); }
+    @Override protected void writeData()   { System.out.println("Writing to DB"); }
+}
+
+public class JsonApiProcessor extends DataProcessor {
+    @Override protected void readData()    { System.out.println("Fetching JSON from API"); }
+    @Override protected void processData() { System.out.println("Deserialising JSON"); }
+    @Override protected void writeData()   { System.out.println("Pushing to message queue"); }
+    @Override protected void onComplete()  { System.out.println("JSON pipeline done."); }
+}
+```
+
+```java
+DataProcessor csv  = new CsvDataProcessor();
+DataProcessor json = new JsonApiProcessor();
+
+csv.process();
+// Reading CSV file
+// Parsing CSV rows
+// Writing to DB
+// Processing complete.
+
+json.process();
+// Fetching JSON from API
+// Deserialising JSON
+// Pushing to message queue
+// JSON pipeline done.
+```
+
+## Template Method in the JDK
+
+`java.util.AbstractList` is a canonical Template Method: it implements `indexOf`, `iterator`, `subList` etc., all in terms of `get(int index)` and `size()`, which are declared abstract. Extend `AbstractList`, override only `get` and `size`, and you get a full `List` implementation for free.
+
+```java
+public class FixedList<E> extends java.util.AbstractList<E> {
+    private final E[] data;
+
+    @SuppressWarnings("unchecked")
+    public FixedList(E... items) { data = items; }
+
+    @Override public E get(int index) { return data[index]; }
+    @Override public int size()        { return data.length; }
+}
+
+FixedList<String> fl = new FixedList<>("a", "b", "c");
+System.out.println(fl);         // [a, b, c]
+System.out.println(fl.indexOf("b")); // 1 — free from AbstractList!
+```
+
+## Try it
+
+Implement `Range` as `Iterable<Integer>` and `DataProcessor` as an abstract Template Method:
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // Iterator demo
+        Range evens = new Range(0, 10);
+        for (int n : evens) {
+            if (n % 2 == 0) System.out.print(n + " ");
+        }
+        System.out.println();  // 0 2 4 6 8
+
+        // Template Method demo
+        DataProcessor proc = new CsvDataProcessor();
+        proc.process();
+        // Reading CSV file
+        // Parsing CSV rows
+        // Writing to DB
+        // Processing complete.
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Not throwing `NoSuchElementException` in `next()`** — the `Iterator` contract requires this exception when the collection is exhausted. Callers rely on it.
+- **Mutating the source during iteration** — adding or removing elements from the underlying collection while iterating produces `ConcurrentModificationException` for standard Java collections. Use `iterator.remove()` or collect mutations and apply them after the loop.
+- **Making the template method non-final** — this allows subclasses to override the algorithm itself, destroying the pattern's main guarantee.
+- **Declaring too many abstract methods in the abstract class** — each mandatory override increases friction for subclasses. Consider `protected` hook methods with sensible defaults for optional steps.
+
+## Recap
+
+- **Iterator** separates traversal logic from the collection, enabling any class to participate in for-each loops via `Iterable<T>` + `Iterator<T>`
+- The for-each loop is syntax sugar for `iterator()` → `hasNext()` + `next()`
+- `Iterator.remove()` has a default no-op since Java 8; only override if mutation during traversal is supported
+- **Template Method** defines an algorithm skeleton in a `final` method; abstract methods enforce mandatory steps; hook methods allow optional customisation
+- `AbstractList`, `AbstractSet`, and `AbstractMap` are Template Method in the JDK — override one or two methods and inherit the rest
+
+**Up next:** Patterns in the JDK — spotting all the patterns you've learned inside the Java standard library itself.

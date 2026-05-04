@@ -1,0 +1,277 @@
+export const meta = {
+  title: "Common Java Performance Traps",
+  duration: 14,
+  order: 6,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "perf-mid-1",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Stats {
+    public static long sum(List<Integer> numbers) {
+        long total = 0;
+        for (Integer n : numbers) {   // bug here
+            total += n;
+        }
+        return total;
+    }
+}`,
+    buggyLine: 4,
+    issue: "The loop variable is declared as `Integer` (boxed), not `int` (primitive). Each iteration unboxes `n` to add to `total`, and the `List<Integer>` stores boxed objects. For large lists this creates significant overhead compared to `List<int>` (not available) or an `int[]` array.",
+    explanation: "Autoboxing converts between primitives and their wrapper types automatically, but not for free. Each `Integer` is a heap object with 16 bytes of overhead. A list of 1 million integers uses ~16 MB on the heap and generates GC pressure. For performance-critical accumulation, consider `int[]`, `IntStream`, or `LongAdder` instead of `List<Integer>`.",
+  },
+  endQ1: {
+    id: "perf-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which data structure gives O(1) average-case `contains()` compared to `List.contains()` which is O(n)?",
+    options: [
+      { text: "LinkedList", correct: false, feedback: "`LinkedList.contains()` is O(n) just like `ArrayList.contains()` — it traverses nodes sequentially." },
+      { text: "TreeSet", correct: false, feedback: "`TreeSet.contains()` is O(log n) due to its balanced BST structure. Better than O(n), but not O(1)." },
+      { text: "HashSet", correct: true, feedback: "Correct. `HashSet.contains()` computes the hash code and checks the bucket, giving O(1) average time regardless of set size." },
+      { text: "ArrayDeque", correct: false, feedback: "`ArrayDeque` has O(n) `contains()` just like other sequential collections." },
+    ],
+    explanation: "`HashSet` (and `HashMap.containsKey()`) use hashing to achieve O(1) average-case lookup. When you need to repeatedly check membership in a large collection, moving from `List` to `HashSet` is one of the highest-ROI algorithmic optimizations available.",
+  },
+  endQ2: {
+    id: "perf-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class LogParser {
+    public List<String> findErrors(List<String> lines) {
+        List<String> errors = new ArrayList<>();
+        for (String line : lines) {
+            if (line.matches("ERROR:.*")) {   // bug here
+                errors.add(line);
+            }
+        }
+        return errors;
+    }
+}`,
+    buggyLine: 5,
+    issue: "`String.matches()` compiles the regex pattern on every call. With 1 million log lines, the pattern `\"ERROR:.*\"` is compiled 1 million times, each requiring regex NFA construction and optimization.",
+    explanation: "Fix by compiling the pattern once with `Pattern.compile(\"ERROR:.*\")` at the field or static level, then calling `pattern.matcher(line).matches()` in the loop. A compiled `Pattern` is thread-safe and can be reused across calls. This change typically reduces regex-heavy loop times by 5–20×.",
+  },
+  endQ3: {
+    id: "perf-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "In which situation does using `Stream` have measurably higher overhead than an equivalent `for` loop?",
+    options: [
+      { text: "When processing a list of one million strings with a single `filter` and `map`.", correct: false, feedback: "For large collections the JIT inlines stream operations effectively. Overhead is negligible relative to the work done." },
+      { text: "When the stream pipeline operates on a very small collection (e.g., 5 elements) and is called in a tight loop millions of times.", correct: true, feedback: "Correct. Stream setup — lambda object creation, spliterator allocation, pipeline construction — costs a fixed amount per call. For tiny collections in a hot loop, this overhead can exceed the data processing cost." },
+      { text: "When using `parallelStream()` on a multi-core machine.", correct: false, feedback: "`parallelStream()` can improve throughput on multi-core machines for CPU-bound work. The overhead of parallel stream coordination is usually justified." },
+      { text: "When the stream uses `collect(Collectors.toList())`.", correct: false, feedback: "`collect` has no special overhead beyond what an equivalent `add` loop would cost. It is not a significant source of stream overhead." },
+    ],
+    explanation: "Streams have a fixed setup cost per pipeline invocation. For small collections processed in a hot loop, that fixed cost dominates. The rule of thumb: use streams for readability; switch to loops if profiling shows stream overhead is significant in a hot path.",
+  },
+};
+
+Production Java code is full of patterns that look harmless until they appear in a hot path. A `List.contains()` on a 100-element list — fine. On a 100,000-element list called per HTTP request — catastrophic. Autoboxing, regex recompilation, and string concatenation each carry hidden costs that only surface at scale. This lesson catalogs the most common traps, shows exactly why they hurt, and gives you direct replacements.
+
+## Trap 1: autoboxing in loops
+
+Java automatically converts between primitives (`int`, `long`, `double`) and their wrapper types (`Integer`, `Long`, `Double`). This conversion is not free:
+
+```java
+// SLOW — autoboxing on every iteration
+List<Integer> numbers = new ArrayList<>();
+long sum = 0;
+for (Integer n : numbers) {   // unboxes n each iteration
+    sum += n;                 // Integer → int unboxing
+}
+```
+
+Each `Integer` is a separate heap object (~16 bytes). A `List<Integer>` with 1 million elements uses ~16 MB vs ~4 MB for an `int[]`. The unboxing in the loop generates a method call per element.
+
+```java
+// FAST — stay primitive
+int[] numbers = new int[size];
+long sum = 0;
+for (int n : numbers) {   // no boxing/unboxing
+    sum += n;
+}
+
+// Or use IntStream
+long sum = IntStream.of(numbers).asLongStream().sum();
+```
+
+<Note>Eclipse Collections, Trove, and Koloboke provide `IntList`, `LongMap`, and similar collections that hold primitives without boxing. They are worth adopting for performance-critical code that processes large numbers of numeric values.</Note>
+
+## Trap 2: String concatenation in loops
+
+`javac` compiles `"hello" + name` to `new StringBuilder().append("hello").append(name).toString()` in simple cases. But inside a loop, it creates a **new StringBuilder on every iteration**:
+
+```java
+// SLOW — O(n²) copies, n new StringBuilder objects
+String result = "";
+for (String item : items) {
+    result += item + ", ";   // new StringBuilder each time
+}
+```
+
+Each iteration copies the entire accumulated string into a new object. For 10,000 items this is ~50 million character copies.
+
+```java
+// FAST — one StringBuilder, sized up front
+StringBuilder sb = new StringBuilder(items.size() * 16);
+for (String item : items) {
+    sb.append(item).append(", ");
+}
+String result = sb.toString();
+
+// Even more idiomatic with streams:
+String result = String.join(", ", items);
+```
+
+## Trap 3: `List.contains()` on large lists
+
+```java
+// SLOW — O(n) per call
+List<String> allowedRoles = loadRolesFromDB();  // 50,000 entries
+for (User user : users) {
+    if (allowedRoles.contains(user.getRole())) {  // scans up to 50,000 elements
+        grant(user);
+    }
+}
+```
+
+`ArrayList.contains()` performs a linear scan. If `allowedRoles` has 50,000 entries and you check 10,000 users, that's up to 500 million comparisons.
+
+```java
+// FAST — O(1) per lookup
+Set<String> allowedRoles = new HashSet<>(loadRolesFromDB());
+for (User user : users) {
+    if (allowedRoles.contains(user.getRole())) {  // ~1 hash lookup
+        grant(user);
+    }
+}
+```
+
+The `HashSet` wraps the list conversion in one pass, then every lookup is O(1). This change alone can turn a 30-second batch job into a sub-second one.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Trap 4: regex recompilation
+
+`String.matches()`, `String.replaceAll()`, and `String.split()` all compile a new `Pattern` object on every call:
+
+```java
+// SLOW — compiles the regex 1 million times
+for (String line : millionLines) {
+    if (line.matches("\\d{4}-\\d{2}-\\d{2}")) {
+        process(line);
+    }
+}
+```
+
+Pattern compilation involves parsing the regex, building an NFA, and (optionally) converting to a DFA. It is orders of magnitude more expensive than matching.
+
+```java
+// FAST — compile once, reuse forever (Pattern is thread-safe)
+private static final Pattern DATE_PATTERN =
+    Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+
+for (String line : millionLines) {
+    if (DATE_PATTERN.matcher(line).matches()) {
+        process(line);
+    }
+}
+```
+
+## Trap 5: stream overhead on tiny collections
+
+```java
+// Measurably slower for tiny collections in a hot loop
+for (int i = 0; i < 10_000_000; i++) {
+    List<String> small = List.of("a", "b", "c");
+    String found = small.stream()
+        .filter(s -> s.equals("b"))
+        .findFirst()
+        .orElse(null);
+}
+```
+
+The `stream()` call allocates a `Spliterator` and pipeline objects. For a 3-element list, this setup cost can dominate. Use a loop for tiny collections in hot paths:
+
+```java
+// Faster for tiny collections in hot loops
+for (int i = 0; i < 10_000_000; i++) {
+    List<String> small = List.of("a", "b", "c");
+    String found = null;
+    for (String s : small) {
+        if (s.equals("b")) { found = s; break; }
+    }
+}
+```
+
+## Try it
+
+Each snippet below has a performance trap. Fix each one:
+
+```java
+// Fix 1: boxing trap
+Map<String, Integer> wordCount = new HashMap<>();
+for (String word : words) {
+    Integer count = wordCount.get(word);
+    wordCount.put(word, count == null ? 1 : count + 1);  // boxing on every put
+}
+// Better: wordCount.merge(word, 1, Integer::sum);
+//         or use a mutable int holder
+
+// Fix 2: contains trap
+List<String> stopWords = Arrays.asList("the", "a", "an", "and", "or");
+List<String> filtered = new ArrayList<>();
+for (String word : corpus) {
+    if (!stopWords.contains(word)) filtered.add(word);  // O(n) per check
+}
+// Better: Set<String> stopWordSet = Set.of("the", "a", "an", "and", "or");
+
+// Fix 3: regex recompilation trap
+public boolean isValidEmail(String email) {
+    return email.matches("[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}");
+}
+// Better: static final Pattern EMAIL = Pattern.compile("...");
+
+// Fix 4: string concat trap
+public String formatRows(List<String[]> rows) {
+    String out = "";
+    for (String[] row : rows) {
+        out += String.join("\t", row) + "\n";
+    }
+    return out;
+}
+// Better: StringBuilder or String.join("\n", rows.stream()...)
+```
+
+Apply each fix and compare performance with `System.nanoTime()` before and after.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Premature optimization** — fixing these traps in code that runs once at startup wastes time and reduces readability. Profile first; only optimize hot paths.
+- **Using `HashMap.put` in a counting loop** — `map.put(k, map.get(k) + 1)` boxes and unboxes on every call. Use `map.merge(k, 1, Integer::sum)` or `compute` to reduce boxing.
+- **Forgetting that `String.split()` also compiles a Pattern** — if your split separator is a plain string like `","`, use `StringTokenizer` or check whether the JDK's fast path applies (single-char, non-regex separators).
+- **Fixing stream overhead without measuring** — the JIT often eliminates stream overhead in real code through inlining. Don't blindly replace streams with loops; confirm the overhead with a profiler first.
+
+## Recap
+
+- **Autoboxing** converts primitives to heap objects — avoid it in tight loops by using primitive arrays or `IntStream`.
+- **String `+=` in a loop** is O(n²) — use `StringBuilder` or `String.join()`.
+- **`List.contains()` on large lists** is O(n) — convert to `HashSet` for O(1) lookups.
+- **`String.matches()` and `String.split()`** recompile the `Pattern` on every call — use a `static final Pattern`.
+- **Stream overhead** is real for tiny collections in hot loops — use a plain loop when profiling confirms it matters.
+
+**Up next:** GraalVM & Native Image — AOT compilation, closed-world assumptions, and production use cases.

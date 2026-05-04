@@ -1,0 +1,445 @@
+export const meta = {
+  title: "Capstone Part 5 — Testing the System",
+  duration: 18,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "test-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A method returns `CompletableFuture<Void>`. What is the correct way to assert its outcome in a JUnit 5 test?",
+    options: [
+      {
+        text: "Call `.join()` on the future and assert afterward — the test thread waits until the future completes.",
+        correct: true,
+        feedback: "Correct! `.join()` blocks the calling thread until the future completes (or throws an unchecked `CompletionException` on failure), making the assertion deterministic.",
+      },
+      {
+        text: "Assert immediately after calling the method — the future completes before the next line.",
+        correct: false,
+        feedback: "CompletableFuture operations run on separate threads and may not be complete by the next statement. Asserting without waiting produces flaky tests.",
+      },
+      {
+        text: "Use `Thread.sleep(1000)` and then assert — 1 second is always enough.",
+        correct: false,
+        feedback: "Time-based waiting creates flaky tests: too short on slow machines, needlessly slow on fast ones. Always use a deterministic wait like `.join()` or `.get(timeout, unit)`.",
+      },
+      {
+        text: "CompletableFuture cannot be tested in JUnit 5.",
+        correct: false,
+        feedback: "CompletableFuture is fully testable. `.join()` or `.get()` on the test thread makes the async result synchronous for the duration of the assertion.",
+      },
+    ],
+    explanation: "`.join()` is the idiomatic test-time synchronisation for `CompletableFuture`. Unlike `.get()`, it rethrows exceptions as `CompletionException` (unchecked), so JUnit 5 catches failures automatically. For cases where you want a timeout, use `.get(5, TimeUnit.SECONDS)` to prevent tests hanging forever.",
+  },
+  endQ1: {
+    id: "test-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A `@ParameterizedTest` with `@MethodSource` feeds transition pairs into a test method. Why is this preferable to writing one `@Test` per transition?",
+    options: [
+      {
+        text: "Parameterised tests run faster because JUnit shares the test instance.",
+        correct: false,
+        feedback: "JUnit 5 creates a new test instance per invocation by default — there is no shared state speed-up.",
+      },
+      {
+        text: "Each transition gets a separate, named test result, so a CI report shows exactly which transition failed without running the others.",
+        correct: true,
+        feedback: "Correct! With `@ParameterizedTest`, JUnit reports each case individually. If `TODO→DONE` fails and `TODO→IN_PROGRESS` passes, the report says so clearly — a single `@Test` testing both would only tell you 'the test failed'.",
+      },
+      {
+        text: "Parameterised tests do not require the `assertEquals` assertion.",
+        correct: false,
+        feedback: "Parameterised tests use all the same assertion methods as regular tests.",
+      },
+      {
+        text: "They allow the test to run on multiple JVM versions simultaneously.",
+        correct: false,
+        feedback: "JVM version selection is a build tool concern, unrelated to parameterised tests.",
+      },
+    ],
+    explanation: "Parameterised tests give you **one failure per failing case**. With five transition pairs in one `@Test`, a single failure tells you nothing about the other four. With `@ParameterizedTest`, the CI report names each case: `[2] IN_PROGRESS → DONE` vs `[5] TODO → DONE (invalid)` — instant diagnosis without re-running.",
+  },
+  endQ2: {
+    id: "test-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the assertion that verifies the repository holds exactly the right number of tasks after 10 concurrent `createTask` calls:",
+    code: `@Test
+void concurrentCreate_allTasksPersisted() throws Exception {
+    int threadCount = 10;
+    CountDownLatch latch = new CountDownLatch(threadCount);
+    ExecutorService exec = Executors.newFixedThreadPool(threadCount);
+
+    for (int i = 0; i < threadCount; i++) {
+        final int n = i;
+        exec.submit(() -> {
+            service.createTask("Task " + n, "desc", Priority.LOW,
+                               Optional.empty(), Optional.empty());
+            latch.countDown();
+        });
+    }
+
+    latch.await(5, TimeUnit.SECONDS);
+    exec.shutdown();
+
+    assertEquals(___, taskRepo.count());
+}`,
+    correctAnswers: ["10"],
+    caseSensitive: false,
+    explanation: "Ten threads each call `createTask` once. With a thread-safe `ConcurrentHashMap` backing store, all ten writes succeed without overwriting each other. `count()` must return 10. If it returns anything less, there is a race condition in the repository.",
+  },
+  endQ3: {
+    id: "test-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `@Test
+void notifyAsync_logsMessage() {
+    Task task = Task.create("Deploy", "prod deploy",
+                            Priority.CRITICAL, Optional.empty(), Optional.empty());
+    NotificationService svc = new NotificationService(Runnable::run);
+
+    CompletableFuture<Void> future = svc.notifyAsync(task);
+
+    assertTrue(future.isDone());
+    assertFalse(future.isCompletedExceptionally());
+}`,
+    buggyLine: 7,
+    issue: "The test passes `Runnable::run` as the executor, which runs tasks synchronously on the calling thread. This works for the happy path, but the assertion `future.isDone()` passes only because of this synchronous executor — the test does not verify behaviour under real async execution. It also doesn't assert the *content* of the notification (what was logged), making it a weak test.",
+    explanation: "Using `Runnable::run` as a synchronous executor is a valid testing trick, but it must be done intentionally. Document it with a comment. More importantly, capture the log output (e.g., with a custom `Handler` or a `ListAppender`) and assert on it — otherwise the test proves nothing about what `notifyAsync` actually does.",
+  },
+};
+
+Four parts in, we have a domain model, a generic repository, a service layer with functional validation, and concurrent background workers. Before we add more features it is time to verify what we have. This lesson covers the full testing strategy for the Task Management System, from fast unit tests on the domain model all the way to multi-threaded stress tests on the repository.
+
+Testing connects to every previous module: parameterised tests use streams to generate inputs, integration tests exercise the service + repository stack together, and concurrent tests expose races that single-threaded tests never catch. This is also where the discipline of the architecture pays off — because domain, repository, and service are cleanly separated, we can test each in isolation.
+
+## Testing pyramid for this system
+
+| Layer | What to test | Test type | Speed |
+|---|---|---|---|
+| Domain (`Task`, `TaskStatus`) | Record invariants, transition guards | Unit | < 1 ms each |
+| Validation pipeline | All valid/invalid combos | Parameterised unit | < 1 ms each |
+| `TaskService` | Business rules, Optional semantics | Integration (real repo) | < 10 ms |
+| Concurrent code | Race conditions, queue draining | Concurrent / stress | 100–500 ms |
+| Notification pipeline | Async completion, error handling | Async unit | < 50 ms |
+
+Run the unit tests on every commit; run the concurrent tests in CI but not necessarily on every local build (they are slower and nondeterministic by nature).
+
+## Domain unit tests — TaskStatus transitions
+
+```java
+package com.bytecode.tasks.domain;
+
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class TaskStatusTest {
+
+    record TransitionCase(TaskStatus from, TaskStatus to, boolean expected) {}
+
+    static Stream<TransitionCase> transitions() {
+        return Stream.of(
+            new TransitionCase(TaskStatus.TODO,        TaskStatus.IN_PROGRESS, true),
+            new TransitionCase(TaskStatus.IN_PROGRESS, TaskStatus.DONE,        true),
+            new TransitionCase(TaskStatus.TODO,        TaskStatus.DONE,        false),
+            new TransitionCase(TaskStatus.DONE,        TaskStatus.TODO,        false),
+            new TransitionCase(TaskStatus.DONE,        TaskStatus.IN_PROGRESS, false),
+            new TransitionCase(TaskStatus.IN_PROGRESS, TaskStatus.TODO,        false)
+        );
+    }
+
+    @ParameterizedTest(name = "{0} → {1} should be {2}")
+    @MethodSource("transitions")
+    void canTransitionTo(TransitionCase tc) {
+        assertEquals(tc.expected(), tc.from().canTransitionTo(tc.to()),
+            tc.from() + " → " + tc.to());
+    }
+}
+```
+
+Each row is a separate test invocation with a descriptive name. If the `DONE → TODO` case regresses, the CI report names it explicitly.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Domain unit tests — Task record invariants
+
+```java
+class TaskTest {
+
+    @Test
+    void create_withBlankTitle_throws() {
+        assertThrows(IllegalArgumentException.class, () ->
+            Task.create("  ", "desc", Priority.LOW, Optional.empty(), Optional.empty()));
+    }
+
+    @Test
+    void withStatus_validTransition_returnsNewRecord() {
+        Task t = Task.create("Do it", "desc", Priority.MEDIUM,
+                             Optional.empty(), Optional.empty());
+        Task updated = t.withStatus(TaskStatus.IN_PROGRESS);
+
+        assertEquals(TaskStatus.IN_PROGRESS, updated.status());
+        assertEquals(TaskStatus.TODO, t.status());   // original unchanged
+        assertEquals(t.id(), updated.id());           // same identity
+    }
+
+    @Test
+    void withStatus_invalidTransition_throws() {
+        Task t = Task.create("Do it", "desc", Priority.MEDIUM,
+                             Optional.empty(), Optional.empty());
+        assertThrows(IllegalStateException.class, () ->
+            t.withStatus(TaskStatus.DONE));
+    }
+}
+```
+
+The `withStatus_validTransition` test verifies two things: the new record has the updated status, *and* the original record is unchanged — confirming immutability.
+
+## Integration test — TaskService with real repository
+
+An **integration test** wires the real `InMemoryTaskRepository` to the real `TaskService`. No mocks. If you use mocks here you are testing your assumptions, not your code.
+
+```java
+class TaskServiceIntegrationTest {
+
+    private InMemoryTaskRepository taskRepo;
+    private InMemoryProjectRepository projectRepo;
+    private TaskService service;
+
+    @BeforeEach
+    void setUp() {
+        taskRepo    = new InMemoryTaskRepository();
+        projectRepo = new InMemoryProjectRepository();
+        service     = new TaskService(taskRepo, projectRepo);
+    }
+
+    @Test
+    void createTask_valid_persistsAndReturns() {
+        Optional<Task> result = service.createTask(
+            "Write docs", "API docs", Priority.LOW,
+            Optional.empty(), Optional.empty());
+
+        assertTrue(result.isPresent());
+        assertEquals("Write docs", result.get().title());
+        assertEquals(1, taskRepo.count());
+    }
+
+    @Test
+    void createTask_blankTitle_returnsEmpty() {
+        Optional<Task> result = service.createTask(
+            "", "desc", Priority.LOW, Optional.empty(), Optional.empty());
+
+        assertTrue(result.isEmpty());
+        assertEquals(0, taskRepo.count());
+    }
+
+    @Test
+    void updateStatus_validTransition_updatesRepository() {
+        Task t = service.createTask("Fix bug", "desc", Priority.HIGH,
+                                   Optional.empty(), Optional.empty()).get();
+
+        Optional<Task> updated = service.updateStatus(t.id(), TaskStatus.IN_PROGRESS);
+
+        assertTrue(updated.isPresent());
+        assertEquals(TaskStatus.IN_PROGRESS, updated.get().status());
+        // Repository should reflect the update
+        assertEquals(TaskStatus.IN_PROGRESS,
+                     taskRepo.findById(t.id()).get().status());
+    }
+
+    @Test
+    void updateStatus_invalidTransition_returnsEmpty() {
+        Task t = service.createTask("Fix bug", "desc", Priority.HIGH,
+                                   Optional.empty(), Optional.empty()).get();
+
+        Optional<Task> updated = service.updateStatus(t.id(), TaskStatus.DONE);
+
+        assertTrue(updated.isEmpty());
+        // Original record in repo is unchanged
+        assertEquals(TaskStatus.TODO, taskRepo.findById(t.id()).get().status());
+    }
+
+    @Test
+    void countByStatus_reflectsAllTasks() {
+        service.createTask("T1", "", Priority.LOW, Optional.empty(), Optional.empty());
+        service.createTask("T2", "", Priority.LOW, Optional.empty(), Optional.empty());
+        Task t3 = service.createTask("T3", "", Priority.LOW,
+                                     Optional.empty(), Optional.empty()).get();
+        service.updateStatus(t3.id(), TaskStatus.IN_PROGRESS);
+
+        Map<TaskStatus, Long> counts = service.countByStatus();
+
+        assertEquals(2L, counts.get(TaskStatus.TODO));
+        assertEquals(1L, counts.get(TaskStatus.IN_PROGRESS));
+        assertNull(counts.get(TaskStatus.DONE));
+    }
+}
+```
+
+## Parameterised validation tests
+
+```java
+class ValidationPipelineTest {
+
+    record ValidationCase(String title, Priority priority, Optional<LocalDate> dueDate, boolean valid) {}
+
+    static Stream<ValidationCase> cases() {
+        return Stream.of(
+            new ValidationCase("Good title", Priority.HIGH, Optional.empty(), true),
+            new ValidationCase("",           Priority.HIGH, Optional.empty(), false),
+            new ValidationCase("  ",         Priority.HIGH, Optional.empty(), false),
+            new ValidationCase("Title",      null,          Optional.empty(), false),
+            new ValidationCase("Title",      Priority.LOW,
+                Optional.of(LocalDate.now().minusDays(1)), false),
+            new ValidationCase("Title",      Priority.LOW,
+                Optional.of(LocalDate.now().plusDays(1)), true)
+        );
+    }
+
+    @ParameterizedTest(name = "title=''{0}'' priority={1} valid={3}")
+    @MethodSource("cases")
+    void validation(ValidationCase vc) {
+        Task candidate = Task.create(
+            vc.title().isBlank() ? "placeholder" : vc.title(),
+            "desc", vc.priority() != null ? vc.priority() : Priority.LOW,
+            Optional.empty(), vc.dueDate());
+
+        // We test the pipeline directly, not through the service
+        // so we can inject arbitrary state including null priority
+        // In practice, null priority is guarded by the domain compact constructor
+        boolean result = TaskValidation.ALL.test(candidate);
+        assertEquals(vc.valid(), result);
+    }
+}
+```
+
+## Concurrent stress test — repository consistency
+
+```java
+class RepositoryConcurrencyTest {
+
+    @Test
+    void tenThreadsCreateTasks_allPersisted() throws Exception {
+        var taskRepo    = new InMemoryTaskRepository();
+        var projectRepo = new InMemoryProjectRepository();
+        var service     = new TaskService(taskRepo, projectRepo);
+
+        int threadCount = 10;
+        CountDownLatch ready  = new CountDownLatch(threadCount);
+        CountDownLatch start  = new CountDownLatch(1);
+        CountDownLatch done   = new CountDownLatch(threadCount);
+        ExecutorService exec  = Executors.newFixedThreadPool(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            final String title = "Task-" + i;
+            exec.submit(() -> {
+                ready.countDown();
+                try {
+                    start.await();   // all threads start simultaneously
+                    service.createTask(title, "desc", Priority.MEDIUM,
+                                       Optional.empty(), Optional.empty());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        ready.await();    // wait until all threads are at the start line
+        start.countDown(); // fire!
+        done.await(5, TimeUnit.SECONDS);
+        exec.shutdown();
+
+        assertEquals(threadCount, taskRepo.count(),
+            "Repository should contain exactly " + threadCount + " tasks");
+    }
+}
+```
+
+<Note>The `start` latch synchronises all threads to begin at the same instant, maximising contention. Without it, threads would start staggered and the test would be far less likely to expose races.</Note>
+
+## Async notification test
+
+```java
+class NotificationServiceTest {
+
+    @Test
+    void notifyAsync_completesSuccessfully() {
+        // Synchronous executor: future completes before join() returns
+        NotificationService svc = new NotificationService(Runnable::run);
+        Task task = Task.create("Deploy", "desc", Priority.CRITICAL,
+                                Optional.empty(), Optional.empty());
+
+        CompletableFuture<Void> future = svc.notifyAsync(task);
+        // join() would throw CompletionException if the future failed
+        assertDoesNotThrow(future::join);
+        assertTrue(future.isDone());
+        assertFalse(future.isCompletedExceptionally());
+    }
+
+    @Test
+    void notifyAll_allFuturesComplete() {
+        NotificationService svc = new NotificationService(Runnable::run);
+        List<Task> tasks = List.of(
+            Task.create("T1", "", Priority.LOW, Optional.empty(), Optional.empty()),
+            Task.create("T2", "", Priority.LOW, Optional.empty(), Optional.empty()),
+            Task.create("T3", "", Priority.LOW, Optional.empty(), Optional.empty())
+        );
+
+        CompletableFuture<Void> all = svc.notifyAll(tasks);
+        all.join();
+
+        assertTrue(all.isDone());
+        assertFalse(all.isCompletedExceptionally());
+    }
+}
+```
+
+## Try it
+
+Write the full test suite for the system:
+
+1. **`TaskStatusTest`** — parameterised over all six transition combinations as shown.
+2. **`TaskTest`** — test blank-title rejection, `withStatus` immutability, and the invalid-transition exception.
+3. **`TaskServiceIntegrationTest`** — test all five scenarios: valid create, blank-title create, valid status update, invalid status update, `countByStatus` correctness.
+4. **`RepositoryConcurrencyTest`** — the 10-thread concurrent create test shown above.
+5. **`NotificationServiceTest`** — happy path and `notifyAll` using `Runnable::run` as the synchronous executor.
+
+Stretch goal: Add a `@RepeatedTest(50)` annotation to the concurrency test — run it 50 times in CI. A genuine race condition surfaces within a handful of runs; 50 repetitions gives high confidence. Note how the IDE reports each run individually.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Mocking the repository in integration tests** — mocking `InMemoryTaskRepository` defeats the purpose of an integration test. Use the real in-memory implementation; it is fast (microseconds) and exercises the actual code path. Reserve mocks for external systems (email APIs, databases) that you genuinely cannot run in a test.
+- **Non-deterministic async assertions** — asserting on a `CompletableFuture` result without calling `.join()` or `.get()` first creates a race between the test assertion and the async computation. Always block before asserting.
+- **Missing `@BeforeEach` reset** — if the repository is a shared field, tasks created in one test pollute the next. Always create a fresh instance in `@BeforeEach`.
+- **Testing only the happy path** — validation logic is most valuable when it is tested on the *edges*: blank strings, null values, yesterday's date. Every validation rule deserves at least one invalid-input test that confirms the rejection.
+
+## Recap
+
+- A **parameterised test** with `@MethodSource` gives each test case a separate named result in the CI report — critical for state-machine transition matrices.
+- **Integration tests** with real in-memory implementations are preferred over mocks for testing service + repository interactions; they are fast enough and test real behaviour.
+- `CountDownLatch` with a shared `start` latch forces maximum thread contention in concurrency tests, surfacing races that staggered starts would miss.
+- `CompletableFuture` tests use `.join()` or `.get(timeout, unit)` to synchronise the test thread before asserting.
+- Test coverage goals: 100% on domain logic and validation, ≥ 90% on the service layer, at least one concurrent stress test per shared mutable resource.
+
+**Up next: Part 6** — polish, patterns, and reflection: Command, Observer, Builder, Javadoc, and the grand recap of the Java Advanced track.

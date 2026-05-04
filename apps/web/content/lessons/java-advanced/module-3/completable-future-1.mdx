@@ -1,0 +1,222 @@
+export const meta = {
+  title: "CompletableFuture — Async Pipelines (Part 1)",
+  duration: 15,
+  order: 7,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "cfa-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.concurrent.CompletableFuture;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        CompletableFuture<String> cf = CompletableFuture
+            .supplyAsync(() -> "hello")
+            .thenApply(s -> s + " world")
+            .thenApply(String::toUpperCase);
+
+        System.out.println(cf.get());
+    }
+}`,
+    expectedOutput: "HELLO WORLD",
+    explanation: "`supplyAsync` produces `\"hello\"` on a background thread. The first `thenApply` appends `\" world\"` to produce `\"hello world\"`. The second `thenApply` applies `toUpperCase()` giving `\"HELLO WORLD\"`. `get()` blocks until the chain finishes and returns the final value.",
+  },
+  endQ1: {
+    id: "cfa-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the difference between `thenApply()` and `thenCompose()` on a CompletableFuture?",
+    options: [
+      { text: "thenApply is synchronous; thenCompose is asynchronous.", correct: false, feedback: "Both schedule their callbacks on a thread. The difference is in the return type of the function they accept." },
+      { text: "thenApply transforms the value (T → U); thenCompose chains another async stage (T → CompletableFuture<U>), flattening the nested future.", correct: true, feedback: "Correct. Use thenApply for synchronous transformations. Use thenCompose when the next step is itself async (returns a CompletableFuture), to avoid CompletableFuture<CompletableFuture<U>>." },
+      { text: "thenCompose accepts a Runnable; thenApply accepts a Function.", correct: false, feedback: "Both accept Function-like arguments. The difference is the return type of that function." },
+      { text: "They are interchangeable; thenCompose is just the newer API.", correct: false, feedback: "They are not interchangeable. Using thenApply with a function that returns a CompletableFuture results in a nested CompletableFuture<CompletableFuture<U>>." },
+    ],
+    explanation: "`thenApply(f)` applies a synchronous `Function<T, U>` and wraps the result in a new `CompletableFuture<U>`. `thenCompose(f)` applies a `Function<T, CompletableFuture<U>>` and *flattens* the result — it's the async equivalent of `flatMap`.",
+  },
+  endQ2: {
+    id: "cfa-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the pipeline so that if any stage throws, `\"fallback\"` is returned instead:",
+    code: `CompletableFuture<String> cf = CompletableFuture
+    .supplyAsync(() -> riskyOp())
+    .___(ex -> "fallback");`,
+    correctAnswers: ["exceptionally"],
+    caseSensitive: true,
+    explanation: "`exceptionally(fn)` registers a recovery function that is called only when the stage completes exceptionally. It provides a fallback value of the same type, allowing the pipeline to continue normally.",
+  },
+  endQ3: {
+    id: "cfa-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `CompletableFuture<String> cf = CompletableFuture
+    .supplyAsync(() -> fetchUserId())           // returns String
+    .thenApply(id -> fetchUserName(id));        // fetchUserName returns CompletableFuture<String>
+
+cf.thenAccept(name -> System.out.println(name)); // bug here`,
+    buggyLine: 3,
+    issue: "`fetchUserName` returns a `CompletableFuture<String>`, so `thenApply` produces `CompletableFuture<CompletableFuture<String>>`. `thenAccept` then receives a `CompletableFuture<String>` object, not a `String`.",
+    explanation: "When the transformation function itself returns a `CompletableFuture`, use `thenCompose` instead of `thenApply`. `thenCompose` flattens the nested future: `.thenCompose(id -> fetchUserName(id))` yields `CompletableFuture<String>` directly.",
+  },
+};
+
+`Future.get()` is a step forward from raw threads, but it still blocks a thread while waiting for a result. In highly concurrent systems — think thousands of simultaneous HTTP requests, each waiting on a database query — blocking threads wastes enormous amounts of memory and scheduler overhead. `CompletableFuture`, introduced in Java 8, solves this by letting you describe a pipeline of transformations that execute asynchronously, with each step starting automatically when the previous one finishes. No thread sits idle waiting. This is the model behind reactive programming frameworks and modern async Java libraries.
+
+## supplyAsync — starting an async computation
+
+`CompletableFuture.supplyAsync(supplier)` runs the `Supplier` on the common fork-join pool (or a custom executor) and returns a `CompletableFuture<T>` that completes with the supplier's result:
+
+```java
+CompletableFuture<String> cf = CompletableFuture.supplyAsync(() -> {
+    // runs on ForkJoinPool.commonPool()
+    return fetchFromDatabase("user-1");
+});
+```
+
+The calling thread is not blocked. `cf` is a *handle* to the future result.
+
+## thenApply — transforming the result
+
+`thenApply(function)` registers a callback that runs when the previous stage completes, transforming its value:
+
+```java
+CompletableFuture<Integer> lengthCf = CompletableFuture
+    .supplyAsync(() -> "hello world")
+    .thenApply(String::length);         // "hello world".length() = 11
+
+System.out.println(lengthCf.get());    // 11
+```
+
+Chains are lazy: each `.thenApply` just registers a callback; no thread blocks until you call `.get()` (or another terminal operation).
+
+## thenAccept — consuming the result
+
+`thenAccept(consumer)` runs a side-effecting action when the stage completes but returns `CompletableFuture<Void>`:
+
+```java
+CompletableFuture.supplyAsync(() -> computeResult())
+    .thenApply(r -> format(r))
+    .thenAccept(s -> System.out.println("Result: " + s));
+```
+
+## thenRun — running after completion
+
+`thenRun(runnable)` executes after the previous stage but does not receive the result:
+
+```java
+CompletableFuture.supplyAsync(() -> writeToDatabase(data))
+    .thenRun(() -> System.out.println("Write complete"));
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## thenCompose — chaining async stages
+
+If the next step is itself async (i.e. it returns a `CompletableFuture`), use `thenCompose` to avoid nesting:
+
+```java
+// Wrong — produces CompletableFuture<CompletableFuture<String>>
+CompletableFuture<CompletableFuture<String>> nested =
+    CompletableFuture.supplyAsync(() -> getUserId())
+        .thenApply(id -> fetchUserName(id));  // fetchUserName returns CF<String>
+
+// Right — thenCompose flattens it to CompletableFuture<String>
+CompletableFuture<String> flat =
+    CompletableFuture.supplyAsync(() -> getUserId())
+        .thenCompose(id -> fetchUserName(id));
+```
+
+Think of `thenCompose` as `flatMap` for `CompletableFuture`.
+
+## exceptionally — handling errors in the pipeline
+
+`exceptionally(handler)` provides a fallback value when any earlier stage throws:
+
+```java
+CompletableFuture<String> safe = CompletableFuture
+    .supplyAsync(() -> {
+        if (Math.random() < 0.5) throw new RuntimeException("network error");
+        return "data";
+    })
+    .exceptionally(ex -> {
+        System.err.println("Failed: " + ex.getMessage());
+        return "default-data";
+    });
+
+System.out.println(safe.get());   // "data" or "default-data"
+```
+
+`exceptionally` only fires if the pipeline completed exceptionally; otherwise it passes the value through unchanged.
+
+<Note>`thenApply` callbacks run on the thread that completed the previous stage (often a pool thread or even the calling thread if the stage already completed). For long-running callbacks use `thenApplyAsync` to ensure they run on a pool thread and don't block the completing thread.</Note>
+
+## Try it
+
+Build an async pipeline that simulates fetching a user name, transforming it to uppercase, and printing it:
+
+```java
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+public class Main {
+    static String fetchUserName(String id) throws InterruptedException {
+        Thread.sleep(100);   // simulate network call
+        return "alice";
+    }
+
+    public static void main(String[] args) throws Exception {
+        CompletableFuture<Void> pipeline = CompletableFuture
+            .supplyAsync(() -> {
+                try { return fetchUserName("user-42"); }
+                catch (InterruptedException e) { throw new RuntimeException(e); }
+            })
+            .thenApply(String::toUpperCase)
+            .thenApply(name -> "Hello, " + name + "!")
+            .thenAccept(System.out::println)
+            .exceptionally(ex -> {
+                System.err.println("Pipeline failed: " + ex.getMessage());
+                return null;
+            });
+
+        pipeline.get();   // wait for the whole chain to finish
+        System.out.println("Pipeline complete");
+    }
+}
+```
+
+Expected output:
+```
+Hello, ALICE!
+Pipeline complete
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using `thenApply` when the callback returns a `CompletableFuture`** — this creates `CompletableFuture<CompletableFuture<T>>`. Use `thenCompose` to flatten.
+- **Blocking inside a `supplyAsync` with `cf.get()`** — this reintroduces blocking on a pool thread, which can cause thread starvation in the ForkJoinPool. Chain continuations instead.
+- **Ignoring exceptions** — if you don't attach `exceptionally` or `handle`, exceptions are silently swallowed unless you call `get()` and observe the `ExecutionException`.
+- **Assuming callback thread identity** — `thenApply` may run on any thread. Never rely on which thread executes a callback; use `thenApplyAsync(fn, executor)` to control it.
+
+## Recap
+
+- `CompletableFuture.supplyAsync(supplier)` starts an async computation without blocking the calling thread.
+- `thenApply(fn)` transforms the result; `thenAccept(fn)` consumes it; `thenRun(fn)` reacts to completion.
+- `thenCompose(fn)` flattens a function that itself returns a `CompletableFuture` (the async `flatMap`).
+- `exceptionally(fn)` provides a fallback value when any earlier stage throws an exception.
+
+**Up next:** Lesson 8 covers combining multiple `CompletableFuture` pipelines with `thenCombine`, `allOf`, and `anyOf`, plus more advanced error recovery with `handle` and `whenComplete`.

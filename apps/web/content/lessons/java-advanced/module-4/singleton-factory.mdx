@@ -1,0 +1,302 @@
+export const meta = {
+  title: "Singleton & Factory Method",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "sf-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why is an enum-based singleton considered safer than double-checked locking (DCL)?",
+    options: [
+      { text: "Enums are faster to instantiate than regular classes.", correct: false, feedback: "Performance is not the main reason. Both approaches are fast enough for singleton use." },
+      { text: "The JVM guarantees enum instances are created exactly once and are serialization-safe, with no extra code needed.", correct: true, feedback: "Correct! The JVM spec (JLS §12.4) ensures class initialisation happens exactly once. Enum values are instances, so they get the same guarantee — plus the JVM prevents a second instance from being created during deserialization." },
+      { text: "DCL is deprecated in Java 21.", correct: false, feedback: "DCL is not deprecated; it is simply fragile. The volatile keyword makes it work, but the enum approach is still simpler and safer." },
+      { text: "Enums cannot be subclassed, which prevents singleton inheritance bugs.", correct: false, feedback: "Subclassing prevention is a nice property, but it's not the primary safety argument. The main argument is guaranteed single-instance initialisation and serialisation safety." },
+    ],
+    explanation: "Enum singletons leverage two JVM guarantees: class-loading initialises enum constants exactly once (thread-safe without locks), and the serialisation mechanism never deserialises a second copy of an enum value. DCL requires a `volatile` field and a careful double-null check that is easy to write incorrectly.",
+  },
+  endQ1: {
+    id: "sf-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Main {
+    enum AppConfig {
+        INSTANCE;
+        private int retries = 3;
+        public int getRetries() { return retries; }
+        public void setRetries(int r) { retries = r; }
+    }
+
+    public static void main(String[] args) {
+        AppConfig a = AppConfig.INSTANCE;
+        AppConfig b = AppConfig.INSTANCE;
+        a.setRetries(10);
+        System.out.println(a == b);
+        System.out.println(b.getRetries());
+    }
+}`,
+    expectedOutput: "true\n10",
+    explanation: "`AppConfig.INSTANCE` always returns the same JVM object, so `a == b` is `true`. Mutating through `a` is visible through `b` because they are the same instance — demonstrating classic singleton shared state.",
+  },
+  endQ2: {
+    id: "sf-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class ShapeFactory {
+    public static Shape create(String type) {
+        if (type == "circle") {
+            return new Circle();
+        } else if (type == "square") {
+            return new Square();
+        }
+        throw new IllegalArgumentException("Unknown: " + type);
+    }
+}`,
+    buggyLine: 3,
+    issue: "String comparison uses == (reference equality) instead of .equals() (value equality).",
+    explanation: "String literals interned by the compiler may compare equal with `==`, but Strings obtained at runtime (e.g., from user input, a file, or `new String(\"circle\")`) will not. Always use `type.equals(\"circle\")` or a `switch` statement for String comparisons.",
+  },
+  endQ3: {
+    id: "sf-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "An Abstract Factory differs from a Factory Method in that:",
+    options: [
+      { text: "Abstract Factory uses inheritance; Factory Method uses composition.", correct: false, feedback: "It's the opposite — Factory Method relies on subclassing to override which product is created; Abstract Factory uses composition (clients hold a factory object)." },
+      { text: "Abstract Factory creates families of related objects; Factory Method creates one type of object.", correct: true, feedback: "Correct. Abstract Factory groups multiple factory methods for related products (e.g., Button + Checkbox for a theme). Factory Method is a single creation hook overridden by subclasses." },
+      { text: "Abstract Factory is always a singleton.", correct: false, feedback: "Nothing in the Abstract Factory pattern requires it to be a singleton, though it often is in practice." },
+      { text: "Factory Method cannot return interfaces.", correct: false, feedback: "Factory Method's return type is typically an interface or abstract class — that's exactly how it decouples the caller from concrete classes." },
+    ],
+    explanation: "Factory Method defines one virtual constructor overridden by subclasses. Abstract Factory defines a whole interface of factory methods for creating related product families (e.g., a `UIFactory` with `createButton()` and `createCheckbox()`), allowing entire UI toolkits to be swapped without changing client code.",
+  },
+};
+
+Every Java application creates objects. The question is: who decides which concrete class to instantiate, and how many instances should exist? The **Singleton** pattern ensures exactly one instance of a class exists. The **Factory Method** pattern delegates the choice of concrete class to a subclass or factory, decoupling callers from implementation details. Used well, these two patterns make code more testable, flexible, and maintainable. Used carelessly, they become sources of hidden global state and rigid coupling.
+
+## Singleton — the right way
+
+The classic "lazy double-checked locking" singleton is surprisingly difficult to write correctly. The simplest thread-safe, serialization-safe singleton in Java is an **enum**:
+
+```java
+public enum Logger {
+    INSTANCE;
+
+    public void log(String message) {
+        System.out.println("[LOG] " + message);
+    }
+}
+
+// Usage — no new, no getInstance, no null checks
+Logger.INSTANCE.log("Application started");
+```
+
+The JVM initialises enum constants during class loading, which is inherently thread-safe. Deserialization of an enum never creates a second instance — the JVM spec enforces this.
+
+Compare to the fragile DCL version you should recognise but avoid:
+
+```java
+// Avoid: complex, easy to get wrong
+public class Logger {
+    private static volatile Logger instance;  // volatile is REQUIRED
+
+    private Logger() {}
+
+    public static Logger getInstance() {
+        if (instance == null) {                // first check (no lock)
+            synchronized (Logger.class) {
+                if (instance == null) {        // second check (under lock)
+                    instance = new Logger();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+
+<Note>The `volatile` keyword on the DCL field is non-optional. Without it, the JVM's memory model allows another thread to observe a partially-constructed instance. This is a real concurrency bug that only surfaces under load. Prefer the enum form.</Note>
+
+## When singletons hurt testability
+
+Singletons introduce hidden global state. Consider:
+
+```java
+// Hard to test — OrderService reaches out to a global singleton
+public class OrderService {
+    public void placeOrder(Order order) {
+        Database.INSTANCE.save(order);     // can't swap in a test double
+        EmailService.INSTANCE.send(order); // test sends real emails!
+    }
+}
+```
+
+The fix is **dependency injection**: accept collaborators as constructor parameters. The singleton can still exist, but it is no longer hard-wired into every consumer:
+
+```java
+public class OrderService {
+    private final Database db;
+    private final EmailService email;
+
+    public OrderService(Database db, EmailService email) {
+        this.db = db;
+        this.email = email;
+    }
+}
+// In tests: new OrderService(fakeDb, fakeEmail)
+// In production: new OrderService(Database.INSTANCE, EmailService.INSTANCE)
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Factory Method pattern
+
+A **Factory Method** declares a method for creating an object, but lets subclasses (or a dedicated factory class) decide the concrete type. The caller uses the abstract type and never mentions a constructor directly.
+
+```java
+// The product interface
+public interface Notification {
+    void send(String message);
+}
+
+// Concrete products
+public class EmailNotification implements Notification {
+    public void send(String message) { System.out.println("Email: " + message); }
+}
+public class SmsNotification implements Notification {
+    public void send(String message) { System.out.println("SMS: " + message); }
+}
+
+// Factory — centralises the creation decision
+public class NotificationFactory {
+    public static Notification create(String channel) {
+        return switch (channel) {
+            case "email" -> new EmailNotification();
+            case "sms"   -> new SmsNotification();
+            default      -> throw new IllegalArgumentException("Unknown channel: " + channel);
+        };
+    }
+}
+
+// Client code — no concrete class mentioned
+Notification n = NotificationFactory.create("email");
+n.send("Your order has shipped.");
+```
+
+Adding a new channel (`PushNotification`) requires only a new class and one new `case` in the factory — zero changes to client code.
+
+## Abstract Factory
+
+Abstract Factory groups related factory methods. A classic use case is UI theming:
+
+```java
+public interface UIFactory {
+    Button createButton();
+    Checkbox createCheckbox();
+}
+
+public class DarkThemeFactory implements UIFactory {
+    public Button createButton()   { return new DarkButton(); }
+    public Checkbox createCheckbox() { return new DarkCheckbox(); }
+}
+
+public class LightThemeFactory implements UIFactory {
+    public Button createButton()   { return new LightButton(); }
+    public Checkbox createCheckbox() { return new LightCheckbox(); }
+}
+
+// Client code never mentions Dark/Light directly
+UIFactory factory = userPrefersDark ? new DarkThemeFactory() : new LightThemeFactory();
+Button btn = factory.createButton();
+```
+
+## Try it
+
+**Logger singleton and ShapeFactory.** Complete the two classes below:
+
+```java
+// 1. Enum singleton logger
+public enum AppLogger {
+    INSTANCE;
+
+    public void info(String msg)  { System.out.println("[INFO]  " + msg); }
+    public void error(String msg) { System.out.println("[ERROR] " + msg); }
+}
+
+// 2. Shape hierarchy
+public interface Shape {
+    double area();
+    String name();
+}
+
+public class Circle implements Shape {
+    private final double radius;
+    public Circle(double radius) { this.radius = radius; }
+    public double area() { return Math.PI * radius * radius; }
+    public String name() { return "Circle"; }
+}
+
+public class Rectangle implements Shape {
+    private final double w, h;
+    public Rectangle(double w, double h) { this.w = w; this.h = h; }
+    public double area() { return w * h; }
+    public String name() { return "Rectangle"; }
+}
+
+// 3. Factory
+public class ShapeFactory {
+    public static Shape create(String type, double... dims) {
+        return switch (type) {
+            case "circle"    -> new Circle(dims[0]);
+            case "rectangle" -> new Rectangle(dims[0], dims[1]);
+            default          -> throw new IllegalArgumentException(type);
+        };
+    }
+}
+
+// 4. Main
+public class Main {
+    public static void main(String[] args) {
+        AppLogger.INSTANCE.info("Starting shape demo");
+
+        Shape c = ShapeFactory.create("circle", 5.0);
+        Shape r = ShapeFactory.create("rectangle", 4.0, 6.0);
+
+        AppLogger.INSTANCE.info(c.name() + " area: " + String.format("%.2f", c.area()));
+        AppLogger.INSTANCE.info(r.name() + " area: " + String.format("%.2f", r.area()));
+    }
+}
+// [INFO]  Starting shape demo
+// [INFO]  Circle area: 78.54
+// [INFO]  Rectangle area: 24.00
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using a non-enum singleton without `volatile`** — the double-checked locking pattern requires `volatile` on the field. Missing it causes subtle, intermittent data-race bugs.
+- **Calling `getInstance()` directly inside business logic** — this buries the singleton dependency, making classes impossible to unit-test. Inject the singleton via constructor instead.
+- **Comparing Strings with `==` in the factory switch** — always use a `switch` statement (which uses `equals` under the hood) or call `.equals()` explicitly.
+- **Making the factory method do too much** — factory methods should only create and return objects. Initialisation logic, side effects, and business rules belong elsewhere.
+
+## Recap
+
+- **Enum singleton** is the preferred form: thread-safe, serialization-safe, and requires no boilerplate
+- Singletons with global state hurt testability — prefer **dependency injection** so consumers can accept mock instances
+- **Factory Method** decouples the caller from concrete classes by delegating creation to a factory
+- **Abstract Factory** extends Factory Method to produce families of related objects (e.g., a complete UI theme)
+- Adding new products means adding a new class and a new case — **existing client code stays unchanged**
+
+**Up next:** Builder Pattern — when constructors grow beyond control, the Builder pattern tames complexity while producing immutable objects.

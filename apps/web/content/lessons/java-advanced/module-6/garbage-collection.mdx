@@ -1,0 +1,225 @@
+export const meta = {
+  title: "Garbage Collection — Algorithms & Tuning",
+  duration: 15,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "gc-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What most commonly triggers a **major (full) GC** in the generational heap?",
+    options: [
+      { text: "A `System.gc()` call in application code.", correct: false, feedback: "`System.gc()` is only a hint — the JVM can ignore it entirely. It is rarely the cause of major GCs in production." },
+      { text: "The Eden space fills up during object allocation.", correct: false, feedback: "Eden filling triggers a **minor GC**, which collects the young generation only. Objects that survive are promoted to survivor spaces, not directly to old gen." },
+      { text: "The old generation fills up because too many objects were promoted from the young generation.", correct: true, feedback: "Correct. When promoted objects can no longer fit in the old generation, a major GC (or full GC) is triggered to reclaim space there." },
+      { text: "The JVM detects that a thread has been sleeping for more than one second.", correct: false, feedback: "Thread sleep has no effect on GC triggering. GC is driven by heap occupancy, not thread activity." },
+    ],
+    explanation: "Minor GCs collect the young generation (Eden + survivors). Objects that survive enough minor GCs get promoted to old gen. When old gen is too full to accept promotions, a major or full GC occurs — this is what causes the long pauses applications want to avoid.",
+  },
+  endQ1: {
+    id: "gc-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which GC algorithm is the default in JDK 9 and later?",
+    options: [
+      { text: "Parallel GC", correct: false, feedback: "Parallel GC was the default in JDK 8 and earlier for server-class machines." },
+      { text: "CMS (Concurrent Mark Sweep)", correct: false, feedback: "CMS was deprecated in JDK 9 and removed in JDK 14." },
+      { text: "G1GC (Garbage-First)", correct: true, feedback: "Correct. G1GC became the default in JDK 9 and is designed to balance throughput and pause times for most applications." },
+      { text: "ZGC", correct: false, feedback: "ZGC is available since JDK 15 (production) but is not the default. It targets sub-millisecond pauses." },
+    ],
+    explanation: "G1GC divides the heap into equal-sized regions rather than fixed generational areas. It prioritizes collecting regions with the most garbage first (hence 'Garbage-First'), aiming for predictable pause times.",
+  },
+  endQ2: {
+    id: "gc-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Cache {
+    private static final Map<String, byte[]> cache = new HashMap<>();
+
+    public static void store(String key, byte[] data) {
+        cache.put(key, data);   // bug here
+    }
+
+    public static void evict(String key) {
+        cache.remove(key);
+    }
+}`,
+    buggyLine: 4,
+    issue: "The static `cache` map holds strong references forever. Objects stored via `store()` will never be garbage-collected unless `evict()` is explicitly called, causing a memory leak.",
+    explanation: "A `static` field lives for the lifetime of the ClassLoader. Any object reachable through it is a GC root and can never be collected. Using `WeakHashMap` or an explicit eviction policy prevents unbounded growth.",
+  },
+  endQ3: {
+    id: "gc-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the JVM flags to set initial heap to 512 MB, maximum heap to 2 GB, and enable G1GC:",
+    code: `java ___ -Xmx2g -XX:+UseG1GC -jar myapp.jar`,
+    correctAnswers: ["-Xms512m"],
+    caseSensitive: true,
+    explanation: "`-Xms` sets the initial (minimum) heap size and `-Xmx` sets the maximum. Setting them equal avoids costly heap resize pauses. `-XX:+UseG1GC` explicitly selects G1 (it is the default since JDK 9, but being explicit is good practice in production).",
+  },
+};
+
+Memory management is invisible until it breaks — then it dominates every conversation. Long GC pauses cause latency spikes, heap exhaustion crashes services, and memory leaks slowly degrade performance over hours. Understanding how the JVM collects garbage lets you tune heap sizes intelligently, choose the right collector for your latency requirements, and diagnose GC-related production incidents from logs rather than guesswork.
+
+## The generational hypothesis
+
+Most objects die young. A `StringBuilder` created to format a log line, a DTO returned from a repository method, a stream pipeline's intermediate objects — all become unreachable within milliseconds. This observation — the **generational hypothesis** — is why HotSpot divides the heap into generations:
+
+```
+Young Generation                  Old Generation     Metaspace
+┌──────────────────────────────┐  ┌──────────────┐  ┌──────────────┐
+│ Eden │ Survivor 0 │Survivor 1│  │              │  │ Class meta   │
+│      │            │          │  │ Long-lived   │  │ Method info  │
+│ new objects here  │ ← aging →│  │ objects      │  │ String pool  │
+└──────────────────────────────┘  └──────────────┘  └──────────────┘
+```
+
+- **Eden** — where `new` allocations land. Fast bump-pointer allocation.
+- **Survivor spaces (S0, S1)** — objects that survive a minor GC are copied here. They alternate each collection.
+- **Old generation** — objects that survive enough minor GCs (default age threshold: 15) are promoted here.
+- **Metaspace** — class metadata, static fields, method bytecode. Not part of the heap; grows natively.
+
+## GC roots and reachability
+
+The GC does not track which objects are dead — it finds the live ones. Starting from **GC roots** (stack frames, static fields, JNI handles, active threads), it traces every reference. Anything not reachable is garbage.
+
+```java
+void processOrder(Order order) {
+    Invoice invoice = new Invoice(order);  // reachable via stack
+    invoice.send();
+    // invoice goes out of scope here → no longer reachable → eligible for GC
+}
+```
+
+<Note>An object is eligible for GC as soon as no live thread can reach it through any chain of references — even if a variable still exists but will never be read again. The JIT can even make objects eligible before the variable goes out of scope.</Note>
+
+## Mark-sweep-compact
+
+The classic algorithm used in old-generation collections:
+
+1. **Mark** — trace from GC roots, marking every reachable object.
+2. **Sweep** — identify unmarked (dead) objects and record their memory as free.
+3. **Compact** — slide live objects together to eliminate fragmentation.
+
+Compaction requires moving objects, which means updating every reference to them — this is the source of stop-the-world pauses.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## G1GC — Garbage-First (default since JDK 9)
+
+G1GC breaks the heap into ~2000 equal-sized **regions** (1–32 MB each) and tags each region dynamically as Eden, Survivor, or Old. It builds a priority list of regions with the most garbage and collects those first:
+
+```bash
+# Explicitly enable G1GC (already default in JDK 9+)
+java -XX:+UseG1GC -Xms1g -Xmx4g -jar myapp.jar
+
+# Set a soft pause-time goal of 200 ms
+java -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -jar myapp.jar
+```
+
+G1 runs most of its marking work **concurrently** with application threads, reducing stop-the-world time compared to Parallel GC.
+
+## ZGC and Shenandoah — low-latency collectors
+
+For applications that can't tolerate pauses above a few milliseconds (financial trading, real-time APIs):
+
+```bash
+# ZGC — sub-millisecond pauses, JDK 15+ production
+java -XX:+UseZGC -Xmx8g -jar myapp.jar
+
+# Shenandoah — concurrent compaction, available in OpenJDK builds
+java -XX:+UseShenandoahGC -jar myapp.jar
+```
+
+Both collectors do nearly all work concurrently. The tradeoff: slightly lower throughput than G1 (more CPU cycles spent on concurrent GC work).
+
+| Collector | Default since | Pause target | Best for |
+|-----------|--------------|-------------|----------|
+| Parallel GC | JDK 8 | High throughput | Batch jobs |
+| G1GC | JDK 9 | Balanced (~200 ms) | General services |
+| ZGC | JDK 15 | Sub-ms | Latency-critical |
+| Shenandoah | OpenJDK | Sub-ms | Latency-critical |
+
+## Reading GC logs
+
+Enable GC logging in production to diagnose issues:
+
+```bash
+java -Xlog:gc*:file=gc.log:time,uptime:filecount=5,filesize=20m -jar myapp.jar
+```
+
+Sample log output to decode:
+
+```
+[2.543s][info][gc] GC(12) Pause Young (Normal) (G1 Evacuation Pause) 512M->89M(1024M) 18.231ms
+[8.901s][info][gc] GC(13) Pause Young (Concurrent Start) 712M->101M(1024M) 22.114ms
+[8.923s][info][gc] GC(14) Concurrent Mark Cycle
+[9.445s][info][gc] GC(15) Pause Remark 210M->210M(1024M) 5.003ms
+```
+
+Key fields: `Young` = minor GC, `before→after(heap total)`, pause duration in ms. A pause above your SLA target is worth investigating.
+
+## Try it
+
+Observe the object lifecycle by watching what becomes unreachable:
+
+```java
+import java.lang.ref.WeakReference;
+
+public class LifecycleDemo {
+    public static void main(String[] args) throws InterruptedException {
+        // Strong reference — keeps object alive
+        byte[] bigBlock = new byte[10 * 1024 * 1024]; // 10 MB
+        WeakReference<byte[]> weak = new WeakReference<>(bigBlock);
+        System.out.println("Before nulling: " + (weak.get() != null ? "alive" : "collected"));
+
+        bigBlock = null;   // remove strong reference → eligible for GC
+        System.gc();       // hint (not guaranteed)
+        Thread.sleep(100);
+
+        System.out.println("After nulling:  " + (weak.get() != null ? "alive" : "collected"));
+    }
+}
+```
+
+Now analyze this GC log snippet and answer: was there a major GC?
+
+```
+[1.023s] GC(3) Pause Young (Normal) 128M->32M(512M) 12ms
+[2.310s] GC(4) Pause Young (Normal) 256M->41M(512M) 14ms
+[3.891s] GC(5) Pause Full (System.gc()) 412M->38M(512M) 340ms
+```
+
+The third line shows a full GC triggered by `System.gc()`, taking 340 ms — 24x longer than the minor GCs. This is why `System.gc()` calls in production code are dangerous.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Calling `System.gc()` in production** — it is only a hint, but on most JVMs it triggers a full GC, causing long pauses. Remove it from production code.
+- **Setting `-Xms` much lower than `-Xmx`** — the JVM grows the heap lazily, causing resize pauses. For low-latency services, set `-Xms` equal to `-Xmx` to pre-allocate the full heap.
+- **Ignoring metaspace** — Metaspace is not bounded by `-Xmx`. Use `-XX:MaxMetaspaceSize=256m` to prevent runaway class loading (e.g., from dynamic proxies) from consuming native memory.
+- **Chasing GC stats before measuring allocation rate** — the fastest GC pause is the one that doesn't happen. High allocation rate is the root cause; reduce it before tuning GC flags.
+
+## Recap
+
+- The **generational hypothesis** drives heap layout: Eden, Survivor spaces, Old generation, Metaspace.
+- GC traces from **GC roots** to find live objects; everything else is garbage.
+- **Minor GC** collects the young generation (fast); **major/full GC** collects old gen (slow, avoid).
+- **G1GC** is the default since JDK 9, offering balanced throughput and predictable pauses.
+- **ZGC / Shenandoah** deliver sub-millisecond pauses for latency-critical workloads.
+- Use `-Xlog:gc*` to capture GC logs; read pause durations and heap reclamation in production.
+
+**Up next:** Java Memory Model — happens-before relationships and how to write correctly synchronized concurrent code.

@@ -1,0 +1,207 @@
+export const meta = {
+  title: "The Executor Framework",
+  duration: 14,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "ef-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is the key difference between `ExecutorService.submit()` and `ExecutorService.execute()`?",
+    options: [
+      { text: "execute() runs tasks immediately; submit() queues them.", correct: false, feedback: "Both queue the task for execution by a thread pool thread. The difference is in the return value and exception handling." },
+      { text: "submit() returns a Future that lets you retrieve a result or exception; execute() returns void.", correct: true, feedback: "Correct. submit() wraps the task in a Future so you can check completion, get a result, or catch exceptions. execute() is fire-and-forget." },
+      { text: "execute() accepts Callable; submit() only accepts Runnable.", correct: false, feedback: "It's the opposite: execute() only accepts Runnable. submit() accepts both Runnable and Callable." },
+      { text: "They are identical; submit() is just a newer alias.", correct: false, feedback: "They are distinct methods with different signatures and semantics." },
+    ],
+    explanation: "`submit(task)` returns a `Future<?>` (for Runnable) or `Future<T>` (for Callable). This lets you track completion and retrieve results or exceptions. `execute(runnable)` is void — exceptions thrown by the task are silently swallowed unless you set a thread's uncaught-exception handler.",
+  },
+  endQ1: {
+    id: "ef-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "You call `executor.shutdown()` and immediately after submit a new task. What happens?",
+    options: [
+      { text: "The new task is queued and executed normally.", correct: false, feedback: "shutdown() stops accepting new submissions." },
+      { text: "A RejectedExecutionException is thrown.", correct: true, feedback: "Correct. After shutdown(), the executor's rejection policy (default: AbortPolicy) throws RejectedExecutionException for any new submission." },
+      { text: "The call blocks until all existing tasks finish, then runs the new task.", correct: false, feedback: "shutdown() initiates an orderly shutdown — it does not block. awaitTermination() blocks." },
+      { text: "The executor restarts to process the new task.", correct: false, feedback: "ExecutorService instances cannot be restarted once shut down." },
+    ],
+    explanation: "After `shutdown()`, the executor rejects new tasks immediately. Previously submitted tasks continue to completion. If you need to wait for them, call `executor.awaitTermination(timeout, unit)` after `shutdown()`.",
+  },
+  endQ2: {
+    id: "ef-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Create a fixed thread pool with 4 threads:",
+    code: `ExecutorService pool = Executors.___(4);`,
+    correctAnswers: ["newFixedThreadPool"],
+    caseSensitive: true,
+    explanation: "`Executors.newFixedThreadPool(n)` creates a pool that maintains exactly n threads. Tasks beyond what the threads can immediately handle are queued in an unbounded `LinkedBlockingQueue`.",
+  },
+  endQ3: {
+    id: "ef-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        ExecutorService exec = Executors.newFixedThreadPool(3);
+        for (int i = 0; i < 10; i++) {
+            exec.submit(() -> System.out.println("task"));
+        }
+        // bug: no shutdown
+    }
+}`,
+    buggyLine: 7,
+    issue: "The ExecutorService is never shut down. Its non-daemon pool threads keep the JVM alive after main() returns, and the program never exits.",
+    explanation: "Always call `executor.shutdown()` (and optionally `awaitTermination`) when you are done submitting tasks. Without it the JVM cannot exit because the pool threads are non-daemon. Use try-finally or a shutdown hook to ensure cleanup.",
+  },
+};
+
+Creating a raw `Thread` for every unit of work is expensive: each thread allocates a stack (typically 512 KB–1 MB), and creating thousands of them exhausts memory and overwhelms the OS scheduler. The **Executor framework**, introduced in Java 5 as part of `java.util.concurrent`, decouples *what* you want to run from *how* it is run. You submit tasks; the framework manages a pool of reusable threads. This is how every production Java application handles concurrent work — from web servers processing HTTP requests to batch processors crunching data.
+
+## The ExecutorService interface
+
+`ExecutorService` extends `Executor` and is the main entry point:
+
+```java
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+ExecutorService pool = Executors.newFixedThreadPool(4);
+
+pool.submit(() -> System.out.println("Task A"));
+pool.submit(() -> System.out.println("Task B"));
+
+pool.shutdown();
+```
+
+The factory class `Executors` provides several ready-made implementations.
+
+## Thread pool flavours
+
+### Fixed thread pool
+
+Keeps exactly *n* threads alive. Extra tasks queue up until a thread becomes free:
+
+```java
+ExecutorService fixed = Executors.newFixedThreadPool(4);
+```
+
+Best for CPU-bound work where you want to cap parallelism at the number of cores.
+
+### Cached thread pool
+
+Spins up new threads on demand and reuses idle ones. Idle threads are recycled after 60 seconds:
+
+```java
+ExecutorService cached = Executors.newCachedThreadPool();
+```
+
+Good for short-lived, bursty I/O tasks. Avoid for CPU-bound work — it will happily create thousands of threads.
+
+### Single-thread executor
+
+Exactly one thread, tasks run sequentially in submission order:
+
+```java
+ExecutorService single = Executors.newSingleThreadExecutor();
+```
+
+Useful for serialising access to a non-thread-safe resource without writing `synchronized` everywhere.
+
+<Note>Avoid `Executors.newFixedThreadPool` with an unbounded queue for work that can grow without limit — if tasks arrive faster than they are processed the queue fills heap memory indefinitely. In production, construct a `ThreadPoolExecutor` directly with a bounded queue and an explicit rejection policy.</Note>
+
+## submit() vs execute()
+
+```java
+// execute — fire and forget, void return
+pool.execute(() -> processOrder(orderId));
+
+// submit — returns a Future
+Future<?> future = pool.submit(() -> processOrder(orderId));
+future.get();  // blocks until done; rethrows exceptions as ExecutionException
+```
+
+`execute()` accepts only `Runnable`. `submit()` accepts `Runnable` or `Callable<T>` and returns a `Future`. Exceptions thrown by a Runnable passed to `execute()` are handed to the thread's uncaught-exception handler and are otherwise lost. With `submit()`, exceptions are captured inside the `Future` and thrown when you call `get()`.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Lifecycle: shutdown() and shutdownNow()
+
+An `ExecutorService` must be shut down or its threads will keep the JVM alive:
+
+```java
+ExecutorService pool = Executors.newFixedThreadPool(3);
+try {
+    for (int i = 0; i < 10; i++) {
+        pool.submit(task);
+    }
+} finally {
+    pool.shutdown();                            // stop accepting new tasks
+    pool.awaitTermination(10, TimeUnit.SECONDS); // wait up to 10s for current tasks
+}
+```
+
+- `shutdown()` — orderly: no new tasks accepted, existing queued tasks complete.
+- `shutdownNow()` — aggressive: attempts to interrupt running tasks, returns the list of queued-but-not-started tasks.
+
+## Try it
+
+Submit 10 tasks to a 3-thread pool and observe which thread handles each:
+
+```java
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+
+        for (int i = 1; i <= 10; i++) {
+            final int taskId = i;
+            pool.submit(() -> {
+                System.out.printf("Task %2d handled by %s%n",
+                    taskId, Thread.currentThread().getName());
+                try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            });
+        }
+
+        pool.shutdown();
+        pool.awaitTermination(5, TimeUnit.SECONDS);
+        System.out.println("All done");
+    }
+}
+```
+
+You will see only three distinct thread names cycling through the ten tasks — the pool is reusing its three threads.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting to call `shutdown()`** — pool threads are non-daemon; the JVM will hang after `main()` returns if the pool is never shut down.
+- **Using `newCachedThreadPool()` for CPU-heavy tasks** — it creates a new thread for every task if the pool is saturated, quickly exhausting memory and thrashing the scheduler.
+- **Calling `shutdownNow()` and assuming tasks stopped** — `shutdownNow()` sends interrupt signals; tasks that ignore `InterruptedException` will keep running.
+- **Not handling `RejectedExecutionException`** — if you submit tasks after `shutdown()`, or if a bounded-queue pool is full, submissions are rejected. Always catch or prevent this.
+
+## Recap
+
+- `ExecutorService` decouples task submission from thread management.
+- `newFixedThreadPool(n)` — fixed threads, bounded parallelism. `newCachedThreadPool()` — dynamic threads. `newSingleThreadExecutor()` — serial execution.
+- `submit()` returns a `Future`; `execute()` is void. Use `submit()` whenever you need to track completion or handle exceptions.
+- Always call `shutdown()` (and optionally `awaitTermination()`) to release pool threads and allow JVM exit.
+
+**Up next:** Lesson 6 covers `Callable` and `Future` in depth — returning values from background tasks and handling their exceptions.

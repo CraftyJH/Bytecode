@@ -1,0 +1,241 @@
+export const meta = {
+  title: "Callable & Future — Returning Results",
+  duration: 13,
+  order: 6,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "cf-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        ExecutorService exec = Executors.newSingleThreadExecutor();
+        Future<String> f = exec.submit(() -> {
+            Thread.sleep(50);
+            return "hello";
+        });
+        System.out.println("submitted");
+        System.out.println(f.get());
+        System.out.println("done");
+        exec.shutdown();
+    }
+}`,
+    expectedOutput: "submitted\nhello\ndone",
+    explanation: "`submitted` prints immediately after submit() returns (the task runs in the background). `f.get()` blocks the main thread until the Callable finishes and returns `\"hello\"`. `done` prints after get() returns.",
+  },
+  endQ1: {
+    id: "cf-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A Callable throws a `RuntimeException`. You call `future.get()`. What is thrown?",
+    options: [
+      { text: "The original RuntimeException is thrown directly.", correct: false, feedback: "Future wraps exceptions. The original is accessible via getCause()." },
+      { text: "An ExecutionException wrapping the original exception.", correct: true, feedback: "Correct. future.get() throws ExecutionException when the callable threw any exception. Call getCause() on it to retrieve the original." },
+      { text: "Nothing — exceptions in background threads are swallowed.", correct: false, feedback: "Using submit() (unlike execute()) captures exceptions inside the Future, making them accessible at get()." },
+      { text: "An InterruptedException.", correct: false, feedback: "InterruptedException is thrown if the *waiting* thread (the one calling get()) is interrupted, not when the background task fails." },
+    ],
+    explanation: "`Future.get()` can throw two checked exceptions: `InterruptedException` (if the calling thread is interrupted while waiting) and `ExecutionException` (if the task itself threw any exception). Always unwrap `ExecutionException.getCause()` to get the actual failure.",
+  },
+  endQ2: {
+    id: "cf-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the Callable that returns the square of an integer:",
+    code: `Callable<Integer> square = () -> ___ * ___;`,
+    correctAnswers: ["n * n", "x * x", "num * num", "val * val"],
+    caseSensitive: false,
+    explanation: "A Callable<T> is a functional interface with one method: `T call() throws Exception`. A lambda that returns a value of type T satisfies it. Any valid Java expression that computes the square works here.",
+  },
+  endQ3: {
+    id: "cf-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `ExecutorService exec = Executors.newFixedThreadPool(2);
+List<Future<Integer>> futures = new ArrayList<>();
+
+for (int i = 1; i <= 5; i++) {
+    final int n = i;
+    futures.add(exec.submit(() -> n * n));
+}
+
+for (Future<Integer> f : futures) {
+    System.out.println(f.get());  // may throw — uncaught
+}
+exec.shutdown();`,
+    buggyLine: 9,
+    issue: "`f.get()` throws `ExecutionException` and `InterruptedException`, both checked exceptions, but they are not caught. The code will not compile.",
+    explanation: "Wrap the get() call in try-catch, or declare the enclosing method with `throws Exception`. In production code it's better to handle each case: catch `InterruptedException`, restore the interrupt flag, and handle or log `ExecutionException` by inspecting its cause.",
+  },
+};
+
+`Runnable` is fine when you want to fire off work and don't need a result. But most real tasks *produce* something: a database query returns rows, an HTTP call returns a response body, a computation returns a number. Java's `Callable<T>` interface and `Future<T>` handle exactly this scenario — submit work that returns a typed value, retrieve it later (blocking only when the result is actually needed), and propagate any exceptions that occur on the background thread back to the caller.
+
+## Callable vs Runnable
+
+`Runnable`:
+```java
+void run();          // no return value, cannot throw checked exceptions
+```
+
+`Callable<T>`:
+```java
+T call() throws Exception;   // returns T, can throw any exception
+```
+
+`Callable` is also a functional interface, so lambdas work perfectly:
+
+```java
+Callable<Integer> computePi = () -> {
+    Thread.sleep(200);   // simulate work
+    return 314159;
+};
+```
+
+## Submitting a Callable and getting a Future
+
+```java
+ExecutorService exec = Executors.newFixedThreadPool(2);
+
+Future<String> future = exec.submit(() -> {
+    Thread.sleep(100);
+    return "result";
+});
+
+// Do other work here — the Callable runs concurrently
+System.out.println("Working on something else…");
+
+// Block until the result is ready
+String result = future.get();   // throws ExecutionException or InterruptedException
+System.out.println(result);
+
+exec.shutdown();
+```
+
+`get()` blocks the calling thread until the task completes and returns the value. If the task threw an exception, `get()` wraps it in `ExecutionException`.
+
+## Future's full API
+
+```java
+future.get();                       // block indefinitely
+future.get(2, TimeUnit.SECONDS);    // block at most 2 seconds (throws TimeoutException)
+future.isDone();                    // true if finished (normally, exceptionally, or cancelled)
+future.isCancelled();               // true if cancel() succeeded
+future.cancel(true);               // attempt to cancel; true = interrupt if running
+```
+
+<Note>`future.get()` with no timeout will block forever if the task never completes (e.g. it's stuck in an infinite loop or waiting for I/O that never arrives). Always prefer `get(timeout, unit)` in production code and handle `TimeoutException` by cancelling the future or logging a warning.</Note>
+
+## Handling ExecutionException
+
+```java
+try {
+    String value = future.get();
+} catch (ExecutionException e) {
+    Throwable cause = e.getCause();   // the original exception from the Callable
+    if (cause instanceof IOException) {
+        System.err.println("I/O failed: " + cause.getMessage());
+    } else {
+        throw new RuntimeException("Unexpected failure", cause);
+    }
+} catch (InterruptedException e) {
+    Thread.currentThread().interrupt();   // restore interrupt flag
+    System.err.println("Interrupted while waiting");
+}
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Collecting multiple results with invokeAll
+
+When you have a batch of homogeneous tasks, `invokeAll` submits them all and returns a `List<Future<T>>` only after *all* tasks complete:
+
+```java
+List<Callable<Integer>> tasks = List.of(
+    () -> 1 + 1,
+    () -> 2 * 3,
+    () -> 10 - 4
+);
+
+List<Future<Integer>> results = exec.invokeAll(tasks);
+
+for (Future<Integer> f : results) {
+    System.out.println(f.get());   // 2, 6, 6
+}
+```
+
+## Try it
+
+Submit 5 Callable tasks that compute squares, collect the `Future` results, and print them:
+
+```java
+import java.util.*;
+import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        ExecutorService exec = Executors.newFixedThreadPool(3);
+        List<Future<Integer>> futures = new ArrayList<>();
+
+        for (int i = 1; i <= 5; i++) {
+            final int n = i;
+            futures.add(exec.submit(() -> {
+                Thread.sleep(50);   // simulate work
+                return n * n;
+            }));
+        }
+
+        System.out.println("All tasks submitted, now collecting results:");
+
+        for (int i = 0; i < futures.size(); i++) {
+            try {
+                System.out.printf("%d² = %d%n", i + 1, futures.get(i).get());
+            } catch (ExecutionException e) {
+                System.err.println("Task " + (i+1) + " failed: " + e.getCause());
+            }
+        }
+
+        exec.shutdown();
+    }
+}
+```
+
+Expected output (order may vary in submission but results collected in order):
+```
+All tasks submitted, now collecting results:
+1² = 1
+2² = 4
+3² = 9
+4² = 16
+5² = 25
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Calling `get()` immediately after `submit()`** — this defeats concurrency entirely; you block immediately and the task runs sequentially. Submit all tasks first, then collect results.
+- **Not unwrapping `ExecutionException`** — `e.getMessage()` on an `ExecutionException` is often unhelpful; always call `e.getCause()` to inspect the real failure.
+- **Ignoring `InterruptedException`** — catching and swallowing it silences the JVM's cooperative cancellation mechanism. Always restore the interrupt flag.
+- **Using `future.get()` without a timeout in production** — a stuck background task will block the calling thread forever. Use `get(timeout, unit)` and handle `TimeoutException`.
+
+## Recap
+
+- `Callable<T>` is like `Runnable` but returns a typed value and can throw checked exceptions.
+- `ExecutorService.submit(callable)` returns a `Future<T>` representing the pending result.
+- `future.get()` blocks until the result is ready; it throws `ExecutionException` if the task failed and `InterruptedException` if the waiting thread was interrupted.
+- `invokeAll(callables)` submits a batch and returns a `List<Future<T>>` once all tasks complete.
+
+**Up next:** Lesson 7 introduces `CompletableFuture` — a far more powerful API that lets you build non-blocking async pipelines without ever blocking a thread.

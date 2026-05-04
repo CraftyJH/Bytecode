@@ -1,0 +1,345 @@
+export const meta = {
+  title: "Proxy & Facade",
+  duration: 13,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "pf-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the key conceptual difference between Proxy and Decorator?",
+    options: [
+      { text: "Proxy always adds new behaviour; Decorator controls access.", correct: false, feedback: "It's the reverse. Decorator adds behaviour; Proxy controls access to the real subject." },
+      { text: "Proxy controls access to the real subject; Decorator transparently adds behaviour.", correct: true, feedback: "Correct! Proxy may limit, delay, or mediate access. Decorator enriches what the real object does. Both wrap an object behind the same interface, but their intent differs." },
+      { text: "Proxy requires the subject interface; Decorator does not.", correct: false, feedback: "Both patterns typically implement the same interface as the object they wrap." },
+      { text: "Proxy cannot be stacked; Decorator can.", correct: false, feedback: "Proxies can be chained (e.g., a caching proxy in front of a logging proxy), just like Decorators." },
+    ],
+    explanation: "Proxy and Decorator look structurally identical — both implement the same interface and hold a reference to the real object. Their **intent** is what differs: Proxy manages access (lazy load, security check, cache); Decorator adds transparent feature extensions.",
+  },
+  endQ1: {
+    id: "pf-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    interface ExpensiveService {
+        String compute(String input);
+    }
+
+    static class RealService implements ExpensiveService {
+        public String compute(String input) {
+            return input.toUpperCase();
+        }
+    }
+
+    static class CachingProxy implements ExpensiveService {
+        private final ExpensiveService real;
+        private final java.util.Map<String, String> cache = new java.util.HashMap<>();
+
+        CachingProxy(ExpensiveService real) { this.real = real; }
+
+        public String compute(String input) {
+            if (cache.containsKey(input)) {
+                System.out.println("Cache hit: " + input);
+                return cache.get(input);
+            }
+            String result = real.compute(input);
+            cache.put(input, result);
+            return result;
+        }
+    }
+
+    public static void main(String[] args) {
+        ExpensiveService svc = new CachingProxy(new RealService());
+        System.out.println(svc.compute("hello"));
+        System.out.println(svc.compute("world"));
+        System.out.println(svc.compute("hello"));
+    }
+}`,
+    expectedOutput: "HELLO\nWORLD\nCache hit: hello\nHELLO",
+    explanation: "First call to `compute(\"hello\")` misses the cache, delegates to `RealService`, stores result. Second call for `\"world\"` also misses. Third call for `\"hello\"` hits the cache: it prints the cache hit message and returns the stored result.",
+  },
+  endQ2: {
+    id: "pf-end-2",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "When using `java.lang.reflect.Proxy.newProxyInstance`, what does the InvocationHandler's `invoke` method receive as its second argument?",
+    options: [
+      { text: "The name of the method as a String.", correct: false, feedback: "The name is available via `method.getName()`, but the argument itself is a `Method` object, not a plain String." },
+      { text: "A `java.lang.reflect.Method` object representing the called method.", correct: true, feedback: "Correct! The `invoke(Object proxy, Method method, Object[] args)` signature gives you the full `Method` reflective descriptor, letting you inspect annotations, return types, or selectively intercept calls." },
+      { text: "The return value that should be returned to the caller.", correct: false, feedback: "The return value is what `invoke` produces (its return value), not what it receives." },
+      { text: "The target object (the real implementation).", correct: false, feedback: "The target object is not automatically passed to `invoke`. If you need to delegate to a real object, you must capture it in the `InvocationHandler` closure yourself." },
+    ],
+    explanation: "`InvocationHandler.invoke(Object proxy, Method method, Object[] args)` — `proxy` is the generated proxy object, `method` is the reflective descriptor of the called interface method, and `args` is the array of actual arguments. Your handler decides what to do: delegate, intercept, log, cache, etc.",
+  },
+  endQ3: {
+    id: "pf-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class HomeTheaterFacade {
+    private final Amplifier amp;
+    private final Projector proj;
+    private final Lights lights;
+
+    public HomeTheaterFacade(Amplifier amp, Projector proj) {  // bug here
+        this.amp    = amp;
+        this.proj   = proj;
+        this.lights = new Lights();  // tight coupling — hidden dependency
+    }
+
+    public void watchMovie(String title) {
+        lights.dim(30);
+        proj.on();
+        amp.setVolume(8);
+        System.out.println("Watching: " + title);
+    }
+}`,
+    buggyLine: 6,
+    issue: "The Lights dependency is created inside the constructor (tight coupling). It should be injected as a constructor parameter, making it replaceable and testable.",
+    explanation: "Creating `new Lights()` inside the constructor hides a dependency. Code that creates `new HomeTheaterFacade(amp, proj)` cannot substitute a mock Lights in a test, and swapping Lights implementations requires modifying the Facade. Accept all collaborators as constructor parameters.",
+  },
+};
+
+Not every class should be accessed directly, and not every subsystem should be exposed in full. The **Proxy** pattern sits in front of a real object, controlling who can use it and when — enabling lazy loading, caching, and access control. The **Facade** pattern provides a single simplified entry point to a complex subsystem, hiding its moving parts from the caller. Both reduce coupling; Proxy does it at the object level, Facade does it at the subsystem level.
+
+## Virtual Proxy — lazy initialisation
+
+A virtual proxy defers creation of an expensive object until it is first needed:
+
+```java
+public interface Image {
+    void display();
+}
+
+// Expensive — reads from disk on construction
+public class HighResImage implements Image {
+    private final String filename;
+    private final byte[] data;
+
+    public HighResImage(String filename) {
+        this.filename = filename;
+        System.out.println("Loading image from disk: " + filename);
+        // Simulate expensive I/O
+        this.data = new byte[1024 * 1024]; // 1 MB
+    }
+
+    public void display() {
+        System.out.println("Displaying: " + filename + " (" + data.length + " bytes)");
+    }
+}
+
+// Proxy — creates the real object only on first display()
+public class LazyImageProxy implements Image {
+    private final String filename;
+    private HighResImage realImage;  // null until first use
+
+    public LazyImageProxy(String filename) {
+        this.filename = filename;
+        System.out.println("Proxy created for: " + filename);
+    }
+
+    public void display() {
+        if (realImage == null) {
+            realImage = new HighResImage(filename);
+        }
+        realImage.display();
+    }
+}
+```
+
+```java
+Image img = new LazyImageProxy("banner.png"); // no I/O yet
+System.out.println("--- later ---");
+img.display(); // I/O happens here, first access
+img.display(); // cached — no second load
+// Proxy created for: banner.png
+// --- later ---
+// Loading image from disk: banner.png
+// Displaying: banner.png (1048576 bytes)
+// Displaying: banner.png (1048576 bytes)
+```
+
+## Protection Proxy — access control
+
+A protection proxy checks permissions before delegating:
+
+```java
+public interface AdminService {
+    void deleteUser(String userId);
+    List<String> listUsers();
+}
+
+public class AdminServiceImpl implements AdminService {
+    public void deleteUser(String userId) { System.out.println("Deleted: " + userId); }
+    public List<String> listUsers()       { return List.of("alice", "bob"); }
+}
+
+public class AuthProxy implements AdminService {
+    private final AdminService real;
+    private final String currentRole;
+
+    public AuthProxy(AdminService real, String currentRole) {
+        this.real = real;
+        this.currentRole = currentRole;
+    }
+
+    public void deleteUser(String userId) {
+        if (!"ADMIN".equals(currentRole)) {
+            throw new SecurityException("Access denied: deleteUser requires ADMIN role");
+        }
+        real.deleteUser(userId);
+    }
+
+    public List<String> listUsers() {
+        return real.listUsers(); // all roles may list users
+    }
+}
+```
+
+<Note>The protection proxy is a lightweight alternative to full-blown AOP frameworks for simple access control rules. For complex cross-cutting concerns, consider Spring Security or a proper AOP library.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Dynamic Proxy with `java.lang.reflect.Proxy`
+
+Java's `java.lang.reflect.Proxy` generates a proxy class at runtime for any interface:
+
+```java
+import java.lang.reflect.*;
+
+public class LoggingProxyFactory {
+    @SuppressWarnings("unchecked")
+    public static <T> T wrap(T target, Class<T> iface) {
+        return (T) Proxy.newProxyInstance(
+            iface.getClassLoader(),
+            new Class<?>[]{ iface },
+            (proxy, method, args) -> {
+                System.out.println("Calling: " + method.getName());
+                Object result = method.invoke(target, args);
+                System.out.println("Done:    " + method.getName());
+                return result;
+            }
+        );
+    }
+}
+
+// Usage — no subclassing, works for any interface
+AdminService logged = LoggingProxyFactory.wrap(new AdminServiceImpl(), AdminService.class);
+logged.listUsers();
+// Calling: listUsers
+// Done:    listUsers
+```
+
+Dynamic proxies are the foundation of Spring AOP, JPA lazy-loading, and mocking frameworks like Mockito.
+
+## Facade — hiding subsystem complexity
+
+A Facade provides a single method that orchestrates multiple subsystem classes. The caller never needs to know the subsystem exists:
+
+```java
+// Subsystem classes — complex on their own
+public class Amplifier {
+    public void on()            { System.out.println("Amp on"); }
+    public void setVolume(int v){ System.out.println("Volume: " + v); }
+    public void off()           { System.out.println("Amp off"); }
+}
+
+public class Projector {
+    public void on()  { System.out.println("Projector on"); }
+    public void off() { System.out.println("Projector off"); }
+}
+
+public class Lights {
+    public void dim(int level)  { System.out.println("Lights dimmed to " + level + "%"); }
+    public void full()          { System.out.println("Lights full"); }
+}
+
+// Facade — a single orchestrating class
+public class HomeTheaterFacade {
+    private final Amplifier amp;
+    private final Projector proj;
+    private final Lights lights;
+
+    public HomeTheaterFacade(Amplifier amp, Projector proj, Lights lights) {
+        this.amp = amp; this.proj = proj; this.lights = lights;
+    }
+
+    public void watchMovie(String title) {
+        System.out.println("Get ready to watch: " + title);
+        lights.dim(20);
+        proj.on();
+        amp.on();
+        amp.setVolume(8);
+    }
+
+    public void endMovie() {
+        System.out.println("Shutting down...");
+        amp.off();
+        proj.off();
+        lights.full();
+    }
+}
+```
+
+```java
+HomeTheaterFacade theater = new HomeTheaterFacade(
+    new Amplifier(), new Projector(), new Lights()
+);
+theater.watchMovie("Inception");
+// Get ready to watch: Inception
+// Lights dimmed to 20%
+// Projector on
+// Amp on
+// Volume: 8
+```
+
+## Try it
+
+Combine a `CachingProxy` around an `ExpensiveService` and a `HomeTheaterFacade`:
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // 1. CachingProxy demo
+        ExpensiveService svc = new CachingProxy(new RealService());
+        System.out.println(svc.compute("hello"));  // delegates to real
+        System.out.println(svc.compute("hello"));  // cache hit — no real call
+
+        // 2. Facade demo
+        HomeTheaterFacade theater = new HomeTheaterFacade(
+            new Amplifier(), new Projector(), new Lights()
+        );
+        theater.watchMovie("The Matrix");
+        theater.endMovie();
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Confusing Proxy with Decorator** — same structure, different intent. If the wrapper controls access, it's a Proxy; if it adds transparent features, it's a Decorator.
+- **Tight coupling in Facade constructors** — never `new` subsystem objects inside the Facade constructor. Inject them so they can be tested and swapped.
+- **Dynamic proxies only work with interfaces** — `java.lang.reflect.Proxy` cannot proxy concrete classes. For class proxying you need a library like CGLIB (used internally by Spring).
+- **Forgetting to synchronise lazy proxy init** — `LazyImageProxy` as written is not thread-safe. In multithreaded code, protect the null check with `synchronized` or a `volatile` field.
+
+## Recap
+
+- **Virtual proxy** defers expensive construction until first use (lazy init)
+- **Protection proxy** enforces access control before delegating to the real subject
+- **`java.lang.reflect.Proxy`** generates dynamic proxies for any interface at runtime — the foundation of Spring AOP and Mockito
+- **Facade** provides a simple, unified interface to an otherwise complex subsystem
+- Both Proxy and Facade reduce coupling; Proxy works at the object level, Facade at the subsystem level
+
+**Up next:** Observer — Event-Driven Design — learning how objects can broadcast changes to unlimited interested parties without knowing who is listening.

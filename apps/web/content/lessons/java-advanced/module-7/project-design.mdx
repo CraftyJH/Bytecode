@@ -1,0 +1,402 @@
+export const meta = {
+  title: "Capstone Part 1 — Domain Design & Architecture",
+  duration: 18,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "pd-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which of the following is the strongest reason to model a `TaskId` as a Java record rather than a plain `UUID` field on the Task class?",
+    options: [
+      {
+        text: "Records are faster than classes at runtime.",
+        correct: false,
+        feedback: "Records compile to ordinary classes — there is no runtime performance difference. The benefit is semantic, not computational.",
+      },
+      {
+        text: "Records give `TaskId` its own type, preventing accidental mix-ups like passing a `ProjectId` where a `TaskId` is expected.",
+        correct: true,
+        feedback: "Correct! This is the primitive-obsession cure: wrapping a UUID in a named record makes the type system enforce correct usage at compile time.",
+      },
+      {
+        text: "Records allow you to add mutable fields later.",
+        correct: false,
+        feedback: "Records are intentionally immutable — all components are final. Mutability would defeat their value-object purpose.",
+      },
+      {
+        text: "Records automatically serialize to JSON without a library.",
+        correct: false,
+        feedback: "Records provide no built-in JSON serialization; that still requires a library. Their benefit is concise, immutable value semantics.",
+      },
+    ],
+    explanation: "A **value object** wraps a primitive or identifier so it carries meaning through the type system. `record TaskId(UUID value) {}` is a one-liner that prevents `assignTask(projectId, taskId)` from being called as `assignTask(taskId, projectId)` — a whole class of bugs eliminated at zero runtime cost.",
+  },
+  endQ1: {
+    id: "pd-end-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `import java.util.Optional;
+
+record Task(String id, String title, TaskStatus status) {}
+
+enum TaskStatus { TODO, IN_PROGRESS, DONE }
+
+public class Main {
+    public static void main(String[] args) {
+        Task t = new Task("1", "Write tests", TaskStatus.TODO);
+        System.out.println(t.title());
+        System.out.println(t.status());
+        System.out.println(t.equals(new Task("1", "Write tests", TaskStatus.TODO)));
+    }
+}`,
+    expectedOutput: "Write tests\nTODO\ntrue",
+    explanation: "Records auto-generate accessor methods (same name as the component, no `get` prefix), and `equals` compares all components structurally. Two records with identical component values are considered equal.",
+  },
+  endQ2: {
+    id: "pd-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the enum so that calling `TODO.canTransitionTo(IN_PROGRESS)` returns true but `TODO.canTransitionTo(DONE)` returns false:",
+    code: `enum TaskStatus {
+    TODO, IN_PROGRESS, DONE;
+
+    public boolean canTransitionTo(TaskStatus next) {
+        return switch (this) {
+            case TODO        -> next == ___;
+            case IN_PROGRESS -> next == ___;
+            case DONE        -> false;
+        };
+    }
+}`,
+    correctAnswers: ["IN_PROGRESS", "DONE"],
+    caseSensitive: true,
+    explanation: "Encoding valid transitions directly inside the enum keeps transition logic co-located with the states themselves. The switch expression is exhaustive, so adding a new status forces the developer to handle the transition — the compiler enforces completeness.",
+  },
+  endQ3: {
+    id: "pd-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.time.Instant;
+import java.util.UUID;
+
+public record Task(
+    UUID id,
+    String title,
+    String description,
+    TaskStatus status,
+    Priority priority,
+    String assigneeId,
+    Instant createdAt
+) {
+    public Task {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("Title must not be blank");
+        }
+    }
+
+    public Task withStatus(TaskStatus newStatus) {
+        return new Task(id, title, description, newStatus, priority, assigneeId, createdAt);
+    }
+}`,
+    buggyLine: 7,
+    issue: "`assigneeId` is declared as a plain `String` but should be `Optional<String>` to make nullability explicit in the type signature. Using a nullable field in a record defeats the goal of making the domain model self-documenting.",
+    explanation: "Optional fields in a domain record should be declared as `Optional<T>` so callers can never forget to handle the absent case. Swap `String assigneeId` for `Optional<String> assigneeId` and update the compact constructor and `withStatus` accordingly.",
+  },
+};
+
+This is the first of six capstone lessons. By the end of module 7 you will have built a fully working **Task Management System** — a Trello-style backend — from scratch. The system will demonstrate everything covered in the Java Advanced track: generics, streams and functional programming, concurrency, design patterns, testing, and JVM internals. Each lesson constructs one vertical slice of the architecture, and every subsequent lesson extends what came before.
+
+This first lesson is about the most important step in any software project: **getting the model right before writing a single line of logic**. A well-designed domain model makes the service layer obvious, the tests self-explanatory, and refactoring safe. A poor model creates debt that compounds through every later layer.
+
+## What we are building
+
+Our Task Management System supports the following requirements:
+
+- Users can create **Projects** to group related work.
+- Each project contains **Tasks** with a title, description, priority, due date, and assignee.
+- Tasks move through a defined status lifecycle: `TODO → IN_PROGRESS → DONE`.
+- The system enforces valid status transitions — a task cannot jump from `TODO` directly to `DONE`.
+- Tasks and projects are queried by multiple criteria (status, priority, assignee, date range).
+- Background workers send notifications for overdue tasks.
+
+These requirements map cleanly to a layered architecture: **domain model → repository layer → service layer → concurrency → tests → patterns**. We build each layer in its own lesson.
+
+## Package structure
+
+Organising code into packages before writing classes is an architectural discipline that pays for itself immediately. Our layout follows the **ports-and-adapters** mental model without the full framework overhead:
+
+```
+com.bytecode.tasks
+├── domain          ← pure Java records, enums, and domain logic
+│   ├── Task.java
+│   ├── Project.java
+│   ├── User.java
+│   ├── TaskStatus.java
+│   └── Priority.java
+├── repository      ← generic persistence interfaces and in-memory impls
+│   ├── Repository.java
+│   ├── InMemoryRepository.java
+│   └── InMemoryTaskRepository.java
+├── service         ← business rules, validation, orchestration
+│   ├── TaskService.java
+│   └── ValidationPipeline.java
+├── concurrent      ← background workers, async notifications
+│   ├── TaskNotificationService.java
+│   └── TaskProcessor.java
+└── event           ← observer/event bus
+    └── TaskEventBus.java
+```
+
+<Note>Everything inside `domain` has **zero dependencies** on other layers. Domain classes import only the JDK. This rule makes the domain independently testable and maximises reuse.</Note>
+
+## Entities vs value objects
+
+Two fundamental categories of domain objects behave very differently:
+
+| Category | Identity? | Mutability | Java idiom |
+|---|---|---|---|
+| **Entity** | Yes — by ID | Typically mutable lifecycle | Plain class or record with `withX` copy methods |
+| **Value object** | No — by content | Always immutable | `record` |
+
+A `Task` is an **entity**: two tasks with the same title are different tasks. A `Priority` is a **value object**: `Priority.HIGH` is always the same thing regardless of which object it came from.
+
+Java records are the perfect fit for value objects: the compiler generates `equals`, `hashCode`, and `toString` based on all components, and all components are `final`.
+
+## The Priority and TaskStatus enums
+
+Enums are more than named constants in Java — they can carry behaviour. Our `Priority` enum defines an ordering:
+
+```java
+package com.bytecode.tasks.domain;
+
+public enum Priority {
+    LOW, MEDIUM, HIGH, CRITICAL;
+
+    public boolean isHigherThan(Priority other) {
+        return this.ordinal() > other.ordinal();
+    }
+}
+```
+
+`TaskStatus` encodes the valid state machine transitions directly:
+
+```java
+package com.bytecode.tasks.domain;
+
+public enum TaskStatus {
+    TODO, IN_PROGRESS, DONE;
+
+    public boolean canTransitionTo(TaskStatus next) {
+        return switch (this) {
+            case TODO        -> next == IN_PROGRESS;
+            case IN_PROGRESS -> next == DONE;
+            case DONE        -> false;  // terminal state
+        };
+    }
+}
+```
+
+Putting transition logic inside the enum means the service layer never has to contain a messy `if-else` chain. Every place that needs to check validity calls `current.canTransitionTo(next)`.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## The core domain records and classes
+
+With the enums in place, the full domain model compiles in a single pass:
+
+```java
+package com.bytecode.tasks.domain;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Optional;
+import java.util.UUID;
+
+public record Task(
+    UUID            id,
+    String          title,
+    String          description,
+    TaskStatus      status,
+    Priority        priority,
+    Optional<String> assigneeId,
+    Optional<LocalDate> dueDate,
+    Instant         createdAt
+) {
+    // Compact constructor for validation
+    public Task {
+        Objects.requireNonNull(id,          "id must not be null");
+        Objects.requireNonNull(title,        "title must not be null");
+        Objects.requireNonNull(status,       "status must not be null");
+        Objects.requireNonNull(priority,     "priority must not be null");
+        Objects.requireNonNull(createdAt,    "createdAt must not be null");
+        if (title.isBlank()) throw new IllegalArgumentException("Title must not be blank");
+        assigneeId = Objects.requireNonNullElse(assigneeId, Optional.empty());
+        dueDate    = Objects.requireNonNullElse(dueDate,    Optional.empty());
+    }
+
+    /** Returns a new Task with the status updated — records are immutable. */
+    public Task withStatus(TaskStatus newStatus) {
+        if (!status.canTransitionTo(newStatus)) {
+            throw new IllegalStateException(
+                "Cannot transition from " + status + " to " + newStatus);
+        }
+        return new Task(id, title, description, newStatus, priority, assigneeId, dueDate, createdAt);
+    }
+
+    /** Factory for creating a brand-new task. */
+    public static Task create(String title, String description,
+                              Priority priority, Optional<String> assigneeId,
+                              Optional<LocalDate> dueDate) {
+        return new Task(UUID.randomUUID(), title, description,
+                        TaskStatus.TODO, priority, assigneeId, dueDate, Instant.now());
+    }
+}
+```
+
+The `withStatus` method demonstrates the **immutable update** pattern: instead of mutating the task, it returns a new record with the changed field. This is safe to share across threads and trivial to test.
+
+The `Project` class is a regular class because it accumulates tasks over time:
+
+```java
+package com.bytecode.tasks.domain;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+
+public class Project {
+    private final UUID   id;
+    private final String name;
+    private final String ownerId;
+    private final List<UUID> taskIds;
+
+    public Project(String name, String ownerId) {
+        this.id      = UUID.randomUUID();
+        this.name    = name;
+        this.ownerId = ownerId;
+        this.taskIds = new ArrayList<>();
+    }
+
+    public UUID getId()           { return id; }
+    public String getName()       { return name; }
+    public String getOwnerId()    { return ownerId; }
+
+    public List<UUID> getTaskIds() {
+        return Collections.unmodifiableList(taskIds);
+    }
+
+    public void addTask(UUID taskId) {
+        taskIds.add(taskId);
+    }
+
+    public void removeTask(UUID taskId) {
+        taskIds.remove(taskId);
+    }
+}
+```
+
+<Note>`Collections.unmodifiableList` wraps the internal list before returning it. Callers see a read-only view — they cannot sneak mutations in through the returned reference. This is a lightweight alternative to making a defensive copy on every call.</Note>
+
+The `User` record is the simplest member of the domain:
+
+```java
+package com.bytecode.tasks.domain;
+
+import java.util.UUID;
+
+public record User(UUID id, String username, String email) {
+    public User {
+        Objects.requireNonNull(id,       "id must not be null");
+        Objects.requireNonNull(username, "username must not be null");
+        Objects.requireNonNull(email,    "email must not be null");
+        if (username.isBlank()) throw new IllegalArgumentException("Username must not be blank");
+    }
+
+    public static User create(String username, String email) {
+        return new User(UUID.randomUUID(), username, email);
+    }
+}
+```
+
+## Wiring it together — a domain-only smoke test
+
+Even before we write repositories or services, the domain model is fully exercisable:
+
+```java
+import com.bytecode.tasks.domain.*;
+import java.time.LocalDate;
+import java.util.Optional;
+
+public class DomainSmoke {
+    public static void main(String[] args) {
+        User alice   = User.create("alice", "alice@example.com");
+        Project proj = new Project("Spring Cleanup", alice.id().toString());
+
+        Task t = Task.create(
+            "Write unit tests",
+            "Cover the service layer",
+            Priority.HIGH,
+            Optional.of(alice.id().toString()),
+            Optional.of(LocalDate.now().plusDays(7))
+        );
+
+        proj.addTask(t.id());
+
+        System.out.println(t.title());         // Write unit tests
+        System.out.println(t.status());        // TODO
+
+        Task inProgress = t.withStatus(TaskStatus.IN_PROGRESS);
+        System.out.println(inProgress.status()); // IN_PROGRESS
+
+        // This would throw IllegalStateException — can't skip to DONE from TODO
+        // t.withStatus(TaskStatus.DONE);
+    }
+}
+```
+
+The entire domain model compiles and runs with zero external dependencies — just the JDK.
+
+## Try it
+
+Build the complete domain model from scratch in your IDE or an online Java playground:
+
+1. Create `TaskStatus` with `canTransitionTo` logic as shown. Add a fourth status `CANCELLED` that can be reached from `TODO` or `IN_PROGRESS` but is also terminal (no outgoing transitions).
+2. Create the `Priority` enum with `isHigherThan`.
+3. Create the `Task` record. Verify that the compact constructor rejects a blank title and that `withStatus` throws when given an invalid transition.
+4. Create `Project` with the unmodifiable task-id list.
+5. Create `User` with the compact constructor.
+6. Write a `main` method that exercises all four status transitions (`TODO→IN_PROGRESS`, `IN_PROGRESS→DONE`, `TODO→CANCELLED`, `IN_PROGRESS→CANCELLED`) and prints the result of each.
+
+Stretch goal: Add a `tags` field to `Task` as `Set<String>`. Update the compact constructor to make a defensive copy with `Set.copyOf(tags)` and default a null set to `Set.of()`.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Mutable records** — records make components final, but if a component is itself a mutable object (like a `List`) the record is only shallowly immutable. Use `List.copyOf()` in the compact constructor to ensure the record is truly immutable.
+- **Null vs Optional** — using nullable fields instead of `Optional<T>` hides absence from callers. The rule: if a field may legitimately be absent, its type must be `Optional<T>`.
+- **Fat domain objects** — the domain model should contain only state and state-transition logic (`withStatus`, `canTransitionTo`). Business rules that depend on multiple aggregates (e.g., "can this user be assigned this task?") belong in the service layer.
+- **Skipping the package split** — dumping every class in a single package feels faster at first but makes boundaries invisible. Enforce the `domain → repository → service` dependency direction from day one; it is much harder to untangle later.
+
+## Recap
+
+- **Records** are the ideal Java idiom for immutable value objects; they auto-generate `equals`, `hashCode`, `toString`, and accessor methods.
+- **Enums with methods** encode state-machine transition logic close to the states themselves, eliminating scattered `if-else` chains in the service layer.
+- **Optional fields** in domain records make nullability explicit and force callers to handle the absent case.
+- A clean **package structure** enforces the dependency direction and makes the architecture legible before any code is read.
+- The domain model should compile and be testable with zero non-JDK dependencies.
+
+**Up next: Part 2** — building the generic Repository layer on top of this domain model.

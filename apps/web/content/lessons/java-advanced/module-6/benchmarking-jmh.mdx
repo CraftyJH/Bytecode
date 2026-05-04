@@ -1,0 +1,252 @@
+export const meta = {
+  title: "Benchmarking with JMH",
+  duration: 14,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "jmh-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why does benchmarking Java code without a JIT warm-up phase produce misleading results?",
+    options: [
+      { text: "The JVM allocates more memory during the first few iterations.", correct: false, feedback: "Memory allocation is relatively consistent from the start. The main issue is compilation, not allocation differences." },
+      { text: "Early iterations run in the slow interpreter before the JIT compiles the method to native code, so they measure cold-start overhead rather than steady-state performance.", correct: true, feedback: "Correct. Without warm-up you measure interpreter performance (10–100× slower than JIT-compiled code). A warm-up phase lets the JIT fully optimize the code before measurements begin." },
+      { text: "The operating system scheduler gives the JVM more CPU time during warm-up.", correct: false, feedback: "OS scheduling is not related to JIT warm-up. The issue is purely about JIT compilation tiers." },
+      { text: "Java initializes class static fields lazily, which slows the first call.", correct: false, feedback: "Class initialization affects the very first call to a class, but that is a one-time overhead. The main issue is repeated interpreter execution before JIT kicks in." },
+    ],
+    explanation: "The HotSpot JVM interprets bytecode until a method is called ~10 000 times, then compiles it to optimized native code. Without warm-up, measurements mix slow interpreted iterations with fast compiled iterations, making results inconsistent and unrepresentative of production throughput.",
+  },
+  endQ1: {
+    id: "jmh-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the purpose of the `@State(Scope.Benchmark)` annotation in JMH?",
+    options: [
+      { text: "It marks a class whose instances are created once and shared across all benchmark threads.", correct: true, feedback: "Correct. `Scope.Benchmark` means one shared instance per benchmark run. Use `Scope.Thread` for per-thread state and `Scope.Group` for group-shared state." },
+      { text: "It tells JMH to run the benchmark in a separate JVM process.", correct: false, feedback: "Running in a forked JVM is controlled by the `@Fork` annotation, not `@State`." },
+      { text: "It prevents the JIT from eliminating the benchmark method as dead code.", correct: false, feedback: "Dead code elimination is prevented by consuming return values via `Blackhole` or returning them from the benchmark method. `@State` manages object lifecycle." },
+      { text: "It enables JMH to measure memory allocation instead of CPU time.", correct: false, feedback: "Allocation profiling requires the `GCProfiler` or similar JMH profiler add-on. `@State` is purely about object scope." },
+    ],
+    explanation: "`@State` tells JMH how to manage instances of a class used as benchmark input or fixtures. `Scope.Benchmark` shares the state across all concurrent threads; `Scope.Thread` gives each thread its own copy to avoid contention.",
+  },
+  endQ2: {
+    id: "jmh-end-2",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+public class StringBenchmark {
+
+    @Benchmark
+    public void concatStrings() {
+        String s = "";
+        for (int i = 0; i < 100; i++) {
+            s += i;       // bug here
+        }
+        // result 's' is never used
+    }
+}`,
+    buggyLine: 8,
+    issue: "The result `s` is never returned or consumed by a `Blackhole`. The JIT can detect that `s` has no observable effect and eliminate the entire loop as dead code, measuring near-zero time instead of the actual string concatenation cost.",
+    explanation: "JMH benchmarks must either return the result from the `@Benchmark` method, or pass it to a `Blackhole` parameter (`Blackhole bh` then `bh.consume(s)`). Without this, the JIT's dead code elimination makes the benchmark meaningless.",
+  },
+  endQ3: {
+    id: "jmh-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the annotation to configure JMH to perform 5 warm-up iterations of 2 seconds each before measuring:",
+    code: `@___(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
+@Benchmark
+public String myBenchmark() { ... }`,
+    correctAnswers: ["Warmup"],
+    caseSensitive: true,
+    explanation: "`@Warmup` configures the warm-up phase before measurements start. `@Measurement` configures the measured phase with the same parameters. Both are essential for reliable benchmarks — warm-up lets the JIT fully compile the code, and measurement controls how many data points are collected.",
+  },
+};
+
+Microbenchmarks are among the most misused tools in a Java developer's arsenal. A well-intentioned benchmark that skips warm-up, ignores dead code elimination, or runs in the same JVM as its test fixtures can produce numbers that are off by 100× in either direction. JMH (Java Microbenchmark Harness), developed by JVM engineers at Oracle, addresses every one of these pitfalls. If you're writing a microbenchmark without JMH, you're almost certainly writing a wrong microbenchmark.
+
+## Why naive benchmarks lie
+
+Consider this "benchmark":
+
+```java
+// DO NOT do this — every pathology in one example
+long start = System.currentTimeMillis();
+for (int i = 0; i < 1_000_000; i++) {
+    String s = "hello" + i;   // result discarded — JIT may eliminate entirely
+}
+long elapsed = System.currentTimeMillis() - start;
+System.out.println("Took: " + elapsed + " ms");
+```
+
+Problems:
+1. **No warm-up** — first iterations run in the interpreter, inflating the result.
+2. **Dead code elimination** — `s` is never used; the JIT may remove the loop body entirely, measuring 0 ns.
+3. **Single run** — one measurement has high variance. You need many iterations averaged.
+4. **Same JVM as test setup** — class loading and JIT state from other code pollutes results.
+5. **Low resolution** — `currentTimeMillis` has ~10 ms precision; the loop may run in 1 ms.
+
+JMH fixes all of these by design.
+
+## JMH setup
+
+Add JMH to your `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>org.openjdk.jmh</groupId>
+    <artifactId>jmh-core</artifactId>
+    <version>1.37</version>
+</dependency>
+<dependency>
+    <groupId>org.openjdk.jmh</groupId>
+    <artifactId>jmh-generator-annprocess</artifactId>
+    <version>1.37</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+Run benchmarks with: `java -jar target/benchmarks.jar`
+
+## Core annotations
+
+```java
+import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.infra.Blackhole;
+import java.util.concurrent.TimeUnit;
+
+@BenchmarkMode(Mode.AverageTime)           // measure average call time
+@OutputTimeUnit(TimeUnit.NANOSECONDS)      // report in nanoseconds
+@Warmup(iterations = 5, time = 1)         // 5 × 1-second warm-up iterations
+@Measurement(iterations = 10, time = 1)   // 10 × 1-second measurement iterations
+@Fork(2)                                  // run in 2 separate JVM forks
+@State(Scope.Benchmark)                   // one shared instance per benchmark
+public class ExampleBenchmark {
+
+    private String input;
+
+    @Setup(Level.Trial)                   // called once before all iterations
+    public void setUp() {
+        input = "Hello, World!";
+    }
+
+    @Benchmark
+    public int measureHashCode() {
+        return input.hashCode();          // return value prevents dead code elimination
+    }
+
+    @Benchmark
+    public void measureToUpperCase(Blackhole bh) {
+        bh.consume(input.toUpperCase());  // Blackhole prevents elimination too
+    }
+}
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## `@BenchmarkMode` options
+
+| Mode | Measures | Use for |
+|------|----------|---------|
+| `AverageTime` | Average time per operation | Latency comparisons |
+| `Throughput` | Operations per time unit | Throughput comparisons |
+| `SampleTime` | Latency distribution (percentiles) | Tail latency analysis |
+| `SingleShotTime` | One cold call | Startup/init cost |
+
+For most comparisons, `AverageTime` or `Throughput` are sufficient.
+
+## `@State` scopes
+
+```java
+@State(Scope.Thread)    // each benchmark thread gets its own instance
+@State(Scope.Benchmark) // one instance shared by all threads (default for comparisons)
+@State(Scope.Group)     // shared within a thread group (for concurrency tests)
+```
+
+If the state object is mutable and you want contention-free measurements, use `Scope.Thread`. If you want to measure concurrent access patterns, use `Scope.Benchmark`.
+
+## Interpreting results
+
+Sample JMH output:
+
+```
+Benchmark                          Mode  Cnt     Score    Error  Units
+StringBenchmark.concatLoop         avgt   20  38421.234 ± 412.1  ns/op
+StringBenchmark.stringBuilderLoop  avgt   20    423.891 ±   8.3  ns/op
+```
+
+- **Score** — the measured average time per operation.
+- **Error** (±) — 99% confidence interval. If two benchmarks' intervals overlap, the difference may not be statistically significant.
+- **Cnt** — total measurement samples (forks × iterations).
+
+The `StringBuilder` version is ~90× faster. A small error interval means the result is reliable.
+
+<Note>Always use `@Fork(2)` or higher to run benchmarks in multiple JVM processes. A single JVM may have JIT compilation artifacts that skew results. Multiple forks average out JIT non-determinism.</Note>
+
+## Try it
+
+Compare `StringBuilder` against `+` concatenation with proper JMH-style annotations:
+
+```java
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@Warmup(iterations = 5, time = 1)
+@Measurement(iterations = 10, time = 1)
+@Fork(2)
+@State(Scope.Benchmark)
+public class ConcatBenchmark {
+
+    private static final int ITERATIONS = 1_000;
+
+    @Benchmark
+    public String plusConcat() {
+        String s = "";
+        for (int i = 0; i < ITERATIONS; i++) {
+            s += i;
+        }
+        return s;   // return prevents dead code elimination
+    }
+
+    @Benchmark
+    public String stringBuilderConcat() {
+        StringBuilder sb = new StringBuilder(ITERATIONS * 4);
+        for (int i = 0; i < ITERATIONS; i++) {
+            sb.append(i);
+        }
+        return sb.toString();
+    }
+}
+```
+
+What JMH would show: `plusConcat` is O(n²) in allocations (each `+=` copies the entire string) while `stringBuilderConcat` is O(n). With `ITERATIONS = 1000` the builder version is typically 50–100× faster. Notice that `javac` may optimize `"hello" + i` to `StringBuilder` in a simple non-loop case, but it cannot do so across loop iterations.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting to warm up** — using `@Fork(0)` and no `@Warmup` measures cold interpreter performance. Always warm up.
+- **Dead code elimination** — not returning or consuming results. The JIT sees that nothing observable depends on the computation and eliminates it. Always return the result or use `Blackhole`.
+- **Benchmarking in the IDE** — running JMH tests via JUnit or in an IDE shares the JVM with test framework overhead. Always run via `java -jar benchmarks.jar`.
+- **Interpreting overlapping error intervals as a real difference** — if two benchmarks' ± ranges overlap, the results are not statistically distinguishable. Add more iterations (`@Measurement(iterations = 20)`) to tighten the intervals.
+
+## Recap
+
+- Naive benchmarks suffer from **no warm-up**, **dead code elimination**, **high variance**, and **low timer precision**. JMH fixes all of these.
+- `@Benchmark`, `@Warmup`, `@Measurement`, `@Fork`, and `@State` are the core annotations.
+- Prevent dead code elimination by **returning results** or consuming them with a **`Blackhole`**.
+- Use `@Fork(2+)` to run in separate JVM processes and average out JIT artifacts.
+- Read the **error interval (±)** — overlapping intervals mean the difference is not statistically significant.
+
+**Up next:** Common Java Performance Traps — boxing, regex, and other subtle killers waiting in everyday code.

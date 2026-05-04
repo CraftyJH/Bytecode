@@ -1,0 +1,216 @@
+export const meta = {
+  title: "Testing Exceptions & Edge Cases",
+  duration: 12,
+  order: 5,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "tex-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "You want to assert that a method throws an `IllegalArgumentException` AND that the message contains \"negative\". Which approach works correctly?",
+    options: [
+      { text: "`assertThrows(IllegalArgumentException.class, () -> method()); // done`", correct: false, feedback: "This only checks the exception type. Without inspecting the returned exception you cannot verify the message." },
+      { text: "`IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> method()); assertTrue(ex.getMessage().contains(\"negative\"));`", correct: true, feedback: "Correct — assertThrows returns the thrown exception. You can then call getMessage(), getCause(), or any other method on it to make further assertions." },
+      { text: "`@Test(expected = IllegalArgumentException.class, message = \"negative\")`", correct: false, feedback: "JUnit 5 has no such attribute. The expected/message pattern was a limited JUnit 4 feature that didn't support message checking anyway." },
+      { text: "`try { method(); fail(); } catch (Exception e) { assertEquals(\"negative\", e.getMessage()); }`", correct: false, feedback: "This works but it is verbose, error-prone (if method() doesn't throw, fail() has to be called manually), and less readable than assertThrows." },
+    ],
+    explanation: "assertThrows(Type.class, executable) both verifies the type and returns the exception object. Capturing it in a variable gives you full access to inspect message, cause, or any custom fields — which is why JUnit 5 deprecated the old @Test(expected=...) style.",
+  },
+  endQ1: {
+    id: "tex-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What is the difference between assertThrows and assertThrowsExactly in JUnit 5?",
+    options: [
+      { text: "assertThrows accepts subtypes; assertThrowsExactly requires the exact declared type.", correct: true, feedback: "Correct — assertThrows passes if the thrown exception is the specified type OR any subtype. assertThrowsExactly uses instanceof-exact matching — the class must match precisely." },
+      { text: "assertThrowsExactly checks the exception message automatically.", correct: false, feedback: "Neither method checks the message automatically. Both return the exception so you can inspect it yourself." },
+      { text: "assertThrows is for checked exceptions; assertThrowsExactly is for unchecked.", correct: false, feedback: "Both methods work with any Throwable regardless of checked/unchecked status." },
+      { text: "They are identical — assertThrowsExactly is just an alias.", correct: false, feedback: "They have different subtype semantics. assertThrows uses instanceof; assertThrowsExactly compares getClass() directly." },
+    ],
+    explanation: "If your method declares `throws IOException` but actually throws a `FileNotFoundException` (a subtype), assertThrows(IOException.class, ...) passes while assertThrowsExactly(IOException.class, ...) fails. Use assertThrowsExactly when the exact exception class matters for the contract.",
+  },
+  endQ2: {
+    id: "tex-end-2",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `int divide(int a, int b) {
+    if (b == 0) throw new ArithmeticException("Division by zero");
+    return a / b;
+}
+
+@Test
+void divideByZeroThrows() {
+    ArithmeticException ex = assertThrows(
+        ArithmeticException.class,
+        () -> divide(10, 0)
+    );
+    System.out.println(ex.getMessage());
+}`,
+    expectedOutput: "Division by zero",
+    explanation: "assertThrows captures the exception and returns it. Printing ex.getMessage() prints the string passed to the ArithmeticException constructor. The test passes because the exception type matches and the message is printed to stdout.",
+  },
+  endQ3: {
+    id: "tex-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "Which technique groups inputs into categories where the system is expected to behave identically for all values in the same group?",
+    options: [
+      { text: "Boundary value analysis", correct: false, feedback: "Boundary value analysis focuses on the edges (min, max, just inside, just outside) of a range — not on grouping equivalent inputs." },
+      { text: "Equivalence partitioning", correct: true, feedback: "Correct — equivalence partitioning divides inputs into classes (valid, invalid, edge) where all members of a class should trigger the same behaviour. Test one representative from each class." },
+      { text: "Property-based testing", correct: false, feedback: "Property-based testing generates random inputs that satisfy a property invariant. It overlaps with partitioning but is a distinct automated technique." },
+      { text: "Mutation testing", correct: false, feedback: "Mutation testing evaluates test quality by introducing deliberate code bugs (mutants) and checking whether tests catch them." },
+    ],
+    explanation: "Equivalence partitioning says: if divide(10, 3) and divide(100, 7) both represent 'non-zero divisor — valid', testing both adds no information over testing just one. Identify the classes (zero, positive, negative, max-int) and test one representative from each rather than exhausting the entire input space.",
+  },
+};
+
+Most developers test the happy path first — the input is valid, the service responds, everything works. Edge cases are where bugs actually live: null inputs that slip through, zero-divisors that crash arithmetic, string boundaries that exceed column widths, or negative values that make no physical sense. Testing exceptions and edges is not pessimism — it is completeness.
+
+## assertThrows — the complete pattern
+
+`assertThrows` verifies the exception type and returns the thrown instance so you can inspect it:
+
+```java
+@Test
+void withdrawNegativeAmountThrowsIllegalArgument() {
+    BankAccount account = new BankAccount(100.0);
+
+    IllegalArgumentException ex = assertThrows(
+        IllegalArgumentException.class,
+        () -> account.withdraw(-50.0)
+    );
+
+    assertTrue(ex.getMessage().contains("negative"),
+        "Expected message to mention 'negative' but was: " + ex.getMessage());
+}
+```
+
+The third argument to `assertThrows` (not used above) is a message supplier — it prints a description when the assertion itself fails (i.e., when no exception is thrown at all), not when the exception has the wrong message.
+
+## assertThrowsExactly
+
+```java
+// assertThrows passes if FileNotFoundException is thrown (it IS an IOException)
+assertThrows(IOException.class, () -> readFile("missing.txt"));
+
+// assertThrowsExactly fails if FileNotFoundException is thrown instead of plain IOException
+assertThrowsExactly(IOException.class, () -> readFile("missing.txt"));
+```
+
+Use `assertThrowsExactly` when the precise type in the public contract matters — for example, when callers catch the specific exception class and behave differently for subtypes.
+
+<Note>Testing the exception message is particularly important when a method can throw the same exception type for multiple reasons. "Amount must be positive" and "Amount exceeds limit" are both IllegalArgumentException but represent different bugs. Your test should verify which one actually fired.</Note>
+
+## Testing null inputs
+
+A well-designed public API should document and enforce null-safety. Test it explicitly:
+
+```java
+@Test
+void nullNameThrowsNullPointerException() {
+    assertThrows(NullPointerException.class,
+        () -> new Customer(null, "alice@example.com"));
+}
+
+@Test
+void nullEmailThrowsIllegalArgument() {
+    IllegalArgumentException ex = assertThrows(
+        IllegalArgumentException.class,
+        () -> new Customer("Alice", null));
+    assertEquals("Email must not be null", ex.getMessage());
+}
+```
+
+If you use `Objects.requireNonNull` in the constructor, JUnit will produce a clear failure message if the null check ever gets accidentally removed.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Boundary value analysis
+
+For any range `[min, max]`, test:
+- The minimum value
+- Just below minimum (should fail/throw)
+- Just above minimum (should succeed)
+- The maximum value
+- Just above maximum (should fail/throw)
+
+```java
+@ParameterizedTest
+@CsvSource({
+    "-1,  false",   // just below minimum (age cannot be negative)
+    " 0,  true",    // minimum boundary
+    " 1,  true",    // just above minimum
+    "150, true",    // maximum reasonable boundary
+    "151, false",   // just above maximum
+})
+void ageValidationBoundaries(int age, boolean valid) {
+    assertEquals(valid, Person.isValidAge(age));
+}
+```
+
+## Equivalence partitioning
+
+Rather than testing every possible integer, group inputs into *equivalence classes* — sets where the system is expected to behave identically for every member:
+
+| Class | Representative | Expected |
+|---|---|---|
+| Negative divisor | -3 | Result is negative |
+| Zero divisor | 0 | ArithmeticException |
+| Positive divisor | 5 | Result is positive |
+| Integer overflow | MAX_INT / -1 | Overflow or exception |
+
+Test one representative from each class. Testing `divide(10, 3)` and `divide(100, 7)` in the same class adds no new information.
+
+## Try it
+
+Implement and thoroughly test a `divide` method:
+
+```java
+public class MathUtils {
+    public static int divide(int numerator, int denominator) {
+        if (denominator == 0) {
+            throw new ArithmeticException("Cannot divide by zero");
+        }
+        return numerator / denominator;
+    }
+}
+```
+
+Write tests covering these equivalence classes and boundaries:
+1. Happy path: positive / positive
+2. Happy path: negative numerator / positive denominator
+3. Zero numerator (result is zero, no exception)
+4. Zero denominator — verify exception type AND message
+5. `Integer.MAX_VALUE / 1` — verify no overflow occurs
+6. `Integer.MIN_VALUE / -1` — this overflows silently in Java; document the behaviour with a test
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Only asserting exception type, not message** — when a method throws the same exception for multiple reasons, a type-only assertion can pass even when the wrong code path fired. Always check the message when the contract distinguishes causes.
+- **Testing implementation instead of contract** — if `withdraw(-1)` throws `IllegalArgumentException` today but you later refactor to throw a custom `InvalidAmountException` (a subtype), `assertThrows(IllegalArgumentException.class, ...)` still passes. That may be intentional with subtype matching, or it may hide a breaking contract change. Know which you want.
+- **Forgetting the overflow case for integer arithmetic** — `Integer.MIN_VALUE / -1` and `Integer.MAX_VALUE + 1` are classic bugs. Test them explicitly; Java does not throw on integer overflow by default.
+- **Empty catch blocks in test code** — writing `try { method(); } catch (Exception e) { }` and calling it a test means exceptions are silently swallowed. Always let unexpected exceptions propagate, or explicitly call `fail()` if the code should have thrown but did not.
+
+## Recap
+
+- **assertThrows** verifies exception type AND returns the exception for message/cause inspection
+- **assertThrowsExactly** requires the precise class, rejecting subtypes
+- Always test null inputs for any public method that does not accept null
+- **Boundary value analysis**: test at min, just below, just above, at max, just above max
+- **Equivalence partitioning**: group inputs into classes; test one representative per class
+- Integer overflow is silent in Java — document and test its behaviour explicitly
+
+**Up next:** Test structure — naming conventions, isolation, and the taxonomy of test doubles.

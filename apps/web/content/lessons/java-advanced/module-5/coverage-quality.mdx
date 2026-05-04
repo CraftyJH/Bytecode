@@ -1,0 +1,216 @@
+export const meta = {
+  title: "Code Coverage — What It Measures (and Doesn't)",
+  duration: 12,
+  order: 7,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "cov-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A method has one `if` statement with no `else` clause. 100% line coverage is achieved. What does branch coverage reveal that line coverage does not?",
+    options: [
+      { text: "Nothing — line coverage and branch coverage are equivalent for this case.", correct: false, feedback: "They are not equivalent. An if without an else has two branches: the condition being true and the condition being false. Line coverage cannot distinguish them." },
+      { text: "Whether the false branch (the case where the if condition is not taken) has been tested.", correct: true, feedback: "Correct — line coverage marks the `if` line as covered when any execution reaches it. Branch coverage requires both the true path (condition met) and the false path (condition not met) to be exercised." },
+      { text: "Whether the method was called at all.", correct: false, feedback: "If the method was never called, no lines would be covered either. Line coverage already captures this." },
+      { text: "Whether every local variable was used.", correct: false, feedback: "Coverage tools track control flow, not variable usage. Dead variable detection is handled by static analysis tools (e.g., SpotBugs, the compiler's unused-variable warning)." },
+    ],
+    explanation: "An if-without-else creates two branches. Line coverage marks the if-line as 'hit' as long as any execution reaches it. Branch coverage requires the test suite to exercise both the truthy branch and the implicit empty falsy branch. Missing the false branch means you have never tested what happens when the condition is not triggered.",
+  },
+  endQ1: {
+    id: "cov-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why is 100% code coverage not a sufficient goal for test quality?",
+    options: [
+      { text: "Because most projects can never practically achieve 100% coverage.", correct: false, feedback: "Some projects do achieve 100% — the problem is that even if they did, it would not guarantee correctness." },
+      { text: "Because a test can execute every line without making any assertions, giving 100% coverage with zero meaningful verification.", correct: true, feedback: "Correct — coverage measures execution, not correctness. `method(); // no assertion` covers the method but tests nothing. The assertion is what catches bugs." },
+      { text: "Because coverage tools are inaccurate and cannot be trusted.", correct: false, feedback: "Modern coverage tools (JaCoCo, IntelliJ's built-in) are reliable. The limitation is what coverage conceptually measures, not measurement accuracy." },
+      { text: "Because 100% coverage causes tests to run too slowly.", correct: false, feedback: "Coverage reporting adds overhead to the test run but is not the reason 100% coverage is an insufficient quality signal." },
+    ],
+    explanation: "Coverage is a necessary but not sufficient condition for quality. It tells you which code was executed; it says nothing about whether the test checked the result was correct. A meaningful test suite combines good coverage with meaningful assertions.",
+  },
+  endQ2: {
+    id: "cov-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the JaCoCo Maven plugin element that sets a minimum line coverage requirement of 80% (the build fails below this threshold):",
+    code: `<rule>
+  <element>BUNDLE</element>
+  <limits>
+    <limit>
+      <counter>LINE</counter>
+      <value>COVEREDRATIO</value>
+      <minimum>___</minimum>
+    </limit>
+  </limits>
+</rule>`,
+    correctAnswers: ["0.80", "0.8"],
+    caseSensitive: false,
+    explanation: "JaCoCo expresses coverage ratios as decimal fractions between 0 and 1. A minimum of 0.80 means the build fails if less than 80% of lines are covered. This is configured in the `check` goal of the jacoco-maven-plugin.",
+  },
+  endQ3: {
+    id: "cov-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "What does a mutation testing tool like PIT (Pitest) actually do?",
+    options: [
+      { text: "It generates random inputs and checks whether the program crashes.", correct: false, feedback: "That describes fuzz testing or property-based testing, not mutation testing." },
+      { text: "It introduces small code changes (mutants) and checks whether the test suite catches them.", correct: true, feedback: "Correct — PIT modifies production code one change at a time (replace + with -, negate a boolean, remove a return statement, etc.). A 'killed' mutant means at least one test failed — good. A 'surviving' mutant means the tests passed even with the bug — a gap in the test suite." },
+      { text: "It measures how many lines of code are executed during the test run.", correct: false, feedback: "That is line coverage, measured by tools like JaCoCo." },
+      { text: "It checks whether test methods have at least one assertion each.", correct: false, feedback: "Static analysis tools or custom test-quality rules can check for empty tests. Mutation testing is about executing the suite against modified code." },
+    ],
+    explanation: "Mutation testing is the gold standard of test quality evaluation. If you can change `>` to `>=` in production code and all tests still pass, your tests never exercised the boundary condition the operator controls. A high mutation score (>80%) correlates strongly with a suite that catches real bugs.",
+  },
+};
+
+A project's test coverage percentage is one of the first numbers a new team member sees on the CI dashboard — and one of the most misunderstood. Coverage tells you which code was *executed* during the test run. It says nothing about whether the tests were *correct*. Understanding what coverage measures, and equally what it does not, is essential for building a test suite you can actually trust.
+
+## Line coverage vs branch coverage
+
+**Line coverage** marks each executable line as covered or uncovered. A line is covered if any test causes its execution at least once.
+
+**Branch coverage** tracks every possible outcome of every decision point. An `if (condition)` has two branches: true and false. A `switch` with four cases has four branches. Line coverage can be 100% while a significant branch is never exercised.
+
+```java
+public String classify(int n) {
+    if (n > 0) {           // line 2
+        return "positive"; // line 3
+    }
+    return "non-positive"; // line 5
+}
+```
+
+If a test only calls `classify(5)`:
+- **Line coverage:** lines 2, 3 are covered (line 5 is not — 75% line coverage)
+- **Branch coverage:** true branch covered, false branch (n ≤ 0) not covered
+
+If a second test calls `classify(-1)`:
+- **Line coverage:** all four lines covered (100%)
+- **Branch coverage:** both branches covered (100%)
+
+Now consider a more subtle case:
+
+```java
+public void process(String value) {
+    if (value != null) {        // branch: null and non-null
+        save(value.trim());
+    }
+    // no else — null case falls through silently
+}
+```
+
+100% line coverage is achievable by only passing a non-null value. Branch coverage exposes the untested null case.
+
+## JaCoCo basics
+
+JaCoCo (Java Code Coverage) is the standard coverage tool for Maven and Gradle projects. Add it to `pom.xml`:
+
+```xml
+<plugin>
+    <groupId>org.jacoco</groupId>
+    <artifactId>jacoco-maven-plugin</artifactId>
+    <version>0.8.12</version>
+    <executions>
+        <execution>
+            <goals><goal>prepare-agent</goal></goals>
+        </execution>
+        <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals><goal>report</goal></goals>
+        </execution>
+    </executions>
+</plugin>
+```
+
+Run `mvn test` and open `target/site/jacoco/index.html`. JaCoCo colour-codes each line green (fully covered), yellow (partially covered — some branches missed), or red (not covered at all).
+
+<Note>JaCoCo's yellow highlighting is your most actionable signal. A yellow `if` line means some branches are tested and others are not — exactly the kind of subtle gap that hides real bugs. Prioritise yellows over hunting for more green lines.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Why 100% coverage is not the goal
+
+Consider this test:
+
+```java
+@Test
+void coverageGame() {
+    String result = classify(5);
+    // No assertion — the method ran, so the line is covered
+}
+```
+
+This test contributes to coverage metrics but verifies nothing. A method that returns the wrong value, throws an unexpected exception, or corrupts state will not be caught by it. **Coverage measures execution, not correctness.**
+
+The real goal is *meaningful assertions* on covered code. A 70% coverage suite where every test has clear assertions is far more valuable than a 100% suite padded with assertion-free calls.
+
+## Mutation testing — evaluating test quality
+
+Mutation testing answers the question coverage cannot: "If I introduced a bug right here, would any test catch it?"
+
+A mutation testing tool (PIT/Pitest is the Java standard) automatically:
+1. Copies the production code
+2. Applies one small change (*mutation*): negates a boolean, replaces `+` with `-`, removes a return statement, changes `>` to `>=`, etc.
+3. Runs the full test suite against the mutated code
+4. Records whether any test failed
+
+A **killed mutant** — the test suite detected the change — is good. A **surviving mutant** — all tests passed despite the bug — reveals a gap.
+
+```java
+// Original
+if (age >= 18) return "adult";
+
+// Mutant: > instead of >=
+if (age > 18) return "adult";
+```
+
+If no test checks the boundary value `age == 18`, this mutant survives. The test suite has 100% line coverage but misses the boundary condition that matters most.
+
+## Try it
+
+Examine this method:
+
+```java
+public String getDiscount(int loyaltyYears, boolean isPremium) {
+    if (loyaltyYears >= 5) {
+        return isPremium ? "30%" : "15%";
+    }
+    return "0%";
+}
+```
+
+1. Identify all branches: how many are there?
+2. Write the minimum set of tests to achieve 100% branch coverage — list the inputs you would use.
+3. Now think like a mutation tester: what would happen if `>=` were changed to `>`? Write the specific test case that kills that mutant.
+4. What happens if `isPremium ? "30%" : "15%"` is replaced with just `"15%"`? Write the test that catches it.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Treating coverage percentage as a quality target** — "we must reach 80%" leads teams to write meaningless tests just to hit the number. Coverage should be a *diagnostic* tool, not a goal.
+- **Ignoring branch coverage in favour of line coverage** — most CI pipelines are configured for line coverage because it is simpler. Add branch coverage checks too; the extra configuration is minimal and the signal is significantly more valuable.
+- **Not running mutation testing** — even with 100% branch coverage, a suite can miss boundary conditions. Running PIT/Pitest on CI at least periodically catches these gaps before production does.
+- **Excluding generated or trivial code from coverage and forgetting about it** — excluding getter/setter boilerplate is reasonable. Excluding complex business logic from the coverage report because it was hard to test is a red flag that indicates untested risk.
+
+## Recap
+
+- **Line coverage** marks lines as executed; **branch coverage** requires every if/switch outcome to be tested
+- JaCoCo's **yellow lines** show partially covered branches — the most actionable coverage signal
+- 100% coverage does not mean bug-free: a test with no assertions contributes coverage but verifies nothing
+- **Mutation testing** (PIT/Pitest) evaluates whether your tests would catch real bugs by introducing deliberate faults
+- Use coverage as a diagnostic to find gaps, not as a target to maximise for its own sake
+
+**Up next:** Capstone — integration testing strategies, test containers, and end-to-end verification without sacrificing speed.

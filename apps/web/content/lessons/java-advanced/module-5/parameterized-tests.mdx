@@ -1,0 +1,218 @@
+export const meta = {
+  title: "Parameterized Tests & Test Factories",
+  duration: 13,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "pt-mid-1",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the @CsvSource annotation so the test receives (2, 4) and (3, 9) as (input, expected) pairs:",
+    code: `@ParameterizedTest
+@CsvSource({___, "3, 9"})
+void squareReturnsCorrectResult(int input, int expected) {
+    assertEquals(expected, MathUtils.square(input));
+}`,
+    correctAnswers: ["\"2, 4\"", "'2, 4'"],
+    caseSensitive: false,
+    explanation: "@CsvSource takes string literals where each string is one row of comma-separated values. JUnit 5 converts each column to the declared parameter type automatically. The entry for (2, 4) is written as the string \"2, 4\".",
+  },
+  endQ1: {
+    id: "pt-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which source annotation supplies a single argument of one type to a parameterized test?",
+    options: [
+      { text: "@CsvSource", correct: false, feedback: "@CsvSource provides multiple comma-separated columns per row, used when the test needs more than one argument." },
+      { text: "@ValueSource", correct: true, feedback: "Correct — @ValueSource takes an array of literals of a single type (ints, strings, etc.) and feeds each one as the sole argument to the test method." },
+      { text: "@MethodSource", correct: false, feedback: "@MethodSource points to a factory method that returns a stream of arguments — useful for complex objects, but more than one value per invocation." },
+      { text: "@EnumSource", correct: false, feedback: "@EnumSource iterates over an enum's constants, not arbitrary single values." },
+    ],
+    explanation: "@ValueSource is the simplest source: one type, one array, one argument per invocation. Use it for quick single-parameter cases like testing a method against several integer inputs or string values.",
+  },
+  endQ2: {
+    id: "pt-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `@ParameterizedTest
+@MethodSource("primeProvider")
+void isPrime(int candidate) {
+    assertTrue(MathUtils.isPrime(candidate));
+}
+
+List<Integer> primeProvider() {
+    return List.of(2, 3, 5, 7, 11);
+}`,
+    buggyLine: 7,
+    issue: "@MethodSource factory methods must be static (unless @TestInstance(PER_CLASS) is used). A non-static provider method causes a JUnit 5 error at runtime.",
+    explanation: "JUnit 5 invokes the method source before creating any test instance, so the factory must be accessible without an instance — it must be static. Add the `static` modifier: `static List<Integer> primeProvider() { ... }`.",
+  },
+  endQ3: {
+    id: "pt-end-3",
+    type: "multiple_choice",
+    difficulty: "hard",
+    question: "What does @DynamicTest allow that @ParameterizedTest does not?",
+    options: [
+      { text: "Running tests in parallel across multiple threads.", correct: false, feedback: "Parallel execution is controlled by JUnit 5 configuration, not by @DynamicTest." },
+      { text: "Generating test cases at runtime with per-test display names computed from data.", correct: true, feedback: "Correct — @DynamicTest instances are constructed at runtime from a Stream. Each has a programmatically generated display name and executable, giving full flexibility over test identity." },
+      { text: "Skipping individual test cases based on a condition.", correct: false, feedback: "@ParameterizedTest combined with Assumptions.assumeTrue() can already skip individual cases conditionally." },
+      { text: "Using non-static source methods without @TestInstance.", correct: false, feedback: "@DynamicTest is still returned from a @TestFactory method that has the same static constraints as @MethodSource." },
+    ],
+    explanation: "@DynamicTest enables truly runtime-generated tests. Each DynamicTest has its own name (built from the data) and executable. This is useful when the set of test cases isn't known until you read a file, hit a database, or compute combinations at test startup.",
+  },
+};
+
+Writing the same assertion five times with slightly different inputs is the kind of copy-paste noise that makes test suites hard to maintain. JUnit 5's parameterized test support lets you declare the logic once and supply the data separately — the framework runs the method once per data row, reports each invocation individually, and makes the intent explicit.
+
+## @ParameterizedTest + @ValueSource
+
+The simplest parameterized form: one value, one type, no ceremony.
+
+```java
+@ParameterizedTest
+@ValueSource(strings = {"", " ", "\t", "\n"})
+void isBlankReturnsTrueForWhitespaceAndEmpty(String input) {
+    assertTrue(StringUtils.isBlank(input));
+}
+```
+
+`@ValueSource` supports `ints`, `longs`, `doubles`, `strings`, `chars`, `booleans`, `bytes`, `shorts`, and `classes`. Each element triggers one test invocation with its own result line in the report.
+
+## @CsvSource — multiple arguments per row
+
+When the test needs both an input and an expected value, `@CsvSource` maps comma-separated columns to method parameters:
+
+```java
+@ParameterizedTest(name = "toUpperCase({0}) = {1}")
+@CsvSource({
+    "hello,  HELLO",
+    "world,  WORLD",
+    "Java,   JAVA",
+    "'',     ''",          // empty string — quoted so CSV parser doesn't swallow it
+})
+void toUpperCase(String input, String expected) {
+    assertEquals(expected, input.toUpperCase());
+}
+```
+
+The optional `name` attribute uses `{0}`, `{1}` placeholders for the arguments, giving each run a readable display name in the IDE.
+
+<Note>Use single quotes inside @CsvSource strings to represent empty strings or strings containing commas: `"'hello, world', 11"` — the outer double-quotes are Java string delimiters; the inner single-quotes are CSV quoting.</Note>
+
+## @MethodSource — factory methods for complex inputs
+
+When inputs are objects or the data needs construction logic, point to a static factory method:
+
+```java
+@ParameterizedTest
+@MethodSource("triangleProvider")
+void triangleAreaIsCorrect(double base, double height, double expectedArea) {
+    assertEquals(expectedArea, Geometry.triangleArea(base, height), 0.001);
+}
+
+static Stream<Arguments> triangleProvider() {
+    return Stream.of(
+        Arguments.of(3.0, 4.0, 6.0),
+        Arguments.of(5.0, 2.0, 5.0),
+        Arguments.of(10.0, 1.0, 5.0)
+    );
+}
+```
+
+The factory must be **static** (unless `@TestInstance(PER_CLASS)` is active). It returns `Stream<Arguments>`, `List<Arguments>`, or any `Iterable<Arguments>`.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## @EnumSource
+
+When the test should run for every (or a selected subset of) enum constants:
+
+```java
+enum Day { MON, TUE, WED, THU, FRI, SAT, SUN }
+
+@ParameterizedTest
+@EnumSource(value = Day.class, names = {"SAT", "SUN"})
+void weekendDaysAreNotWorkDays(Day day) {
+    assertFalse(Schedule.isWorkDay(day));
+}
+```
+
+Omit the `names` attribute to run the test for every constant. Use `mode = EXCLUDE` to blacklist specific constants instead of whitelisting them.
+
+## @DynamicTest factory
+
+Sometimes test cases are not known at compile time — they come from a file, a database query, or a computation. `@TestFactory` returns a `Stream<DynamicTest>` where each test has a runtime-computed name and executable:
+
+```java
+@TestFactory
+Stream<DynamicTest> dynamicPrimeTests() {
+    List<Integer> primes = List.of(2, 3, 5, 7, 11, 13);
+    return primes.stream()
+        .map(n -> DynamicTest.dynamicTest(
+            n + " should be prime",
+            () -> assertTrue(MathUtils.isPrime(n))
+        ));
+}
+```
+
+Each returned `DynamicTest` appears as its own entry in the test report with its custom name.
+
+## Try it
+
+Implement `MathUtils.isPrime(int n)` and write two parameterized test methods:
+
+```java
+// Test 1 — @ValueSource for known primes
+@ParameterizedTest
+@ValueSource(ints = {2, 3, 5, 7, 11, 13, 17, 19})
+void knownPrimesReturnTrue(int n) {
+    assertTrue(MathUtils.isPrime(n));
+}
+
+// Test 2 — @CsvSource for input/expected pairs (including non-primes)
+@ParameterizedTest
+@CsvSource({
+    "1,  false",
+    "4,  false",
+    "9,  false",
+    "2,  true",
+    "7,  true",
+    "25, false",
+})
+void isPrimeReturnsExpected(int input, boolean expected) {
+    assertEquals(expected, MathUtils.isPrime(input));
+}
+```
+
+Run both tests and observe how each CSV row appears as a separate result. Then add a third test using `@MethodSource` that also checks negative numbers and zero — all should return `false`.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Forgetting to annotate with both @ParameterizedTest and a source annotation** — @Test and @ParameterizedTest are mutually exclusive. Using @Test with @ValueSource silently runs only the first value; using @ParameterizedTest with no source is a configuration error.
+- **Non-static @MethodSource factory** — JUnit invokes the factory before instantiating the test class. Make it `static` or add `@TestInstance(Lifecycle.PER_CLASS)` to the class.
+- **Type mismatches in @CsvSource** — JUnit converts strings to the declared parameter types automatically, but the conversion has limits. Complex types need a registered `TypeConverter` or a `@MethodSource` instead.
+- **Overusing @DynamicTest** — dynamic tests have weaker IDE support (no run-single-test button by name). Prefer @ParameterizedTest with a data source unless you genuinely need runtime test generation.
+
+## Recap
+
+- **@ParameterizedTest + @ValueSource** is the simplest form: one type, one array, one argument per invocation
+- **@CsvSource** maps comma-separated rows to multiple method parameters
+- **@MethodSource** delegates to a static factory returning `Stream<Arguments>` for complex inputs
+- **@EnumSource** iterates over enum constants, with optional include/exclude filtering
+- **@TestFactory + DynamicTest** generates tests at runtime with per-case display names
+- JUnit reports each parameterized invocation as an independent result in the test output
+
+**Up next:** Mockito — isolate your unit under test by replacing real dependencies with programmable doubles.

@@ -1,0 +1,225 @@
+export const meta = {
+  title: "CompletableFuture — Combining & Error Recovery (Part 2)",
+  duration: 15,
+  order: 8,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "cfb-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "What is the key behavioural difference between `CompletableFuture.allOf()` and `CompletableFuture.anyOf()`?",
+    options: [
+      { text: "allOf returns the fastest result; anyOf waits for all.", correct: false, feedback: "It's the opposite. anyOf completes as soon as *one* finishes; allOf waits for *all*." },
+      { text: "allOf completes when *all* given futures complete; anyOf completes when *any one* of them completes.", correct: true, feedback: "Correct. allOf is for 'wait for everything'; anyOf is for 'take the first result available'." },
+      { text: "allOf throws if any future fails; anyOf ignores failures.", correct: false, feedback: "allOf completes exceptionally if any future fails, but anyOf can also propagate exceptions if the first-to-complete future failed." },
+      { text: "They are equivalent but allOf is for Runnable tasks and anyOf is for Callable tasks.", correct: false, feedback: "Both accept CompletableFuture arrays and are unrelated to Runnable or Callable." },
+    ],
+    explanation: "`allOf(f1, f2, …)` produces a `CompletableFuture<Void>` that completes only when *every* input future has completed. `anyOf(f1, f2, …)` produces a `CompletableFuture<Object>` that completes as soon as *the first* input future completes (with either a result or an exception). Neither gives you the individual results directly — you must call `.get()` on the originals afterwards.",
+  },
+  endQ1: {
+    id: "cfb-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.concurrent.CompletableFuture;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        CompletableFuture<String> cf = CompletableFuture
+            .supplyAsync(() -> { throw new RuntimeException("boom"); })
+            .handle((result, ex) -> ex != null ? "recovered: " + ex.getMessage() : result);
+
+        System.out.println(cf.get());
+    }
+}`,
+    expectedOutput: "recovered: boom",
+    explanation: "`handle` receives both the result and the exception (one of which will be null). Since the supplier threw, `ex` is non-null and `result` is null. The handler returns `\"recovered: boom\"`, which becomes the value of `cf`. `get()` returns it normally — no ExecutionException is thrown.",
+  },
+  endQ2: {
+    id: "cfb-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the call to combine the results of two CompletableFutures into a single string:",
+    code: `CompletableFuture<String> a = CompletableFuture.supplyAsync(() -> "Hello");
+CompletableFuture<String> b = CompletableFuture.supplyAsync(() -> "World");
+CompletableFuture<String> combined = a.___(b, (x, y) -> x + " " + y);`,
+    correctAnswers: ["thenCombine"],
+    caseSensitive: true,
+    explanation: "`thenCombine(other, biFunction)` waits for *both* this future and `other` to complete, then applies the `BiFunction` to their results. It's the standard way to merge two independent async results.",
+  },
+  endQ3: {
+    id: "cfb-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `CompletableFuture<String> f1 = CompletableFuture.supplyAsync(() -> "A");
+CompletableFuture<String> f2 = CompletableFuture.supplyAsync(() -> "B");
+
+CompletableFuture.allOf(f1, f2).get();
+
+// Retrieve results
+String r1 = f1.getNow("default1");
+String r2 = f2.getNow("default2");
+System.out.println(r1 + r2);`,
+    buggyLine: 6,
+    issue: "`getNow(fallback)` returns the fallback value if the future is not yet done. Although `allOf.get()` guarantees both are done, using getNow here is fragile. But the real bug is that `allOf` returns `CompletableFuture<Void>` — it doesn't carry the individual results. This pattern is correct, however `getNow` is error-prone vs `.get()` on the originals.",
+    explanation: "After `allOf(...).get()` both futures are guaranteed complete, so `getNow` will return the real result here. But it's better practice to call `f1.get()` and `f2.get()` directly — they won't block since the futures are already done, and they surface exceptions via `ExecutionException` rather than silently returning a fallback.",
+  },
+};
+
+Lesson 7 covered the linear pipeline: one async step flowing into the next. Real applications need more: fetching from two APIs in parallel and combining results, running a set of tasks and waiting for all of them, taking the first result from a race, or recovering from errors without losing the pipeline. `CompletableFuture` provides all of these through its combining and error-recovery methods — and with a custom thread pool, you can control exactly which threads execute each stage.
+
+## thenCombine — merging two independent results
+
+`thenCombine(other, biFunction)` waits for *both* this future and another to complete, then combines their results:
+
+```java
+CompletableFuture<String> userCf  = CompletableFuture.supplyAsync(() -> fetchUserName());
+CompletableFuture<Integer> scoreCf = CompletableFuture.supplyAsync(() -> fetchScore());
+
+CompletableFuture<String> summary = userCf.thenCombine(scoreCf,
+    (name, score) -> name + " scored " + score);
+
+System.out.println(summary.get());   // e.g. "Alice scored 42"
+```
+
+Both `supplyAsync` calls start immediately and run concurrently. `thenCombine` fires as soon as the *slower* of the two completes.
+
+## allOf — wait for everything
+
+`CompletableFuture.allOf(futures...)` returns a `CompletableFuture<Void>` that completes when *every* input future has completed:
+
+```java
+CompletableFuture<String> f1 = CompletableFuture.supplyAsync(() -> callApi("endpoint-1"));
+CompletableFuture<String> f2 = CompletableFuture.supplyAsync(() -> callApi("endpoint-2"));
+CompletableFuture<String> f3 = CompletableFuture.supplyAsync(() -> callApi("endpoint-3"));
+
+CompletableFuture.allOf(f1, f2, f3).get();  // wait for all three
+
+// Futures are guaranteed done — get() won't block
+String r1 = f1.get(), r2 = f2.get(), r3 = f3.get();
+System.out.println(r1 + " | " + r2 + " | " + r3);
+```
+
+<Note>`allOf` does not carry individual results — it returns `CompletableFuture<Void>`. After `allOf(...).get()` completes, call `.get()` on each original future to retrieve values. Those `.get()` calls return immediately because all futures are already done.</Note>
+
+## anyOf — take the first result
+
+`anyOf(futures...)` completes as soon as *any one* of the futures completes (with its result or exception):
+
+```java
+CompletableFuture<Object> fastest = CompletableFuture.anyOf(
+    CompletableFuture.supplyAsync(() -> callDC1()),
+    CompletableFuture.supplyAsync(() -> callDC2()),
+    CompletableFuture.supplyAsync(() -> callDC3())
+);
+
+System.out.println("First result: " + fastest.get());
+```
+
+The type is `CompletableFuture<Object>` (because futures may have different types). Cast as needed.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## handle — unified success and error recovery
+
+Unlike `exceptionally` (which only fires on error), `handle(biFunction)` always fires and receives both the result and the exception — one of which will be null:
+
+```java
+CompletableFuture<String> cf = CompletableFuture
+    .supplyAsync(() -> fetchData())
+    .handle((data, ex) -> {
+        if (ex != null) {
+            log.warn("fetch failed: {}", ex.getMessage());
+            return "fallback";
+        }
+        return data.trim();
+    });
+```
+
+Use `handle` when you want to perform post-processing or normalisation regardless of whether the stage succeeded.
+
+## whenComplete — side effects without changing the value
+
+`whenComplete(biConsumer)` is similar to `handle` but does not transform the result — it is purely for side effects (logging, metrics) and then passes the original result or exception downstream:
+
+```java
+CompletableFuture<String> cf = CompletableFuture
+    .supplyAsync(() -> fetchData())
+    .whenComplete((result, ex) -> {
+        if (ex != null) metrics.increment("api.error");
+        else            metrics.increment("api.success");
+    });
+// cf still holds the original result or exception
+```
+
+## Custom thread pool
+
+By default, `supplyAsync` uses `ForkJoinPool.commonPool()`. For I/O-bound work (HTTP calls, DB queries), provide a custom executor to avoid starving CPU-bound tasks:
+
+```java
+ExecutorService ioPool = Executors.newFixedThreadPool(20);
+
+CompletableFuture<String> cf = CompletableFuture.supplyAsync(
+    () -> fetchFromDb(), ioPool);
+```
+
+Every `*Async` variant (`thenApplyAsync`, `thenComposeAsync`, etc.) also accepts an executor as a second argument.
+
+## Try it
+
+Fetch two "APIs" in parallel and combine their results:
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    static String callApi(String name, int delayMs) {
+        try { Thread.sleep(delayMs); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        return name + "-result";
+    }
+
+    public static void main(String[] args) throws Exception {
+        long start = System.currentTimeMillis();
+
+        CompletableFuture<String> api1 = CompletableFuture.supplyAsync(() -> callApi("users",   200));
+        CompletableFuture<String> api2 = CompletableFuture.supplyAsync(() -> callApi("orders",  150));
+
+        String combined = api1.thenCombine(api2, (u, o) -> u + " + " + o).get();
+
+        long elapsed = System.currentTimeMillis() - start;
+        System.out.println(combined);                      // users-result + orders-result
+        System.out.printf("Elapsed: ~%d ms (not 350)%n", elapsed / 100 * 100);
+    }
+}
+```
+
+Because both API calls run concurrently, total time is ~200 ms (the slower one), not 200 + 150 = 350 ms.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Expecting `allOf` to carry results** — it returns `Void`. Always retrieve results from the original futures after `allOf.get()`.
+- **Casting `anyOf` incorrectly** — `anyOf` returns `CompletableFuture<Object>`. If you know all futures are the same type, cast carefully; if they differ, use a common base type or a wrapper.
+- **Confusing `handle` and `exceptionally`** — `handle` runs on both success and failure; `exceptionally` runs only on failure. Using `exceptionally` for post-processing drops results on the success path.
+- **Using `ForkJoinPool.commonPool()` for blocking I/O** — blocking a common-pool thread starves other parallel tasks. Always supply a dedicated I/O executor for blocking calls.
+
+## Recap
+
+- `thenCombine(other, fn)` merges two independent async results with a `BiFunction`.
+- `allOf(futures...)` waits for every future to complete; `anyOf(futures...)` completes on the first.
+- `handle(fn)` fires on both success and failure, allowing unified transformation or recovery.
+- `whenComplete(fn)` is for side effects — it does not modify the result or exception flowing downstream.
+- Provide a custom `ExecutorService` to `*Async` methods to control which thread pool runs each stage.
+
+**Up next:** Lesson 9 explores thread-safe collections — `ConcurrentHashMap`, `CopyOnWriteArrayList`, `BlockingQueue`, and when to reach for them instead of wrapping with `Collections.synchronized*`.

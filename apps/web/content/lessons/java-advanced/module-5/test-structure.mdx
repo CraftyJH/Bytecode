@@ -1,0 +1,235 @@
+export const meta = {
+  title: "Test Structure — Naming, Organization & SOLID Tests",
+  duration: 13,
+  order: 6,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "ts-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which characteristic most commonly makes a test brittle (prone to breaking for reasons unrelated to the behaviour under test)?",
+    options: [
+      { text: "The test has a single, focused assertion.", correct: false, feedback: "Focused assertions make tests more robust, not more brittle — a failure tells you exactly what broke." },
+      { text: "The test asserts on the internal implementation detail of the class, not its observable output.", correct: true, feedback: "Correct — when tests verify private field values, call sequences, or internal state rather than the class's public contract, every internal refactoring breaks the tests even when behaviour is unchanged." },
+      { text: "The test uses @BeforeEach to initialise objects.", correct: false, feedback: "@BeforeEach improves isolation and reduces brittle shared state. It is a good pattern, not a source of brittleness." },
+      { text: "The test uses a descriptive @DisplayName.", correct: false, feedback: "Display names have no effect on test brittleness." },
+    ],
+    explanation: "Tests that reach into private state or verify exact method call sequences couple the test to the implementation. Rename a private field, extract a helper method, or change an internal algorithm and dozens of tests fail even though no external behaviour changed. Test the contract, not the implementation.",
+  },
+  endQ1: {
+    id: "ts-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "In the test doubles taxonomy, what is the difference between a Stub and a Fake?",
+    options: [
+      { text: "A stub has a full working implementation; a fake always returns hardcoded values.", correct: false, feedback: "This is the reverse. Fakes have working implementations; stubs return hardcoded or pre-configured values." },
+      { text: "A stub returns hardcoded responses to calls; a fake is a simplified but working implementation.", correct: true, feedback: "Correct — a stub is configured to return specific values (like Mockito when/thenReturn). A fake has real logic but a simplified implementation unsuitable for production (like an in-memory list repository)." },
+      { text: "Stubs are for dependencies; fakes are for the class under test.", correct: false, feedback: "Both are used for dependencies. The difference is in how much real logic they contain." },
+      { text: "A fake records calls so you can verify them later; a stub does not.", correct: false, feedback: "That describes a spy, not a fake. Fakes have working implementations but do not inherently record interactions." },
+    ],
+    explanation: "Gerard Meszaros's taxonomy: Dummy (passed but never used), Stub (returns canned answers), Spy (records calls), Mock (pre-programmed with expectations), Fake (working simplified implementation). Knowing which you are using clarifies the intent of the test.",
+  },
+  endQ2: {
+    id: "ts-end-2",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class UserServiceTest {
+    static UserService service = new UserService(new InMemoryUserRepo());
+
+    @Test
+    void addUserIncreasesCount() {
+        service.add(new User("alice"));
+        assertEquals(1, service.count());
+    }
+
+    @Test
+    void addDuplicateThrows() {
+        service.add(new User("alice")); // line 11
+        assertThrows(DuplicateUserException.class,
+            () -> service.add(new User("alice")));
+    }
+}`,
+    buggyLine: 1,
+    issue: "The `service` instance is static and shared across both tests. The first test adds 'alice', leaving the repository dirty. The second test then adds 'alice' again — but because the first test already did, the count is 2 and the service may throw DuplicateUserException on line 11 before the assertThrows line is reached.",
+    explanation: "Tests must be independent. Shared mutable state causes order-dependent failures. Fix by creating a fresh `UserService` instance in a `@BeforeEach` method instead of using a static field. Each test then starts from a clean state regardless of execution order.",
+  },
+  endQ3: {
+    id: "ts-end-3",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the test method name following the should_when pattern so it reads: 'should throw when email is null':",
+    code: `@Test
+void shouldThrow___EmailIsNull() { }`,
+    correctAnswers: ["When", "when"],
+    caseSensitive: false,
+    explanation: "The should_when convention encodes the expected outcome and the condition directly in the name. `shouldThrowWhenEmailIsNull` can be read as a sentence without opening the method body, making it a form of living documentation.",
+  },
+};
+
+Good tests are not just correct — they are readable, independent, and maintainable. A test suite where tests fail randomly, require a specific execution order, or take ten minutes to understand is a liability rather than an asset. This lesson covers the conventions that turn a collection of @Test methods into a well-structured safety net.
+
+## Test naming conventions
+
+The method name is the first thing a developer reads when a test fails. Names like `test1`, `checkIt`, or `verifyLogic` provide no information. The two most popular alternatives:
+
+**given_when_then:**
+```java
+@Test
+void givenInsufficientFunds_whenWithdraw_thenThrowsInsufficientFundsException() { }
+```
+
+**should_when:**
+```java
+@Test
+void shouldThrowInsufficientFunds_whenBalanceIsTooLow() { }
+```
+
+Both are self-documenting. The name serves as a failing-test error message: if `shouldThrowInsufficientFunds_whenBalanceIsTooLow` fails, you immediately know the precondition and the expected outcome without opening the method.
+
+## The single-assertion guideline
+
+The *one assertion per test* guideline is frequently misunderstood. It does not mean one `assertEquals` call — it means one *logical scenario*. `assertAll` groups related assertions on the same object into one conceptual assertion:
+
+```java
+// Good — one scenario, multiple related checks via assertAll
+@Test
+void depositUpdatesAllAccountFields() {
+    account.deposit(50.0);
+    assertAll("post-deposit state",
+        () -> assertEquals(150.0, account.getBalance()),
+        () -> assertEquals(1, account.getTransactionCount()),
+        () -> assertNotNull(account.getLastTransactionTime())
+    );
+}
+
+// Bad — two unrelated scenarios in one method
+@Test
+void depositAndWithdraw() {
+    account.deposit(50.0);
+    assertEquals(150.0, account.getBalance());
+    account.withdraw(30.0);
+    assertEquals(120.0, account.getBalance()); // if deposit assertion fails, this never runs
+}
+```
+
+## Test isolation
+
+Each test must start from a known, clean state independent of every other test. The three rules:
+
+1. **Never share mutable state between tests** — static fields are fine for immutable constants; catastrophic for mutable objects.
+2. **Use @BeforeEach for setup, not static initialisers** — each test gets a fresh instance.
+3. **Do not depend on test execution order** — JUnit 5 does not guarantee order by default. A suite that only passes in alphabetical order is hiding an isolation bug.
+
+```java
+class CartServiceTest {
+    Cart cart;
+    CartService service;
+
+    @BeforeEach
+    void setUp() {
+        cart = new Cart();                    // fresh per test
+        service = new CartService(cart);      // fresh per test
+    }
+
+    @Test
+    void addItemIncreasesItemCount() {
+        service.add(new Item("book", 20.0));
+        assertEquals(1, service.itemCount());
+    }
+
+    @Test
+    void removeItemDecreasesItemCount() {
+        service.add(new Item("book", 20.0));
+        service.remove("book");
+        assertEquals(0, service.itemCount());
+    }
+}
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Test doubles taxonomy
+
+The word "mock" is often used loosely to mean any kind of substitute object. Gerard Meszaros defined five precise types:
+
+| Type | Description | Example |
+|---|---|---|
+| **Dummy** | Passed but never used | `null` or empty object to satisfy a constructor parameter |
+| **Stub** | Returns canned answers to calls | `when(repo.findById(1)).thenReturn(user)` |
+| **Spy** | Records calls; real or partial logic | `Mockito.spy(realList)` |
+| **Mock** | Pre-programmed with expectations, verified | `verify(gateway).charge(100.0)` |
+| **Fake** | Simplified but working implementation | `InMemoryUserRepository` used in tests |
+
+Knowing which type you are using makes the test's intent clear. A test that uses a **stub** is checking return-value logic. A test that uses a **mock** is verifying interaction behaviour. A test that uses a **fake** is running a slice of real logic cheaply.
+
+<Note>Fakes are underused. An in-memory repository fake lets service-layer tests run against real repository logic without a database, without Mockito ceremony, and without the fragility of interaction verification.</Note>
+
+## Avoiding test interdependence
+
+Test interdependence has two failure modes:
+
+1. **Test A pollutes state, causing Test B to fail** — share mutable state between tests.
+2. **Test B depends on Test A having run first** — tests rely on execution order.
+
+Both are fixed the same way: isolate setup in `@BeforeEach` and tear down in `@AfterEach`. If cleanup is genuinely expensive (e.g., database schema creation), use `@BeforeAll`/`@AfterAll` with care and ensure each test resets the *data* (not the schema) in its own setup.
+
+## Try it
+
+Here is a poorly written test class. Refactor it:
+
+```java
+class OrderServiceTest {
+    static OrderService service = new OrderService(new FakePaymentGateway());
+    static int testCount = 0;
+
+    @Test
+    void test1() {
+        service.submit(new Order("A", 100.0));
+        testCount++;
+        assertEquals(1, service.orderCount());
+    }
+
+    @Test
+    void test2() {
+        service.submit(new Order("B", 50.0));
+        assertEquals(2, service.orderCount()); // depends on test1 having run first
+    }
+
+    @Test
+    void testCountIsTwo() {
+        assertEquals(2, testCount); // depends on both tests above having run
+    }
+}
+```
+
+Rewrite with proper `@BeforeEach` isolation, `should_when` names, single-scenario tests, and no shared mutable state. The refactored suite should pass in any execution order.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Static mutable fields in test classes** — they persist across tests, causing subtle order-dependent failures that are hard to diagnose. Use instance fields initialised in `@BeforeEach`.
+- **Asserting on private implementation details** — accessing private fields via reflection or testing exact internal call sequences makes every refactoring break the tests. Test the public contract.
+- **Identical setup duplicated across test methods** — copy-pasted `new BankAccount(100.0)` in every test method means a single constructor signature change requires updating dozens of lines. Factor setup into `@BeforeEach`.
+- **Using mocks when a fake would be clearer** — Mockito interaction verification for every call on a repository creates fragile tests that break when the implementation is optimised. An in-memory fake lets the test focus on outcome, not call sequence.
+
+## Recap
+
+- Use **given_when_then** or **should_when** naming so the test name is a self-contained failure description
+- One **logical scenario** per test; use `assertAll` for multiple checks on the same scenario
+- **@BeforeEach** ensures every test starts from a fresh, known state
+- Know your test doubles: **Dummy**, **Stub**, **Spy**, **Mock**, **Fake** — use the right one for the right job
+- Tests must pass in **any execution order** — order dependence always hides an isolation bug
+
+**Up next:** Code coverage — what JaCoCo measures, why 100% coverage is not the goal, and how mutation testing evaluates test quality.

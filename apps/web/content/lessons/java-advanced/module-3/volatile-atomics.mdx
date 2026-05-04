@@ -1,0 +1,239 @@
+export const meta = {
+  title: "volatile and Atomic Classes",
+  duration: 13,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "va-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Does marking a field `volatile` guarantee that `counter++` is atomic?",
+    options: [
+      { text: "Yes — volatile makes all operations on the field atomic.", correct: false, feedback: "volatile only guarantees visibility (reads/writes go to main memory). Compound operations like ++ are still non-atomic." },
+      { text: "No — volatile guarantees visibility but not atomicity. `counter++` is still a read-modify-write sequence that can interleave.", correct: true, feedback: "Correct. volatile is sufficient for a single boolean flag but not for compound read-modify-write operations like increment." },
+      { text: "Yes — the JVM optimises volatile increments into a single instruction.", correct: false, feedback: "No such JVM optimisation exists. The three-step read-add-write sequence remains non-atomic regardless of volatile." },
+      { text: "It depends on the CPU architecture.", correct: false, feedback: "The Java Memory Model specifies volatile semantics independently of CPU; it does not make ++ atomic on any platform." },
+    ],
+    explanation: "`volatile` guarantees that every read of the field sees the most recent write (visibility), and that reads/writes are not reordered with other volatile accesses (ordering). It does NOT make compound operations like `counter++` (read + increment + write) atomic. For atomic compound operations, use `AtomicInteger` or `synchronized`.",
+  },
+  endQ1: {
+    id: "va-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.concurrent.atomic.AtomicInteger;
+
+public class Main {
+    static AtomicInteger n = new AtomicInteger(5);
+
+    public static void main(String[] args) {
+        System.out.println(n.getAndIncrement());
+        System.out.println(n.incrementAndGet());
+        System.out.println(n.get());
+    }
+}`,
+    expectedOutput: "5\n7\n7",
+    explanation: "`getAndIncrement()` returns the value *before* incrementing (5), leaving n=6. `incrementAndGet()` increments first and returns the *new* value (7). The final `get()` confirms n is 7.",
+  },
+  endQ2: {
+    id: "va-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the compareAndSet call so it atomically sets `ref` to `\"new\"` only if it currently holds `\"old\"`:",
+    code: `AtomicReference<String> ref = new AtomicReference<>("old");
+boolean updated = ref.___(\"old\", \"new\");`,
+    correctAnswers: ["compareAndSet"],
+    caseSensitive: true,
+    explanation: "`compareAndSet(expected, update)` is an atomic compare-and-swap (CAS) operation. It checks whether the current value equals `expected` and, if so, atomically replaces it with `update`, returning true. If the current value differs it does nothing and returns false.",
+  },
+  endQ3: {
+    id: "va-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class StopFlag {
+    private boolean running = true;   // bug here
+
+    public void stop() { running = false; }
+
+    public void run() {
+        while (running) {
+            // do work
+        }
+        System.out.println("stopped");
+    }
+}`,
+    buggyLine: 2,
+    issue: "`running` is not `volatile`. A background thread may cache the value in a CPU register and never see the write performed by `stop()`, looping forever.",
+    explanation: "Without `volatile`, the JVM and CPU are free to cache `running` in a register for the looping thread. The write in `stop()` reaches main memory but the reader never looks there again. Declaring `private volatile boolean running = true;` forces every read to fetch from main memory and every write to flush to it.",
+  },
+};
+
+`synchronized` is powerful but coarse: it serialises all access to a block, which can create contention bottlenecks in high-throughput code. Java provides two lighter-weight alternatives for specific scenarios: the `volatile` keyword for simple visibility guarantees, and the `java.util.concurrent.atomic` package for lock-free compound operations. Knowing when to reach for each — and when `synchronized` is still the right choice — is a key concurrency skill.
+
+## The visibility problem
+
+Modern CPUs do not read and write directly to main memory for every operation. They maintain per-core caches, and the JVM compiler can keep a value in a register across multiple iterations of a loop. This is a valid optimisation for single-threaded code, but it means that a write by Thread A may not be visible to Thread B without a memory barrier.
+
+```java
+// Without volatile — the reader thread may loop forever
+public class StopFlag {
+    private boolean running = true;
+
+    public void stop() { running = false; }
+
+    public void loop() {
+        while (running) { /* work */ }   // may never see running=false
+    }
+}
+```
+
+## volatile — visibility without locking
+
+Declaring a field `volatile` inserts memory barriers around every read and write:
+
+- Every **read** of a volatile field fetches from main memory (never from a cache).
+- Every **write** to a volatile field is immediately flushed to main memory.
+
+```java
+public class StopFlag {
+    private volatile boolean running = true;
+
+    public void stop() { running = false; }
+
+    public void loop() {
+        while (running) { /* work */ }   // guaranteed to see the write
+        System.out.println("stopped cleanly");
+    }
+}
+```
+
+`volatile` is ideal for **single-writer, single-reader flags** — boolean stop signals, published references to immutable objects. It is not enough when multiple threads perform compound operations on the field.
+
+<Note>`volatile` does NOT make `counter++` atomic. That operation is three steps: read current value, add 1, write back. Two threads can interleave those steps and lose updates, even on a volatile field. Use `AtomicInteger` for counter patterns.</Note>
+
+## AtomicInteger and AtomicLong
+
+The `java.util.concurrent.atomic` package provides classes that perform compound operations atomically using CPU-level compare-and-swap (CAS) instructions — no lock required:
+
+```java
+import java.util.concurrent.atomic.AtomicInteger;
+
+AtomicInteger counter = new AtomicInteger(0);
+
+counter.incrementAndGet();   // ++counter, returns new value
+counter.getAndIncrement();   // counter++, returns old value
+counter.addAndGet(5);        // counter += 5, returns new value
+counter.get();               // plain read
+```
+
+Running the same 5-thread × 1 000 increments test with `AtomicInteger` always yields exactly 5 000, without any `synchronized`:
+
+```java
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Main {
+    static AtomicInteger counter = new AtomicInteger(0);
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread[] threads = new Thread[5];
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < 1000; j++) counter.incrementAndGet();
+            });
+        }
+        for (Thread t : threads) t.start();
+        for (Thread t : threads) t.join();
+        System.out.println(counter.get());   // always 5000
+    }
+}
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## AtomicReference and compareAndSet
+
+`AtomicReference<T>` lets you atomically swap object references. The core operation is **compareAndSet** (CAS):
+
+```java
+import java.util.concurrent.atomic.AtomicReference;
+
+AtomicReference<String> config = new AtomicReference<>("v1");
+
+// Only updates if current value is still "v1"
+boolean swapped = config.compareAndSet("v1", "v2");
+System.out.println(swapped);         // true
+System.out.println(config.get());    // v2
+
+// Second attempt fails — value is now "v2"
+boolean swapped2 = config.compareAndSet("v1", "v3");
+System.out.println(swapped2);        // false
+System.out.println(config.get());    // still v2
+```
+
+CAS is the building block of all lock-free algorithms. The pattern is: read a value, compute a new value, attempt CAS; if the CAS fails (someone else changed it), retry.
+
+## When to use what
+
+| Scenario | Best tool |
+|---|---|
+| Simple boolean stop flag | `volatile boolean` |
+| Counter incremented by multiple threads | `AtomicInteger` |
+| Swapping an object reference atomically | `AtomicReference` |
+| Multiple variables must change together | `synchronized` |
+| Complex conditional logic on shared state | `synchronized` or `ReentrantLock` |
+
+## Try it
+
+Replace the `synchronized` counter from lesson 2 with `AtomicInteger` and confirm the result is always 5 000:
+
+```java
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        AtomicInteger counter = new AtomicInteger(0);
+        Thread[] threads = new Thread[5];
+
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < 1000; j++) counter.incrementAndGet();
+            });
+        }
+
+        for (Thread t : threads) t.start();
+        for (Thread t : threads) t.join();
+
+        System.out.println("Final: " + counter.get());  // always 5000
+    }
+}
+```
+
+Then experiment with `getAndIncrement()` — print its return value inside the loop to see each thread capturing unique sequence numbers.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using `volatile` for compound operations** — `volatile int counter; counter++` is still not thread-safe. Use `AtomicInteger`.
+- **Assuming `volatile` replaces `synchronized` for complex logic** — if you need to check a value and then update it as one logical unit, you need mutual exclusion (`synchronized` or a lock), not just visibility.
+- **Forgetting to read volatile/atomic values into a local variable** — calling `if (counter.get() > 0) doSomethingWith(counter.get())` can race between the two reads. Read once into a local variable when the reads must be consistent.
+- **Ignoring the return value of `compareAndSet`** — a false return means your update was lost; in retry-based algorithms you must loop and retry, not silently drop the update.
+
+## Recap
+
+- `volatile` guarantees visibility (no caching) and write-ordering but does NOT make compound operations atomic.
+- `AtomicInteger`, `AtomicLong`, and `AtomicReference` provide lock-free atomic operations using hardware CAS instructions.
+- `compareAndSet(expected, update)` succeeds only if the current value equals `expected`, returning a boolean result.
+- Use atomics for single-variable operations; use `synchronized` when multiple variables must be updated together.
+
+**Up next:** Lesson 4 examines what happens when synchronisation goes wrong in a very specific way — deadlock — and how to prevent it.

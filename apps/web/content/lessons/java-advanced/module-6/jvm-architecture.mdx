@@ -1,0 +1,234 @@
+export const meta = {
+  title: "JVM Architecture — ClassLoader, Bytecode & JIT",
+  duration: 14,
+  order: 1,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "jvm-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which statement best describes what the JIT compiler does at the C2 tier?",
+    options: [
+      { text: "It translates Java source code into bytecode during compilation.", correct: false, feedback: "That is the job of `javac`, not the JIT. The JIT operates at runtime on bytecode that is already loaded." },
+      { text: "It aggressively optimizes hot bytecode into native machine code using profile data collected at runtime.", correct: true, feedback: "Correct. C2 is the 'server' compiler — it uses runtime profiling to apply heavy optimizations like method inlining, loop unrolling, and escape analysis." },
+      { text: "It interprets each bytecode instruction one at a time without any optimization.", correct: false, feedback: "That describes the interpreter tier. The JIT compiles, rather than interprets, bytecode." },
+      { text: "It validates bytecode to ensure type safety before any execution begins.", correct: false, feedback: "Bytecode verification is done by the class verifier, which is a separate step from JIT compilation." },
+    ],
+    explanation: "The HotSpot JVM has a tiered compilation model. The interpreter runs first, then C1 adds light optimizations, and finally C2 performs deep, profile-guided optimizations on the hottest code paths.",
+  },
+  endQ1: {
+    id: "jvm-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Which ClassLoader is responsible for loading classes from the JDK itself (e.g., `java.lang.String`)?",
+    options: [
+      { text: "Application ClassLoader", correct: false, feedback: "The Application ClassLoader loads classes from the application classpath, not the JDK core libraries." },
+      { text: "Extension (Platform) ClassLoader", correct: false, feedback: "The Platform ClassLoader handles JDK extension modules, but core classes like `java.lang.String` belong to the bootstrap layer." },
+      { text: "Bootstrap ClassLoader", correct: true, feedback: "Correct. The Bootstrap ClassLoader (written in native code) loads the core JDK classes from the boot module path." },
+      { text: "Custom ClassLoader", correct: false, feedback: "A custom ClassLoader is application-defined. Core JDK classes are always loaded by the Bootstrap ClassLoader." },
+    ],
+    explanation: "The ClassLoader hierarchy is: Bootstrap → Platform (Extension) → Application. Each delegates to its parent first. Bootstrap is the root and loads `java.*` and `javax.*` core classes.",
+  },
+  endQ2: {
+    id: "jvm-end-2",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    public static void main(String[] args) {
+        System.out.println(String.class.getClassLoader());
+        System.out.println(Main.class.getClassLoader().getClass().getSimpleName());
+    }
+}`,
+    expectedOutput: "null\nAppClassLoader",
+    explanation: "`String` is loaded by the Bootstrap ClassLoader, which is native and has no Java object representation — so `getClassLoader()` returns null. `Main` is loaded by the Application (App) ClassLoader, whose simple name is `AppClassLoader`.",
+  },
+  endQ3: {
+    id: "jvm-end-3",
+    type: "fill_in_blank",
+    difficulty: "hard",
+    prompt: "Complete the JVM flag that enables tiered compilation (C1 + C2) explicitly:",
+    code: `java ___ -jar myapp.jar`,
+    correctAnswers: ["-XX:+TieredCompilation"],
+    caseSensitive: true,
+    explanation: "`-XX:+TieredCompilation` enables tiered compilation, which is the default since JDK 8. `-XX:-TieredCompilation` disables it, forcing only the C2 server compiler or the interpreter.",
+  },
+};
+
+Understanding what happens *between* you writing `java Main` and the first line of output is the difference between a developer who guesses at performance and one who reasons about it. The JVM is a sophisticated runtime — it loads classes lazily, verifies bytecode, interprets it, profiles execution, and then compiles the hottest paths to native machine code that rivals hand-written C++. Knowing this pipeline lets you tune startup time, throughput, and latency with purpose rather than trial and error.
+
+## ClassLoader hierarchy
+
+When the JVM needs a class for the first time it asks a **ClassLoader** to find and load it. ClassLoaders are arranged in a parent-delegation tree:
+
+```
+Bootstrap ClassLoader          (native, loads java.* / javax.*)
+    └─ Platform ClassLoader    (loads JDK extension modules)
+           └─ Application ClassLoader   (loads your classpath / module path)
+                  └─ (optional) Custom ClassLoaders   (OSGi, app servers, plugins…)
+```
+
+A ClassLoader always tries its **parent** first. This prevents a rogue `java/lang/String.class` on your classpath from replacing the real one. The process:
+
+1. Check the local cache — if the class is already loaded, return it.
+2. Delegate to parent. If the parent returns a class, use it.
+3. If the parent threw `ClassNotFoundException`, try to find the class locally.
+
+```java
+// Inspect who loaded what at runtime
+System.out.println(String.class.getClassLoader());          // null  (Bootstrap — native)
+System.out.println(java.sql.DriverManager.class
+                       .getClassLoader().getClass().getName()); // jdk.internal.loader.ClassLoaders$PlatformClassLoader
+System.out.println(Main.class.getClassLoader()
+                       .getClass().getSimpleName());           // AppClassLoader
+```
+
+<Note>Returning `null` from `getClassLoader()` is not an error — it means Bootstrap ClassLoader, which has no Java-side object because it is written in C++.</Note>
+
+## From source to bytecode
+
+`javac` compiles `.java` source into `.class` files containing **bytecode** — a compact, stack-based instruction set. You can inspect it with `javap -c`:
+
+```java
+// Source
+public class Add {
+    public static int add(int a, int b) { return a + b; }
+}
+```
+
+```
+// javap -c Add
+public static int add(int, int);
+  Code:
+     0: iload_0        // push a
+     1: iload_1        // push b
+     2: iadd           // pop two ints, push their sum
+     3: ireturn        // return top of stack
+```
+
+Bytecode is platform-neutral — the same `.class` file runs on Windows, Linux, and macOS. The JVM translates it to native instructions at runtime.
+
+## Tiered compilation: interpreter → C1 → C2
+
+HotSpot does not JIT-compile every method immediately. Compiling is expensive, so it profiles execution first:
+
+| Tier | Name | What happens |
+|------|------|--------------|
+| 0 | Interpreter | Bytecode executed one instruction at a time. Profiles collected. |
+| 1–3 | C1 (client compiler) | Simple, fast native code. Minor optimizations. |
+| 4 | C2 (server compiler) | Aggressive optimized native code using full profile data. |
+
+A method reaches C2 after it has been called enough times (default ~10 000 invocations). You can inspect compilation with:
+
+```
+java -XX:+PrintCompilation -jar myapp.jar
+# output sample:
+   127   34     3       java.lang.String::hashCode (55 bytes)
+   129   35     4       com.example.HotLoop::compute (42 bytes)
+```
+
+The number in column 3 is the tier (4 = C2).
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## JIT optimizations
+
+Once a method reaches C2, several powerful transformations apply:
+
+**Method inlining** — the most impactful optimization. Short methods called in a loop get their body copied to the call site, eliminating call overhead and enabling further optimizations.
+
+**Dead code elimination** — branches that profiling shows are never taken are compiled away entirely.
+
+**Escape analysis** — if an object never leaves the scope of a method, the JIT can allocate it on the *stack* instead of the heap, removing GC pressure:
+
+```java
+// The JIT may stack-allocate Point entirely — no GC involved
+public double distance(double x1, double y1, double x2, double y2) {
+    Point p = new Point(x2 - x1, y2 - y1);   // does not escape
+    return Math.sqrt(p.x * p.x + p.y * p.y);
+}
+```
+
+**Loop unrolling** — the JIT duplicates loop bodies to reduce branch overhead:
+
+```java
+// What you write:
+for (int i = 0; i < 8; i++) sum += arr[i];
+// What C2 may emit (conceptually):
+sum += arr[0]; sum += arr[1]; sum += arr[2]; sum += arr[3];
+sum += arr[4]; sum += arr[5]; sum += arr[6]; sum += arr[7];
+```
+
+## AOT with GraalVM Native Image
+
+JIT compilation means every process pays a warm-up cost. GraalVM's `native-image` tool performs **ahead-of-time (AOT)** compilation: it runs a closed-world analysis at build time and emits a standalone executable with no JVM needed at runtime.
+
+```bash
+# Build a native executable (GraalVM installed)
+native-image -jar myapp.jar -o myapp
+
+# Result: instant startup, no warm-up, lower peak throughput
+./myapp            # starts in ~15 ms vs ~200 ms for JVM
+```
+
+The tradeoff: AOT executables can't use runtime reflection or dynamic class loading without explicit configuration hints, and peak throughput is usually lower than a warmed-up JIT.
+
+## Try it
+
+Write the following method and think through what the JIT would do with it:
+
+```java
+public class VectorMath {
+    // Called millions of times in a tight loop
+    public static double dot(double[] a, double[] b) {
+        double sum = 0;
+        for (int i = 0; i < a.length; i++) {
+            sum += a[i] * b[i];
+        }
+        return sum;
+    }
+
+    public static void main(String[] args) {
+        double[] u = {1, 2, 3};
+        double[] v = {4, 5, 6};
+        long start = System.nanoTime();
+        double result = 0;
+        for (int i = 0; i < 1_000_000; i++) {
+            result += dot(u, v);
+        }
+        System.out.printf("Result: %.0f, time: %d ms%n",
+            result, (System.nanoTime() - start) / 1_000_000);
+    }
+}
+```
+
+After running this, consider: which optimizations would C2 apply to `dot`? The method is short (good inlining candidate), the loop has a fixed trip count per call (loop unrolling), and the local `sum` variable does not escape (scalar replacement). Run it with `-XX:+PrintCompilation` to confirm `dot` reaches tier 4.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Assuming JIT kicks in immediately** — the first few thousand invocations run in the interpreter. Benchmarks that measure cold-start calls give misleading numbers. Always warm up.
+- **Defeating inlining with huge methods** — C2's inliner skips methods above ~325 bytecodes by default. Keep hot methods small and let the compiler do the work.
+- **Confusing ClassLoader `null` with an error** — `getClassLoader()` returning `null` is correct behavior for bootstrap-loaded classes, not a NullPointerException waiting to happen.
+- **Treating native-image as a free lunch** — AOT removes warm-up cost but can reduce peak throughput for long-running services. Measure before migrating.
+
+## Recap
+
+- The **ClassLoader hierarchy** (Bootstrap → Platform → Application) uses parent delegation to protect core classes.
+- `javac` compiles source to **bytecode**; `javap -c` lets you inspect it.
+- HotSpot uses **tiered compilation**: interpreter → C1 → C2, compiling hot paths to optimized native code.
+- Key JIT optimizations: **method inlining**, **dead code elimination**, **escape analysis**, **loop unrolling**.
+- **GraalVM native-image** offers AOT compilation for fast startup at the cost of some runtime flexibility.
+
+**Up next:** Garbage Collection — how the JVM reclaims memory and how to tune GC for your workload.

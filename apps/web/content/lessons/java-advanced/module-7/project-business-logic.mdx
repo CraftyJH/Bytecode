@@ -1,0 +1,376 @@
+export const meta = {
+  title: "Capstone Part 3 — Service Layer & Functional Patterns",
+  duration: 18,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "bl-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.Optional;
+
+public class Main {
+    static Optional<String> validate(String title) {
+        if (title == null || title.isBlank()) return Optional.empty();
+        return Optional.of(title.trim());
+    }
+
+    static Optional<String> createTask(String title, boolean active) {
+        return validate(title)
+                .filter(t -> active)
+                .map(t -> "Task: " + t);
+    }
+
+    public static void main(String[] args) {
+        System.out.println(createTask("Fix bug", true));
+        System.out.println(createTask("  ", true));
+        System.out.println(createTask("Write tests", false));
+    }
+}`,
+    expectedOutput: "Optional[Task: Fix bug]\nOptional.empty\nOptional.empty",
+    explanation: "The first call passes validation and the `active` filter, so `map` wraps the result. The second call fails `validate` (blank title) — `Optional.empty()` short-circuits the rest. The third call passes validation but fails `.filter(t -> active)` because `active` is false, giving `Optional.empty()`.",
+  },
+  endQ1: {
+    id: "bl-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "A `TaskService.updateStatus` method returns `Optional<Task>` instead of throwing an exception when the transition is invalid. What is the main advantage of this design?",
+    options: [
+      {
+        text: "It is faster because exceptions have overhead.",
+        correct: false,
+        feedback: "Exception overhead is only relevant on the exceptional path; for invalid inputs that occur regularly, it matters, but that is a secondary concern compared to the API design benefit.",
+      },
+      {
+        text: "The return type forces callers to acknowledge the failure case at compile time, making error handling explicit and un-ignorable.",
+        correct: true,
+        feedback: "Correct! A method returning `Optional<Task>` cannot be called without dealing with the empty case. A thrown exception can be silently swallowed or forgotten — the compiler will not warn you.",
+      },
+      {
+        text: "Optional is automatically logged by the JVM.",
+        correct: false,
+        feedback: "There is no JVM-level logging for Optional. Observability must be added explicitly.",
+      },
+      {
+        text: "It avoids the need for unit tests on the failure path.",
+        correct: false,
+        feedback: "You still need tests for the empty case. Optional makes it easier to write them, but does not replace them.",
+      },
+    ],
+    explanation: "Returning `Optional<Task>` (or a `Result<T, E>` type) makes the failure case part of the method's public contract. Callers must call `.orElse`, `.orElseThrow`, or `.ifPresent` — they cannot simply ignore that the operation might fail. This is the functional alternative to checked exceptions.",
+  },
+  endQ2: {
+    id: "bl-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the validation pipeline so that all three predicates must pass for a task to be considered valid:",
+    code: `import java.util.function.Predicate;
+import java.time.LocalDate;
+
+Predicate<Task> nonBlankTitle = t -> !t.title().isBlank();
+Predicate<Task> futureDueDate = t -> t.dueDate()
+    .map(d -> !d.isBefore(LocalDate.now()))
+    .orElse(true);
+Predicate<Task> hasPriority   = t -> t.priority() != null;
+
+Predicate<Task> isValid = nonBlankTitle.___(futureDueDate).___(hasPriority);`,
+    correctAnswers: ["and", "and"],
+    caseSensitive: true,
+    explanation: "`Predicate.and(other)` returns a composed predicate that is true only when both predicates are true. Chaining `.and(futureDueDate).and(hasPriority)` builds a pipeline equivalent to `nonBlankTitle && futureDueDate && hasPriority`.",
+  },
+  endQ3: {
+    id: "bl-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class TaskService {
+    private final InMemoryTaskRepository repo;
+
+    public TaskService(InMemoryTaskRepository repo) {
+        this.repo = repo;
+    }
+
+    public Optional<Task> updateStatus(UUID taskId, TaskStatus newStatus) {
+        Optional<Task> found = repo.findById(taskId);
+        if (found.isEmpty()) return Optional.empty();
+
+        Task current = found.get();
+        Task updated = current.withStatus(newStatus);
+        repo.save(updated);
+        return Optional.of(updated);
+    }
+
+    public Optional<Task> createTask(String title, Priority priority) {
+        Task t = Task.create(title, "", priority, Optional.empty(), Optional.empty());
+        repo.save(t);
+        return Optional.of(t);
+    }
+}`,
+    buggyLine: 10,
+    issue: "`current.withStatus(newStatus)` throws `IllegalStateException` for invalid transitions. The service layer should catch this (or check `canTransitionTo` first) and return `Optional.empty()` instead of letting the exception propagate to the caller.",
+    explanation: "The service layer owns the business rule that invalid transitions return empty rather than throw. Either call `if (!current.status().canTransitionTo(newStatus)) return Optional.empty();` before the `withStatus` call, or wrap the call in a try-catch and return empty on `IllegalStateException`.",
+  },
+};
+
+The domain model and repository layer are in place. Now we need a **service layer** — the home of business rules. The service layer:
+
+- Validates inputs before they touch the domain.
+- Orchestrates multi-step operations (create task → add to project → notify assignee).
+- Returns `Optional<T>` or a result type rather than throwing exceptions for expected failures.
+- Has no knowledge of HTTP, serialisation, or UI.
+
+This lesson draws heavily on Module 2 (functional programming, Optional, Predicate composition) and Module 3 (stream pipelines). It also introduces a lightweight **Result** type that gives richer error feedback than `Optional`.
+
+## Why not throw exceptions?
+
+Throwing exceptions for expected, recoverable conditions — like a validation failure — is a misuse of the exception mechanism. Exceptions are designed for unexpected events. For predictable failures:
+
+- The calling code must remember to wrap the call in `try-catch`.
+- The compiler does not help (unchecked exceptions are invisible in the signature).
+- Stack-unwinding has overhead when failures are frequent.
+
+Returning `Optional<T>` or a `Result<T, E>` makes the failure case part of the method's type signature. The compiler refuses to compile code that ignores it.
+
+## A lightweight Result type
+
+`Optional<T>` only tells the caller "something or nothing". A `Result<T, E>` also carries the reason for failure:
+
+```java
+package com.bytecode.tasks.service;
+
+public sealed interface Result<T, E> permits Result.Ok, Result.Err {
+
+    record Ok<T, E>(T value)   implements Result<T, E> {}
+    record Err<T, E>(E error)  implements Result<T, E> {}
+
+    static <T, E> Result<T, E> ok(T value)    { return new Ok<>(value); }
+    static <T, E> Result<T, E> err(E error)   { return new Err<>(error); }
+
+    default boolean isOk()  { return this instanceof Ok; }
+    default boolean isErr() { return this instanceof Err; }
+
+    @SuppressWarnings("unchecked")
+    default T valueOrThrow() {
+        if (this instanceof Ok<T, E> ok) return ok.value();
+        throw new NoSuchElementException("Result is Err: " + ((Err<T,E>) this).error());
+    }
+}
+```
+
+We use `sealed` interfaces and pattern-matching records (Java 17+) to make every `Result` either `Ok` or `Err` — never null, never unchecked.
+
+## The validation pipeline
+
+A **validation pipeline** is a composed `Predicate<Task>` that gates creation. Each rule is an independent, named predicate:
+
+```java
+package com.bytecode.tasks.service;
+
+import com.bytecode.tasks.domain.Task;
+import java.time.LocalDate;
+import java.util.function.Predicate;
+
+public final class TaskValidation {
+
+    public static final Predicate<Task> NON_BLANK_TITLE =
+        t -> t.title() != null && !t.title().isBlank();
+
+    public static final Predicate<Task> DUE_DATE_NOT_IN_PAST =
+        t -> t.dueDate()
+              .map(d -> !d.isBefore(LocalDate.now()))
+              .orElse(true);   // absent due date is allowed
+
+    public static final Predicate<Task> PRIORITY_PRESENT =
+        t -> t.priority() != null;
+
+    /** The full pipeline — all three must pass. */
+    public static final Predicate<Task> ALL =
+        NON_BLANK_TITLE.and(DUE_DATE_NOT_IN_PAST).and(PRIORITY_PRESENT);
+
+    private TaskValidation() {}
+}
+```
+
+Named static predicates are readable at the call site: `TaskValidation.ALL.test(candidate)` reads like English.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## The TaskService
+
+```java
+package com.bytecode.tasks.service;
+
+import com.bytecode.tasks.domain.*;
+import com.bytecode.tasks.repository.InMemoryTaskRepository;
+import com.bytecode.tasks.repository.InMemoryProjectRepository;
+
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class TaskService {
+
+    private final InMemoryTaskRepository taskRepo;
+    private final InMemoryProjectRepository projectRepo;
+
+    public TaskService(InMemoryTaskRepository taskRepo,
+                       InMemoryProjectRepository projectRepo) {
+        this.taskRepo    = taskRepo;
+        this.projectRepo = projectRepo;
+    }
+
+    /** Creates a task if validation passes; returns empty on failure. */
+    public Optional<Task> createTask(String title, String description,
+                                     Priority priority,
+                                     Optional<String> assigneeId,
+                                     Optional<LocalDate> dueDate) {
+        Task candidate = Task.create(title, description, priority, assigneeId, dueDate);
+        if (!TaskValidation.ALL.test(candidate)) {
+            return Optional.empty();
+        }
+        taskRepo.save(candidate);
+        return Optional.of(candidate);
+    }
+
+    /** Transitions a task's status; returns empty if task not found or transition invalid. */
+    public Optional<Task> updateStatus(UUID taskId, TaskStatus newStatus) {
+        return taskRepo.findById(taskId)
+            .filter(t -> t.status().canTransitionTo(newStatus))
+            .map(t -> {
+                Task updated = t.withStatus(newStatus);
+                taskRepo.save(updated);
+                return updated;
+            });
+    }
+
+    /** Assigns a task to a user; returns empty if either entity is not found. */
+    public Optional<Task> assignTask(UUID taskId, String assigneeId) {
+        return taskRepo.findById(taskId)
+            .map(t -> {
+                // Build an updated task with the new assignee using a factory/copy
+                Task updated = new Task(
+                    t.id(), t.title(), t.description(), t.status(), t.priority(),
+                    Optional.of(assigneeId), t.dueDate(), t.createdAt()
+                );
+                taskRepo.save(updated);
+                return updated;
+            });
+    }
+
+    /** Returns all tasks belonging to a project, sorted by priority descending. */
+    public List<Task> getTasksByProject(UUID projectId) {
+        return projectRepo.findById(projectId)
+            .map(project -> project.getTaskIds().stream()
+                .map(taskRepo::findById)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .sorted(Comparator.comparing(Task::priority).reversed())
+                .collect(Collectors.toList()))
+            .orElse(Collections.emptyList());
+    }
+
+    /** Returns a summary count by status. */
+    public Map<TaskStatus, Long> countByStatus() {
+        return taskRepo.findAll().stream()
+            .collect(Collectors.groupingBy(Task::status, Collectors.counting()));
+    }
+}
+```
+
+<Note>Notice that `updateStatus` is a single fluent chain: `findById → filter (checks transition) → map (applies update + saves)`. Each step either continues the happy path or collapses to `Optional.empty()`. No if-else, no try-catch, no intermediate variables.</Note>
+
+## Using the Result type for richer feedback
+
+When `createTask` fails, `Optional.empty()` doesn't tell the caller *why*. Switching to `Result<Task, String>` fixes that:
+
+```java
+public Result<Task, String> createTaskWithReason(String title, String description,
+                                                  Priority priority,
+                                                  Optional<String> assigneeId,
+                                                  Optional<LocalDate> dueDate) {
+    if (title == null || title.isBlank())
+        return Result.err("Title must not be blank");
+    if (dueDate.isPresent() && dueDate.get().isBefore(LocalDate.now()))
+        return Result.err("Due date must not be in the past");
+    if (priority == null)
+        return Result.err("Priority must not be null");
+
+    Task task = Task.create(title, description, priority, assigneeId, dueDate);
+    taskRepo.save(task);
+    return Result.ok(task);
+}
+```
+
+The caller can now use a switch expression over `Result`:
+
+```java
+var result = service.createTaskWithReason("", "desc", Priority.HIGH, Optional.empty(), Optional.empty());
+
+switch (result) {
+    case Result.Ok<Task, String>  ok  -> System.out.println("Created: " + ok.value().title());
+    case Result.Err<Task, String> err -> System.out.println("Failed: "  + err.error());
+}
+```
+
+## Composing queries with streams
+
+The service layer is also the natural home for cross-cutting read queries. Stream pipelines express these clearly:
+
+```java
+/** All overdue high-priority tasks assigned to a specific user. */
+public List<Task> criticalOverdueFor(String assigneeId) {
+    return taskRepo.findAll().stream()
+        .filter(t -> t.assigneeId().map(a -> a.equals(assigneeId)).orElse(false))
+        .filter(t -> t.dueDate().map(d -> d.isBefore(LocalDate.now())).orElse(false))
+        .filter(t -> t.status() != TaskStatus.DONE)
+        .filter(t -> t.priority() == Priority.HIGH || t.priority() == Priority.CRITICAL)
+        .sorted(Comparator.comparing(Task::dueDate,
+            Comparator.comparing(opt -> opt.orElse(LocalDate.MAX))))
+        .collect(Collectors.toList());
+}
+```
+
+## Try it
+
+Build the complete service layer on top of Parts 1 and 2:
+
+1. Implement `TaskValidation` with the three named predicates and the composed `ALL` predicate.
+2. Implement `TaskService` with `createTask`, `updateStatus`, `assignTask`, and `getTasksByProject`.
+3. Implement the `Result<T, E>` sealed interface. Add `createTaskWithReason` to `TaskService`.
+4. Write a `main` method that:
+   - Creates a project and two users.
+   - Creates three valid tasks via `createTask`.
+   - Attempts to create one invalid task (blank title) and handles the `Optional.empty()` result.
+   - Transitions one task to `IN_PROGRESS` and verifies the return.
+   - Calls `countByStatus()` and prints the map.
+
+Stretch goal: Add a `bulkUpdatePriority(List<UUID> taskIds, Priority newPriority)` method to `TaskService`. It should return a `Map<UUID, Result<Task, String>>` where each entry reports success or the reason for failure (e.g., task not found).
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Throwing `IllegalArgumentException` from the service layer** — the service layer should translate validation failures into `Optional.empty()` or `Result.err(...)`. Exceptions should be reserved for truly unexpected states (null repository, corrupt data). Callers of a service method should never need a try-catch for routine validation.
+- **Leaking repository logic into the service** — calling `repo.store.get(id)` directly bypasses the `findById` contract. Always go through the interface method; the concrete type is an implementation detail.
+- **Stateful predicates** — a `Predicate<Task>` that captures mutable state (e.g., a running counter) is dangerous when used in parallel streams. Validation predicates should be pure functions.
+- **Side effects inside `.map()` chains** — calling `save` inside a `.map()` on an Optional is valid but can surprise readers. If the side effect is significant, consider extracting it to a named method rather than inlining it in the lambda.
+
+## Recap
+
+- The **service layer** owns business rules, validation, and orchestration; it never contains HTTP, serialisation, or UI concerns.
+- A `sealed interface Result<T, E>` provides richer error feedback than `Optional<T>` when callers need to know *why* an operation failed.
+- **Predicate composition** (`and`, `or`, `negate`) builds validation pipelines that are readable, testable, and reusable.
+- Stream pipelines in the service layer express complex queries — filter, sort, group — with a single coherent expression.
+- Optional chains (`findById → filter → map`) model the "happy path collapses on failure" pattern without any if-else branching.
+
+**Up next: Part 4** — adding concurrency to the system: scheduled overdue checks, a BlockingQueue worker, and CompletableFuture notifications.

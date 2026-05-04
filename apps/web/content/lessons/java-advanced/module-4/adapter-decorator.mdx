@@ -1,0 +1,281 @@
+export const meta = {
+  title: "Adapter & Decorator",
+  duration: 14,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "ad-mid-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "What core problem does the Adapter pattern solve?",
+    options: [
+      { text: "Adding new behaviour to an object at runtime without subclassing.", correct: false, feedback: "That's the Decorator pattern's job. Decorator wraps an object to extend its behaviour." },
+      { text: "Making two incompatible interfaces work together without modifying either.", correct: true, feedback: "Correct! Adapter acts as a translator between a client that expects one interface and a class that provides a different one." },
+      { text: "Ensuring a class has only one instance.", correct: false, feedback: "That's the Singleton pattern's responsibility." },
+      { text: "Simplifying access to a complex subsystem.", correct: false, feedback: "That's the Facade pattern. Adapter is about interface compatibility, not simplification." },
+    ],
+    explanation: "The Adapter pattern converts the interface of an existing class into the interface a client expects. It is most useful when integrating third-party or legacy code you cannot modify.",
+  },
+  endQ1: {
+    id: "ad-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `public class Main {
+    interface Printer { void print(String text); }
+
+    static class LegacyPrinter {
+        void printDocument(String doc) {
+            System.out.println("Legacy: " + doc);
+        }
+    }
+
+    static class PrinterAdapter implements Printer {
+        private final LegacyPrinter legacy;
+        PrinterAdapter(LegacyPrinter lp) { this.legacy = lp; }
+        public void print(String text) { legacy.printDocument(text); }
+    }
+
+    static class LoggingDecorator implements Printer {
+        private final Printer wrapped;
+        LoggingDecorator(Printer p) { this.wrapped = p; }
+        public void print(String text) {
+            System.out.println("Logging: " + text);
+            wrapped.print(text);
+        }
+    }
+
+    public static void main(String[] args) {
+        Printer p = new LoggingDecorator(new PrinterAdapter(new LegacyPrinter()));
+        p.print("Hello");
+    }
+}`,
+    expectedOutput: "Logging: Hello\nLegacy: Hello",
+    explanation: "`LoggingDecorator.print` logs first, then delegates to the wrapped `PrinterAdapter`. The adapter translates `print(text)` into `printDocument(text)` on the legacy class. The output shows both stages in order.",
+  },
+  endQ2: {
+    id: "ad-end-2",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "In the `java.io` package, wrapping a `FileInputStream` in a `BufferedInputStream` is an example of which pattern?",
+    options: [
+      { text: "Adapter — translating FileInputStream's interface to BufferedInputStream's.", correct: false, feedback: "Adapter changes interfaces. Both `FileInputStream` and `BufferedInputStream` implement `InputStream` — the interface is the same. This is Decorator." },
+      { text: "Decorator — adding buffering behaviour by wrapping the original stream.", correct: true, feedback: "Correct! `BufferedInputStream` wraps any `InputStream` and adds buffering without changing the interface. That's exactly Decorator." },
+      { text: "Proxy — controlling access to the underlying file.", correct: false, feedback: "Proxy controls access (e.g., lazy loading, security). `BufferedInputStream` adds a performance feature — buffering — not access control." },
+      { text: "Facade — hiding the complexity of file I/O.", correct: false, feedback: "Facade exposes a simplified interface. `BufferedInputStream` exposes the same `InputStream` API — it doesn't simplify it." },
+    ],
+    explanation: "`java.io` is the canonical Decorator example in Java. Every stream wrapper (`BufferedInputStream`, `DataInputStream`, `GZIPInputStream`) implements `InputStream` AND wraps another `InputStream`, adding behaviour layer by layer without subclassing.",
+  },
+  endQ3: {
+    id: "ad-end-3",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Complete the decorator constructor. The decorator must hold a reference to the wrapped object via the component interface, not the concrete class:",
+    code: `public class TimingDecorator implements DataService {
+    private final ___ wrapped;
+
+    public TimingDecorator(DataService service) {
+        this.wrapped = service;
+    }
+    // ...
+}`,
+    correctAnswers: ["DataService"],
+    caseSensitive: true,
+    explanation: "The wrapped field must be typed as `DataService` (the component interface), not a concrete class like `DatabaseService`. This allows stacking multiple decorators: `new TimingDecorator(new CachingDecorator(new DatabaseService()))` — each wrapping the same interface.",
+  },
+};
+
+Legacy code never goes away, and requirements never stop growing. The **Adapter** pattern bridges the gap between an interface you have and an interface you need — without touching either side. The **Decorator** pattern lets you stack new behaviours on top of an object at runtime, one thin wrapper at a time. Together they are the workhorse structural patterns for real-world Java development.
+
+## Adapter — two flavours
+
+**Object Adapter** uses composition: the adapter holds a reference to the adaptee. This is the preferred Java form because Java supports only single inheritance.
+
+```java
+// Client's expected interface
+public interface ModernPrinter {
+    void print(String text);
+}
+
+// Existing class with a different interface (cannot modify)
+public class LegacyPrinter {
+    public void printDocument(String document) {
+        System.out.println("Legacy output: " + document);
+    }
+}
+
+// Adapter — implements the target, delegates to the adaptee
+public class LegacyPrinterAdapter implements ModernPrinter {
+    private final LegacyPrinter legacy;  // composition
+
+    public LegacyPrinterAdapter(LegacyPrinter legacy) {
+        this.legacy = legacy;
+    }
+
+    @Override
+    public void print(String text) {
+        legacy.printDocument(text);  // translation
+    }
+}
+
+// Client sees only ModernPrinter — unaware of the legacy class
+ModernPrinter printer = new LegacyPrinterAdapter(new LegacyPrinter());
+printer.print("Design Patterns in Java");
+// Legacy output: Design Patterns in Java
+```
+
+**Class Adapter** uses multiple inheritance (via an interface + a class) and is less common in Java:
+
+```java
+// Class adapter — inherits from LegacyPrinter, implements ModernPrinter
+public class LegacyPrinterClassAdapter extends LegacyPrinter implements ModernPrinter {
+    @Override
+    public void print(String text) {
+        printDocument(text);  // inherited from LegacyPrinter
+    }
+}
+```
+
+<Note>Prefer **object adapter** in Java. Class adapter locks you into a specific adaptee class. Object adapter works with any subclass of the adaptee and can be easier to mock in tests.</Note>
+
+## Decorator — building on `java.io`
+
+The `java.io` package is the most-used Decorator in the JDK. Every stream class shares the `InputStream`/`OutputStream` interface, and each wrapper adds one feature:
+
+```java
+import java.io.*;
+
+// Layer by layer — each wrap adds one responsibility
+InputStream raw        = new FileInputStream("data.bin");        // reads bytes from file
+InputStream buffered   = new BufferedInputStream(raw);           // adds an 8KB buffer
+DataInputStream typed  = new DataInputStream(buffered);          // adds readInt(), readDouble()
+
+int value = typed.readInt();  // uses all three layers
+```
+
+The chain `FileInputStream → BufferedInputStream → DataInputStream` stacks three behaviours without subclassing. You can reorder or remove layers with no changes to the inner classes.
+
+## Building your own Decorator
+
+```java
+// Component interface
+public interface TextProcessor {
+    String process(String input);
+}
+
+// Concrete component
+public class PlainTextProcessor implements TextProcessor {
+    public String process(String input) { return input; }
+}
+
+// Base decorator — holds the wrapped component
+public abstract class TextDecorator implements TextProcessor {
+    protected final TextProcessor wrapped;
+    protected TextDecorator(TextProcessor tp) { this.wrapped = tp; }
+}
+
+// Concrete decorators
+public class TrimDecorator extends TextDecorator {
+    public TrimDecorator(TextProcessor tp) { super(tp); }
+    public String process(String input) {
+        return wrapped.process(input).trim();
+    }
+}
+
+public class UpperCaseDecorator extends TextDecorator {
+    public UpperCaseDecorator(TextProcessor tp) { super(tp); }
+    public String process(String input) {
+        return wrapped.process(input).toUpperCase();
+    }
+}
+
+public class StarWrapDecorator extends TextDecorator {
+    public StarWrapDecorator(TextProcessor tp) { super(tp); }
+    public String process(String input) {
+        return "*** " + wrapped.process(input) + " ***";
+    }
+}
+```
+
+Stack them in any order:
+
+```java
+TextProcessor pipeline = new StarWrapDecorator(
+        new UpperCaseDecorator(
+        new TrimDecorator(
+        new PlainTextProcessor())));
+
+System.out.println(pipeline.process("  hello world  "));
+// *** HELLO WORLD ***
+```
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## When Decorator beats subclassing
+
+Suppose you need `BufferedLoggingPrinter`, `TimedPrinter`, `BufferedTimedPrinter`, and `LoggingTimedPrinter`. With subclassing that is 4 classes plus a base class. With Decorator it is 2 decorator classes (`BufferingDecorator`, `TimingDecorator`) composed as needed — any combination without new subclasses.
+
+```java
+// Without decorator: combinatorial explosion of subclasses
+class BufferedLoggingPrinter extends Printer { ... }
+class TimedLoggingPrinter    extends Printer { ... }
+class BufferedTimedPrinter   extends Printer { ... }
+// ...
+
+// With decorator: compose on demand
+Printer p1 = new TimingDecorator(new BufferingDecorator(new ConsolePrinter()));
+Printer p2 = new LoggingDecorator(new TimingDecorator(new ConsolePrinter()));
+```
+
+## Try it
+
+Implement `LegacyPrinter` → `ModernPrinter` adapter, then add a `LoggingDecorator`:
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        // Start with the raw legacy printer adapted to the modern interface
+        ModernPrinter adapted  = new LegacyPrinterAdapter(new LegacyPrinter());
+        // Stack a logging decorator on top
+        ModernPrinter withLogs = new LoggingDecorator(adapted);
+
+        withLogs.print("Invoice #1042");
+        // Expected output:
+        // [LOG] Printing: Invoice #1042
+        // Legacy output: Invoice #1042
+
+        adapted.print("Receipt #88");
+        // Expected output (no logging layer):
+        // Legacy output: Receipt #88
+    }
+}
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Confusing Adapter with Decorator** — Adapter changes the interface; Decorator keeps the same interface and adds behaviour. If the interface changes, it's an Adapter.
+- **Storing the adaptee as the concrete type in the Decorator** — always type the wrapped field as the component interface, not a concrete class. This enables stacking.
+- **Deep inheritance chains for combinations** — whenever you find yourself creating `BufferedLoggingTimedPrinter`, reach for Decorator instead.
+- **Forgetting to delegate in the Decorator** — if a Decorator overrides a method and forgets to call `wrapped.method()`, it silently drops the wrapped behaviour.
+
+## Recap
+
+- **Adapter** converts one interface into another — use it when you can't modify existing code but need it to satisfy a different contract
+- **Object Adapter** uses composition (preferred in Java); **Class Adapter** uses multiple inheritance
+- **Decorator** wraps a component implementing the same interface, adding one responsibility per layer
+- `java.io` streams are the canonical JDK Decorator: `FileInputStream → BufferedInputStream → DataInputStream`
+- Decorator avoids the **combinatorial subclass explosion** that results from using inheritance to combine features
+
+**Up next:** Proxy & Facade — controlling access and simplifying complex subsystems with two more powerful structural patterns.

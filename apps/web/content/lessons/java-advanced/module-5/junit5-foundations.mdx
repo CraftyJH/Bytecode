@@ -1,0 +1,277 @@
+export const meta = {
+  title: "JUnit 5 — Annotations & Assertions",
+  duration: 14,
+  order: 2,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "ju-mid-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `class LifecycleTest {
+    @BeforeAll
+    static void initAll() { System.out.println("before all"); }
+
+    @BeforeEach
+    void init() { System.out.println("before each"); }
+
+    @Test void a() { System.out.println("test a"); }
+    @Test void b() { System.out.println("test b"); }
+
+    @AfterEach
+    void tearDown() { System.out.println("after each"); }
+
+    @AfterAll
+    static void tearDownAll() { System.out.println("after all"); }
+}`,
+    expectedOutput: "before all\nbefore each\ntest a\nafter each\nbefore each\ntest b\nafter each\nafter all",
+    explanation: "@BeforeAll runs once before any test in the class. @BeforeEach and @AfterEach wrap every individual test. @AfterAll runs once after all tests complete. Test method order is not guaranteed, but the lifecycle wrapping is deterministic.",
+  },
+  endQ1: {
+    id: "ju-end-1",
+    type: "multiple_choice",
+    difficulty: "easy",
+    question: "Which JUnit 5 assertion checks that a block of code throws a specific exception type?",
+    options: [
+      { text: "`assertTrue(throws(...))`", correct: false, feedback: "There is no `throws()` helper in JUnit 5's assertion API." },
+      { text: "`assertThrows(ExceptionType.class, () -> { ... })`", correct: true, feedback: "Correct — assertThrows takes the expected exception class and an executable (lambda). It returns the thrown exception so you can inspect its message." },
+      { text: "`@Test(expected = ExceptionType.class)`", correct: false, feedback: "That was JUnit 4 syntax. JUnit 5 removed it in favour of assertThrows, which gives you access to the exception object." },
+      { text: "`catchException(ExceptionType.class, runnable)`", correct: false, feedback: "This is not a standard JUnit 5 method." },
+    ],
+    explanation: "assertThrows(Type.class, executable) is the JUnit 5 way. It returns the caught exception, enabling further assertions on the message or cause — something the old JUnit 4 `expected` attribute could not do.",
+  },
+  endQ2: {
+    id: "ju-end-2",
+    type: "fill_in_blank",
+    difficulty: "medium",
+    prompt: "Fill in the annotation that groups all failures in the block instead of stopping at the first one:",
+    code: `___(
+    () -> assertEquals(1, result.size()),
+    () -> assertEquals("Alice", result.get(0).getName())
+);`,
+    correctAnswers: ["assertAll"],
+    caseSensitive: true,
+    explanation: "assertAll executes every lambda inside it and reports all failures together. This is useful when checking multiple properties of one result — you see everything that's wrong in a single test run rather than playing whack-a-mole.",
+  },
+  endQ3: {
+    id: "ju-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `class BankAccountTest {
+    BankAccount account;
+
+    @BeforeAll
+    void setUp() {
+        account = new BankAccount(100.0);
+    }
+
+    @Test
+    void depositIncreasesBalance() {
+        account.deposit(50.0);
+        assertEquals(150.0, account.getBalance());
+    }
+}`,
+    buggyLine: 4,
+    issue: "@BeforeAll methods must be static (unless the test class uses @TestInstance(Lifecycle.PER_CLASS)). A non-static @BeforeAll method causes a JUnit 5 runtime error.",
+    explanation: "JUnit 5 creates a new test instance per test method by default, so @BeforeAll must be static to run once before any instance is created. Either add `static` to `setUp()`, or annotate the class with `@TestInstance(TestInstance.Lifecycle.PER_CLASS)` to share one instance across all tests.",
+  },
+};
+
+JUnit 5 is the de-facto standard test framework for Java. It ships in three modules — JUnit Platform (the launcher), JUnit Jupiter (the annotations and assertions you use daily), and JUnit Vintage (for running JUnit 4 tests). This lesson focuses on Jupiter, the part you interact with directly when writing tests.
+
+## Core lifecycle annotations
+
+JUnit 5 controls test execution through a set of lifecycle annotations:
+
+```java
+class BankAccountTest {
+
+    BankAccount account;
+
+    @BeforeAll
+    static void initDatabase() {
+        // Runs once before any test in this class.
+        // Must be static (unless @TestInstance(PER_CLASS) is used).
+        System.out.println("Setting up shared resources");
+    }
+
+    @BeforeEach
+    void setUp() {
+        // Runs before EACH test method — gives each test a fresh state.
+        account = new BankAccount(0.0);
+    }
+
+    @Test
+    void depositAddsToBalance() {
+        account.deposit(100.0);
+        assertEquals(100.0, account.getBalance());
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Runs after each test — close connections, reset state, etc.
+    }
+
+    @AfterAll
+    static void cleanUpDatabase() {
+        // Runs once after all tests in this class complete.
+    }
+}
+```
+
+The most important lifecycle rule: **JUnit 5 creates a new instance of the test class for every @Test method**. That is why `setUp()` can assign `account = new BankAccount(...)` and every test gets a clean, independent account without any shared-state bugs.
+
+## @DisplayName
+
+Test method names have to be valid Java identifiers — no spaces, no punctuation. `@DisplayName` lets you write a human-readable label shown in the IDE and CI output:
+
+```java
+@Test
+@DisplayName("Deposit of negative amount throws IllegalArgumentException")
+void negativeDepositThrows() {
+    assertThrows(IllegalArgumentException.class,
+        () -> account.deposit(-10.0));
+}
+```
+
+<Note>Some teams skip @DisplayName and instead follow a strict naming convention such as `given_when_then` or `should_when_given`. Both approaches are valid — pick one and apply it consistently across the codebase.</Note>
+
+## Assertions
+
+JUnit 5's `Assertions` class (statically imported in most test files) covers the full set:
+
+```java
+import static org.junit.jupiter.api.Assertions.*;
+
+// Basic equality
+assertEquals(150.0, account.getBalance(), "balance after deposit");
+
+// Boolean conditions
+assertTrue(account.isOpen());
+assertFalse(account.isClosed());
+
+// Null checks
+assertNotNull(account.getId());
+
+// Exception assertion — returns the exception for further inspection
+IllegalArgumentException ex = assertThrows(
+    IllegalArgumentException.class,
+    () -> account.withdraw(9999.0)
+);
+assertEquals("Insufficient funds", ex.getMessage());
+
+// All-or-nothing block — reports every failure, not just the first
+assertAll("account state",
+    () -> assertEquals(100.0, account.getBalance()),
+    () -> assertTrue(account.isOpen()),
+    () -> assertNotNull(account.getId())
+);
+```
+
+`assertAll` is particularly valuable when checking multiple properties of a result: without it, a failure on the first assertion hides whether the remaining ones pass.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## @Disabled
+
+Sometimes a test cannot run in the current environment — it depends on a service that isn't available in CI, or it's a known failing case being tracked in an issue. `@Disabled` skips it without deleting it:
+
+```java
+@Test
+@Disabled("Flaky in CI until DB migration is complete — see issue #417")
+void withdrawCreatesAuditLog() {
+    // ...
+}
+```
+
+Skipped tests show up in the test report so they stay visible and don't silently rot.
+
+## Nested tests
+
+`@Nested` inner classes let you group related tests and share nested `@BeforeEach` setup without polluting the outer class:
+
+```java
+class BankAccountTest {
+
+    BankAccount account;
+
+    @BeforeEach
+    void createAccount() { account = new BankAccount(100.0); }
+
+    @Nested
+    @DisplayName("Deposit")
+    class DepositTests {
+        @Test void positiveAmountIncreasesBalance() { /* ... */ }
+        @Test void negativeAmountThrows() { /* ... */ }
+    }
+
+    @Nested
+    @DisplayName("Withdraw")
+    class WithdrawTests {
+        @Test void sufficientFundsDecreasesBalance() { /* ... */ }
+        @Test void insufficientFundsFails() { /* ... */ }
+    }
+}
+```
+
+The IDE renders nested classes as a tree, making large test files easy to navigate.
+
+## Try it
+
+Write a complete test class for `BankAccount` with the following behaviour:
+
+```java
+public class BankAccount {
+    private double balance;
+    public BankAccount(double initialBalance) { this.balance = initialBalance; }
+    public void deposit(double amount) {
+        if (amount <= 0) throw new IllegalArgumentException("Amount must be positive");
+        balance += amount;
+    }
+    public void withdraw(double amount) {
+        if (amount > balance) throw new IllegalStateException("Insufficient funds");
+        balance -= amount;
+    }
+    public double getBalance() { return balance; }
+}
+```
+
+Your test class should cover:
+1. Deposit increases balance correctly
+2. Deposit with zero or negative amount throws `IllegalArgumentException`
+3. Withdraw reduces balance correctly
+4. Withdraw more than the balance throws `IllegalStateException`
+5. Check both the exception type *and* the message for the overdraft case using `assertThrows`
+
+Use `@BeforeEach` to create a fresh account for every test and `@DisplayName` on at least two tests.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Sharing mutable state across tests without @BeforeEach** — if two tests modify the same object and test execution order changes, one test will corrupt the other's state. Use `@BeforeEach` to create a fresh instance per test.
+- **Using @BeforeAll on a non-static method** — JUnit 5 creates a new test instance per method, so a non-static @BeforeAll has no single instance to call. Add `static` or switch to `@TestInstance(Lifecycle.PER_CLASS)` when you intentionally share state.
+- **Catching exceptions manually instead of assertThrows** — wrapping code in a try/catch and calling `fail()` in the catch is more verbose and error-prone. `assertThrows` is cleaner and returns the exception for inspection.
+- **Putting multiple unrelated scenarios in one @Test** — when that test fails you don't know which scenario broke. One clear scenario per test method makes failures immediately actionable.
+
+## Recap
+
+- **@BeforeAll / @AfterAll** run once per class (must be static by default)
+- **@BeforeEach / @AfterEach** run before/after every individual test method
+- JUnit creates a **new test instance per @Test** to prevent shared-state bugs
+- **assertThrows** returns the caught exception — assert its message too
+- **assertAll** reports every failure in a block, not just the first
+- **@Nested** classes group related tests and can have their own lifecycle hooks
+- **@Disabled** skips a test visibly rather than deleting it
+
+**Up next:** Parameterized tests — run the same test logic across dozens of inputs with a single method.

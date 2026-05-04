@@ -1,0 +1,418 @@
+export const meta = {
+  title: "Capstone Part 4 — Concurrent Task Processing",
+  duration: 20,
+  order: 4,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "conc-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "The `InMemoryRepository` from Part 2 uses `ConcurrentHashMap` as its backing store. Which additional step is still necessary before the repository is fully safe for concurrent use?",
+    options: [
+      {
+        text: "Nothing — ConcurrentHashMap makes every operation atomic, including read-then-update sequences.",
+        correct: false,
+        feedback: "`ConcurrentHashMap` makes individual method calls (`put`, `get`) atomic, but a read followed by a conditional write is not atomic as a unit. Use `compute`, `merge`, or `putIfAbsent` for compound operations.",
+      },
+      {
+        text: "Compound check-then-act operations (read → modify → write) must use atomic methods like `compute` or be guarded by a lock.",
+        correct: true,
+        feedback: "Correct! `map.get(id)` then `map.put(id, updated)` has a race window between the read and the write. `map.compute(id, (k, v) -> ...)` performs the entire operation atomically.",
+      },
+      {
+        text: "Wrapping the map in `Collections.synchronizedMap` as well.",
+        correct: false,
+        feedback: "Double-wrapping a `ConcurrentHashMap` in `synchronizedMap` does not add safety — it adds unnecessary overhead and can actually reduce throughput by serialising all access.",
+      },
+      {
+        text: "Replacing `ConcurrentHashMap` with `Hashtable`.",
+        correct: false,
+        feedback: "`Hashtable` uses coarse-grained synchronisation and is considered obsolete. `ConcurrentHashMap` is the correct choice for concurrent map access.",
+      },
+    ],
+    explanation: "`ConcurrentHashMap` guarantees that individual operations like `get` and `put` are atomic, but a *read followed by a conditional write* is not. Two threads could both read the old value before either writes the new one. `map.compute(id, (k, v) -> applyUpdate(v))` performs the whole lambda atomically, closing the race window.",
+  },
+  endQ1: {
+    id: "conc-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        ScheduledExecutorService scheduler =
+            Executors.newSingleThreadScheduledExecutor();
+
+        System.out.println("start");
+        scheduler.schedule(() -> System.out.println("tick"), 0, TimeUnit.SECONDS);
+        scheduler.schedule(() -> System.out.println("tock"), 0, TimeUnit.SECONDS);
+        Thread.sleep(100);
+        scheduler.shutdown();
+        System.out.println("done");
+    }
+}`,
+    expectedOutput: "start\ntick\ntock\ndone",
+    explanation: "Both tasks are scheduled with a delay of 0, so they run immediately in FIFO order on the single scheduler thread. `Thread.sleep(100)` gives them time to complete before `shutdown` and the final print.",
+  },
+  endQ2: {
+    id: "conc-end-2",
+    type: "fill_in_blank",
+    difficulty: "hard",
+    prompt: "Complete the CompletableFuture chain so that `notifyAsync` logs the task title, then returns a Void future that completes when the notification is sent:",
+    code: `public CompletableFuture<Void> notifyAsync(Task task, Executor executor) {
+    return CompletableFuture
+        .supplyAsync(() -> task.title(), executor)
+        .___(title -> System.out.println("Notifying for: " + title), executor);
+}`,
+    correctAnswers: ["thenAcceptAsync"],
+    caseSensitive: true,
+    explanation: "`thenAcceptAsync` takes a `Consumer<T>`, consumes the upstream value (logging the title), and returns `CompletableFuture<Void>`. It also accepts an executor to specify which thread pool runs the consumer.",
+  },
+  endQ3: {
+    id: "conc-end-3",
+    type: "find_the_bug",
+    difficulty: "hard",
+    code: `public class TaskProcessor {
+    private final BlockingQueue<Task> queue = new LinkedBlockingQueue<>();
+    private final ExecutorService pool = Executors.newFixedThreadPool(4);
+
+    public void start() {
+        for (int i = 0; i < 4; i++) {
+            pool.submit(() -> {
+                while (true) {
+                    Task task = queue.take();
+                    process(task);
+                }
+            });
+        }
+    }
+
+    public void enqueue(Task task) { queue.add(task); }
+
+    private void process(Task task) {
+        System.out.println("Processing: " + task.title());
+    }
+
+    public void shutdown() {
+        pool.shutdown();
+    }
+}`,
+    buggyLine: 8,
+    issue: "`queue.take()` throws `InterruptedException` (a checked exception) but the lambda does not declare it or handle it. The thread will silently die on interruption, draining the worker pool. Catch `InterruptedException`, restore the interrupt flag with `Thread.currentThread().interrupt()`, and break out of the loop.",
+    explanation: "Worker threads that call blocking operations must handle `InterruptedException` gracefully. The standard pattern is: catch `InterruptedException`, call `Thread.currentThread().interrupt()` to restore the interrupt status, then break or return so the thread can terminate cleanly when the executor shuts down.",
+  },
+};
+
+Parts 1–3 built a fully functional task management system — but it runs on a single thread, processing one operation at a time. Real-world systems need to do several things simultaneously: check for overdue tasks in the background, process completed tasks in a worker pool, and send notifications asynchronously without blocking the request thread.
+
+This lesson adds concurrency to the system using tools from Module 4: `ScheduledExecutorService`, `BlockingQueue`, thread pools, and `CompletableFuture`. The domain model and service layer we built earlier remain unchanged — concurrency is layered *on top* of them, not mixed into them.
+
+## What we are adding
+
+1. **`TaskNotificationService`** — uses a `ScheduledExecutorService` to check for overdue tasks on a fixed interval and fire notifications.
+2. **`TaskProcessor`** — a bounded `BlockingQueue` fed by the service layer; worker threads drain it and handle "task completed" side effects.
+3. **`NotificationService`** — sends notifications asynchronously via `CompletableFuture<Void>`, combining async chains with explicit executors.
+
+## Thread safety review
+
+Before adding new threads, audit what we already have. From Part 2:
+
+- `InMemoryRepository` uses `ConcurrentHashMap` — individual `put`/`get` calls are atomic.
+- `findWhere` iterates `store.values()` — `ConcurrentHashMap` snapshots the values view safely.
+
+The one gap: `save` does a replace operation (`put(id, updated)`). If two threads race to update the same task, the second write overwrites the first silently. We close this with `compute`:
+
+```java
+// Before (race-prone for same-id updates):
+store.put(idExtractor.apply(entity), entity);
+
+// After (atomic read-modify-write):
+store.compute(idExtractor.apply(entity), (id, existing) -> entity);
+```
+
+For most operations a straight `put` is fine; for status transitions the service layer ensures only one caller wins (we will add an optimistic lock token in the stretch goal).
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## TaskNotificationService — scheduled overdue checks
+
+```java
+package com.bytecode.tasks.concurrent;
+
+import com.bytecode.tasks.domain.*;
+import com.bytecode.tasks.repository.InMemoryTaskRepository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.logging.Logger;
+
+public class TaskNotificationService implements AutoCloseable {
+
+    private static final Logger LOG = Logger.getLogger(TaskNotificationService.class.getName());
+
+    private final InMemoryTaskRepository taskRepo;
+    private final NotificationService    notifier;
+    private final ScheduledExecutorService scheduler;
+
+    public TaskNotificationService(InMemoryTaskRepository taskRepo,
+                                   NotificationService notifier) {
+        this.taskRepo  = taskRepo;
+        this.notifier  = notifier;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "overdue-checker");
+            t.setDaemon(true);   // won't block JVM shutdown
+            return t;
+        });
+    }
+
+    /** Schedules the overdue check to run every {@code period} time units. */
+    public void start(long period, TimeUnit unit) {
+        scheduler.scheduleAtFixedRate(this::checkOverdue, 0, period, unit);
+        LOG.info("Overdue checker started — interval: " + period + " " + unit);
+    }
+
+    private void checkOverdue() {
+        List<Task> overdue = taskRepo.findOverdue(LocalDate.now());
+        LOG.info("Overdue check: " + overdue.size() + " tasks overdue");
+        overdue.forEach(task ->
+            notifier.notifyAsync(task)
+                    .exceptionally(ex -> {
+                        LOG.warning("Notification failed for " + task.id() + ": " + ex.getMessage());
+                        return null;
+                    })
+        );
+    }
+
+    @Override
+    public void close() {
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+```
+
+<Note>The thread is created as a **daemon thread** (`t.setDaemon(true)`). Daemon threads do not prevent the JVM from exiting when only daemon threads remain. Background workers and notification threads should almost always be daemons.</Note>
+
+## NotificationService — async with CompletableFuture
+
+```java
+package com.bytecode.tasks.concurrent;
+
+import com.bytecode.tasks.domain.Task;
+
+import java.util.concurrent.*;
+import java.util.logging.Logger;
+
+public class NotificationService {
+
+    private static final Logger LOG = Logger.getLogger(NotificationService.class.getName());
+    private final Executor executor;
+
+    public NotificationService(Executor executor) {
+        this.executor = executor;
+    }
+
+    /** Simulates sending a notification asynchronously. Returns immediately. */
+    public CompletableFuture<Void> notifyAsync(Task task) {
+        return CompletableFuture
+            .supplyAsync(() -> buildMessage(task), executor)
+            .thenAcceptAsync(msg -> {
+                LOG.info("NOTIFY: " + msg);
+                // In production: call an email/Slack/push API here
+            }, executor)
+            .exceptionally(ex -> {
+                LOG.warning("Notification error: " + ex.getMessage());
+                return null;
+            });
+    }
+
+    /** Sends notifications for multiple tasks and waits until all complete. */
+    public CompletableFuture<Void> notifyAll(java.util.List<Task> tasks) {
+        CompletableFuture<?>[] futures = tasks.stream()
+            .map(this::notifyAsync)
+            .toArray(CompletableFuture[]::new);
+        return CompletableFuture.allOf(futures);
+    }
+
+    private String buildMessage(Task task) {
+        String due = task.dueDate().map(Object::toString).orElse("no due date");
+        return String.format("[%s] Task '%s' is overdue (due: %s)",
+                             task.priority(), task.title(), due);
+    }
+}
+```
+
+`CompletableFuture.allOf(futures)` returns a future that completes when every notification finishes — useful when you need to wait for the batch before moving on.
+
+## TaskProcessor — BlockingQueue worker pool
+
+The `TaskProcessor` accepts completed tasks from any thread and processes them in a fixed thread pool — a classic **producer-consumer** pattern:
+
+```java
+package com.bytecode.tasks.concurrent;
+
+import com.bytecode.tasks.domain.Task;
+
+import java.util.concurrent.*;
+import java.util.logging.Logger;
+
+public class TaskProcessor implements AutoCloseable {
+
+    private static final Logger LOG = Logger.getLogger(TaskProcessor.class.getName());
+
+    private final BlockingQueue<Task> queue;
+    private final ExecutorService     pool;
+    private volatile boolean          running = true;
+
+    public TaskProcessor(int workerCount, int queueCapacity) {
+        this.queue = new LinkedBlockingQueue<>(queueCapacity);
+        this.pool  = Executors.newFixedThreadPool(workerCount, r -> {
+            Thread t = new Thread(r, "task-worker-" + workerCount);
+            t.setDaemon(true);
+            return t;
+        });
+
+        for (int i = 0; i < workerCount; i++) {
+            pool.submit(this::workerLoop);
+        }
+    }
+
+    /** Submits a task for background processing; blocks if the queue is full. */
+    public void enqueue(Task task) throws InterruptedException {
+        queue.put(task);   // put blocks; use offer(task, timeout, unit) for a deadline
+    }
+
+    private void workerLoop() {
+        while (running || !queue.isEmpty()) {
+            try {
+                Task task = queue.poll(100, TimeUnit.MILLISECONDS);
+                if (task != null) {
+                    process(task);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+    }
+
+    private void process(Task task) {
+        LOG.info(Thread.currentThread().getName() + " processed: " + task.title());
+        // Archive, audit-log, trigger downstream events, etc.
+    }
+
+    @Override
+    public void close() {
+        running = false;
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                pool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            pool.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+```
+
+<Note>Using `queue.poll(100, TimeUnit.MILLISECONDS)` instead of `queue.take()` means the worker loop re-checks the `running` flag every 100 ms. This allows a clean shutdown: set `running = false`, wait up to 10 seconds for queued work to drain, then force stop.</Note>
+
+## Wiring it all together
+
+In a `main` method (or an integration test in Part 5):
+
+```java
+import com.bytecode.tasks.concurrent.*;
+import com.bytecode.tasks.domain.*;
+import com.bytecode.tasks.repository.*;
+import com.bytecode.tasks.service.*;
+
+import java.util.Optional;
+import java.util.concurrent.*;
+
+public class App {
+    public static void main(String[] args) throws Exception {
+        // Repositories
+        var taskRepo    = new InMemoryTaskRepository();
+        var projectRepo = new InMemoryProjectRepository();
+
+        // Services
+        var taskService = new TaskService(taskRepo, projectRepo);
+        Executor notifyPool = Executors.newCachedThreadPool();
+        var notifier  = new NotificationService(notifyPool);
+
+        // Concurrent workers
+        var processor = new TaskProcessor(4, 100);
+        var overdueChecker = new TaskNotificationService(taskRepo, notifier);
+        overdueChecker.start(1, TimeUnit.SECONDS); // 1 s in tests; 60 s in prod
+
+        // Create some tasks via the service layer
+        for (int i = 1; i <= 10; i++) {
+            taskService.createTask(
+                "Task " + i, "desc", Priority.MEDIUM,
+                Optional.empty(), Optional.empty()
+            ).ifPresent(t -> {
+                try { processor.enqueue(t); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            });
+        }
+
+        Thread.sleep(2000); // let workers drain
+
+        // Graceful shutdown
+        overdueChecker.close();
+        processor.close();
+    }
+}
+```
+
+## Try it
+
+Extend the system with full concurrency support:
+
+1. Add the `TaskNotificationService` class. Wire it to `InMemoryTaskRepository` and `NotificationService`.
+2. Add the `NotificationService` class. Test `notifyAll` by creating five tasks and calling `notifyAll(tasks).get()` — verify the log output shows all five notifications.
+3. Add the `TaskProcessor` with four workers and a queue capacity of 50.
+4. Wire everything together in a `main` method as shown above. Observe that tasks are processed by different threads (print `Thread.currentThread().getName()` in `process`).
+
+Stretch goal: Add an **optimistic lock** to `TaskService.updateStatus`. Add a `version` int field to the `Task` record. `updateStatus` reads the current version, increments it in the updated record, and uses `store.replace(id, expected, updated)` on the map — which returns `false` if another thread already wrote a different version, at which point the service retries or returns an error.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Swallowing `InterruptedException`** — catching `InterruptedException` without calling `Thread.currentThread().interrupt()` clears the interrupted status and breaks the thread's ability to respond to shutdown. Always restore it.
+- **`Executors.newFixedThreadPool` with no custom thread factory** — default threads are named `pool-N-thread-M`, which makes debugging thread dumps painful. Pass a `ThreadFactory` that gives threads meaningful names.
+- **Unbounded queues** — `new LinkedBlockingQueue<>()` (no capacity argument) is unbounded. If producers outpace consumers the queue grows indefinitely, causing an `OutOfMemoryError`. Always specify a capacity and decide what to do when it is full (`put` blocks; `offer` drops or times out).
+- **Forgetting `exceptionally` on CompletableFuture chains** — an unhandled exception in a `thenApplyAsync` stage silently fails the future. Without `.exceptionally(...)` the failure is invisible until something calls `.get()` and receives an `ExecutionException`.
+
+## Recap
+
+- `ScheduledExecutorService.scheduleAtFixedRate` runs a task on a fixed interval; use daemon threads so background work doesn't block JVM exit.
+- `BlockingQueue` + a fixed thread pool is the standard Java producer-consumer pattern; `put` blocks on full, `poll(timeout)` enables clean shutdown.
+- `CompletableFuture.supplyAsync → thenAcceptAsync → exceptionally` composes async pipelines with explicit executor control and error handling.
+- `ConcurrentHashMap.compute` performs atomic read-modify-write operations; plain `put` + `get` has a race window.
+- Always shut down executor services in `AutoCloseable.close()`, awaiting termination before calling `shutdownNow`.
+
+**Up next: Part 5** — testing the full system: unit tests, integration tests, parameterised tests, and strategies for testing concurrent code.

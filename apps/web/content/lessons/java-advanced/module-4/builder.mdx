@@ -1,0 +1,306 @@
+export const meta = {
+  title: "Builder Pattern",
+  duration: 14,
+  order: 3,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "bp-mid-1",
+    type: "predict_output",
+    difficulty: "easy",
+    code: `public class Email {
+    private final String to;
+    private final String subject;
+    private final String body;
+    private final boolean html;
+
+    private Email(Builder b) {
+        this.to = b.to;
+        this.subject = b.subject;
+        this.body = b.body;
+        this.html = b.html;
+    }
+
+    public static class Builder {
+        private final String to;
+        private String subject = "(no subject)";
+        private String body    = "";
+        private boolean html   = false;
+
+        public Builder(String to) { this.to = to; }
+        public Builder subject(String s) { subject = s; return this; }
+        public Builder body(String b)    { body = b;    return this; }
+        public Builder html(boolean h)   { html = h;    return this; }
+        public Email build() { return new Email(this); }
+    }
+
+    @Override public String toString() {
+        return "To=" + to + " sub=" + subject + " html=" + html;
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Email e = new Email.Builder("alice@example.com")
+                .subject("Hello")
+                .html(true)
+                .build();
+        System.out.println(e);
+    }
+}`,
+    expectedOutput: "To=alice@example.com sub=Hello html=true",
+    explanation: "The builder is constructed with the mandatory `to` field, then `subject` and `html` are set. `body` is never called, so it keeps its default empty string. `build()` passes the builder to the private `Email` constructor. The `toString()` prints the three fields shown.",
+  },
+  endQ1: {
+    id: "bp-end-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why does the `build()` method validate required fields rather than the Builder constructor?",
+    options: [
+      { text: "Java constructors cannot throw exceptions.", correct: false, feedback: "Constructors can absolutely throw exceptions in Java. That's not the reason." },
+      { text: "Validation at build() time catches inconsistent combinations of optional fields that can only be checked once all values are known.", correct: true, feedback: "Correct! You may have a rule like 'if startDate is set, endDate is required'. You can only check this when all optional fields are finalised, i.e., at build() time." },
+      { text: "The Builder constructor is always public, so it cannot contain logic.", correct: false, feedback: "Access modifiers have nothing to do with where logic can go. Both the builder constructor and build() can contain validation." },
+      { text: "Validation in build() improves runtime performance.", correct: false, feedback: "This is not a meaningful performance concern. The reason is logical completeness — not speed." },
+    ],
+    explanation: "`build()` is the right validation point because optional fields may form constraints that only make sense together. For example: `if (startDate != null && endDate == null) throw new IllegalStateException(...)`. Putting this in the builder constructor would be premature — the optional fields haven't been set yet.",
+  },
+  endQ2: {
+    id: "bp-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "The Builder's setter methods return `this` so that method calls can be chained. This style is called a ___ API.",
+    code: `// Example of the style:
+new Pizza.Builder("large")
+    .crust("thin")
+    .topping("cheese")
+    .build();`,
+    correctAnswers: ["fluent", "fluent interface"],
+    caseSensitive: false,
+    explanation: "A **fluent API** (or fluent interface) is one where each method returns the current object (`this`), enabling chained method calls that read like natural language. Builders, `StringBuilder`, and Java's `Stream` API all use this style.",
+  },
+  endQ3: {
+    id: "bp-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `public class Config {
+    private final String host;
+    private final int port;
+
+    public static class Builder {
+        private String host;
+        private int port;
+
+        public Builder host(String h) { host = h; return this; }
+        public Builder port(int p)    { port = p; return this; }
+
+        public Config build() {
+            return new Config(host, port);
+        }
+    }
+
+    public Config(String host, int port) {  // bug here
+        this.host = host;
+        this.port = port;
+    }
+}`,
+    buggyLine: 16,
+    issue: "The Config constructor is public, allowing callers to bypass the Builder entirely and construct an invalid or inconsistent object.",
+    explanation: "The Builder pattern's safety guarantee depends on the target class having a **private constructor** that only accepts a Builder. Making the constructor public defeats this: callers can still do `new Config(null, 0)`. The fix is `private Config(Builder b)` with fields assigned from `b`.",
+  },
+};
+
+Constructors with many parameters are one of the most pervasive sources of bugs in Java codebases. Have you ever seen a call like `new Order(true, false, true, null, 3, "USD", false)`? Without looking up the class definition you cannot know which boolean is which. The **Builder pattern** solves the telescoping constructor problem by replacing positional constructor arguments with named, chainable setter methods, and produces an immutable object only when you call `build()`.
+
+## The telescoping constructor problem
+
+```java
+// v1 — one constructor
+public class Pizza {
+    public Pizza(String size) { ... }
+}
+
+// v2 — add optional cheese
+public class Pizza {
+    public Pizza(String size) { ... }
+    public Pizza(String size, boolean cheese) { ... }
+}
+
+// v3 — add pepperoni, mushrooms, sauce...
+// This is where it falls apart:
+Pizza p = new Pizza("large", true, false, true, "tomato", false, true);
+//                            ^      ^      ^       ^         ^     ^
+//                           cheese pepperoni mushrooms sauce olives bacon
+// Which boolean is which?!
+```
+
+A class with 6 optional boolean parameters needs up to 64 constructor overloads to cover every combination. The Builder pattern eliminates all of them.
+
+## Builder with inner static class
+
+```java
+public class Pizza {
+    // All fields are final — the object is immutable after build()
+    private final String size;
+    private final String crust;
+    private final boolean cheese;
+    private final boolean pepperoni;
+    private final boolean mushrooms;
+
+    // Private constructor — only Builder can call it
+    private Pizza(Builder builder) {
+        this.size      = builder.size;
+        this.crust     = builder.crust;
+        this.cheese    = builder.cheese;
+        this.pepperoni = builder.pepperoni;
+        this.mushrooms = builder.mushrooms;
+    }
+
+    public static class Builder {
+        // Required field — set in Builder constructor
+        private final String size;
+
+        // Optional fields with defaults
+        private String  crust      = "regular";
+        private boolean cheese     = false;
+        private boolean pepperoni  = false;
+        private boolean mushrooms  = false;
+
+        public Builder(String size) {
+            this.size = size;
+        }
+
+        // Each setter returns 'this' for chaining (fluent API)
+        public Builder crust(String crust)         { this.crust = crust;           return this; }
+        public Builder cheese(boolean cheese)       { this.cheese = cheese;         return this; }
+        public Builder pepperoni(boolean pepperoni) { this.pepperoni = pepperoni;   return this; }
+        public Builder mushrooms(boolean mushrooms) { this.mushrooms = mushrooms;   return this; }
+
+        public Pizza build() {
+            if (size == null || size.isBlank()) {
+                throw new IllegalStateException("Pizza size is required");
+            }
+            return new Pizza(this);
+        }
+    }
+
+    @Override public String toString() {
+        return String.format("Pizza[%s, crust=%s, cheese=%b, pepperoni=%b, mushrooms=%b]",
+                size, crust, cheese, pepperoni, mushrooms);
+    }
+}
+```
+
+Now the call site is self-documenting:
+
+```java
+Pizza p = new Pizza.Builder("large")
+        .crust("thin")
+        .cheese(true)
+        .pepperoni(true)
+        .build();
+
+System.out.println(p);
+// Pizza[large, crust=thin, cheese=true, pepperoni=true, mushrooms=false]
+```
+
+<Note>Mandatory fields belong in the **Builder's constructor**, not in setter methods. This makes it a compile-time error to omit them, rather than a runtime exception. Optional fields live in setter methods with sensible defaults.</Note>
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## Immutability from a Builder
+
+The target object (`Pizza`) has all `final` fields and no setters. Once `build()` returns the object, its state cannot change. This makes it safe to share across threads and cache without defensive copying.
+
+```java
+// This is fine — Pizza is immutable
+Pizza p = new Pizza.Builder("medium").cheese(true).build();
+cache.put("standard", p);           // safe to share
+list.add(p);                        // safe to put in collections
+```
+
+## Lombok @Builder
+
+In real projects, the boilerplate above is often generated by **Lombok's `@Builder` annotation**:
+
+```java
+import lombok.Builder;
+import lombok.ToString;
+
+@Builder
+@ToString
+public class User {
+    private final String username;
+    private final String email;
+    @Builder.Default private final boolean active = true;
+    @Builder.Default private final int loginCount = 0;
+}
+
+// Lombok generates the Builder class automatically
+User u = User.builder()
+             .username("alice")
+             .email("alice@example.com")
+             .build();
+System.out.println(u);
+// User(username=alice, email=alice@example.com, active=true, loginCount=0)
+```
+
+`@Builder.Default` tells Lombok to use a default value for fields not set by the caller. Without it, unset fields default to Java's zero values (`null`, `0`, `false`).
+
+## Try it
+
+Build `Pizza.Builder` from scratch and verify the output:
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Pizza p1 = new Pizza.Builder("small")
+                .build();
+
+        Pizza p2 = new Pizza.Builder("large")
+                .crust("stuffed")
+                .cheese(true)
+                .pepperoni(true)
+                .mushrooms(true)
+                .build();
+
+        System.out.println(p1);
+        System.out.println(p2);
+
+        // Demonstrate immutability — p1 and p2 can be stored safely
+        java.util.List<Pizza> menu = java.util.List.of(p1, p2);
+        System.out.println("Menu size: " + menu.size());
+    }
+}
+// Pizza[small, crust=regular, cheese=false, pepperoni=false, mushrooms=false]
+// Pizza[large, crust=stuffed, cheese=true, pepperoni=true, mushrooms=true]
+// Menu size: 2
+```
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Making the target class's constructor public** — callers bypass the builder and can create objects in inconsistent states. The constructor must be `private`.
+- **Forgetting to return `this` in setter methods** — without `return this`, the fluent chain breaks and every setter must be on a separate line with the builder variable.
+- **Putting mandatory fields in setter methods** — mandatory fields in the Builder constructor give compile-time safety; as setter methods they silently default to `null`/`0`.
+- **Sharing a Builder across threads** — the builder itself is mutable. Build the final object, then share the immutable result.
+
+## Recap
+
+- The **telescoping constructor problem** arises when optional fields multiply constructor overloads beyond readability
+- Builder uses a **static inner class** that accumulates configuration through chainable setter methods
+- Calling `build()` triggers validation and returns an **immutable** target object
+- The **fluent API** (each setter returns `this`) makes call sites self-documenting
+- **Lombok `@Builder`** eliminates boilerplate in production code while keeping the same pattern
+
+**Up next:** Adapter & Decorator — two structural patterns that let you compose behaviour without touching existing classes.

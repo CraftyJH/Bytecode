@@ -1,0 +1,251 @@
+export const meta = {
+  title: "Thread-Safe Collections",
+  duration: 13,
+  order: 9,
+  isPremium: true,
+};
+
+export const quizzes = {
+  midLesson: {
+    id: "cc-mid-1",
+    type: "multiple_choice",
+    difficulty: "medium",
+    question: "Why is `ConcurrentHashMap` preferred over `Hashtable` (or `Collections.synchronizedMap`) in concurrent code?",
+    options: [
+      { text: "ConcurrentHashMap allows null keys and values; Hashtable does not.", correct: false, feedback: "It's the opposite — ConcurrentHashMap does NOT allow null keys or values. This is not the performance reason." },
+      { text: "ConcurrentHashMap uses segment-level or bucket-level locking so multiple threads can read and write concurrently without blocking the entire map.", correct: true, feedback: "Correct. Hashtable and synchronizedMap lock the entire structure on every operation. ConcurrentHashMap allows high concurrency by locking only the affected bucket (or using CAS for reads)." },
+      { text: "ConcurrentHashMap is faster because it is unsynchronised.", correct: false, feedback: "ConcurrentHashMap is synchronised — just more granularly. It uses CAS and fine-grained locks rather than a single coarse lock." },
+      { text: "ConcurrentHashMap implements a different interface than Hashtable.", correct: false, feedback: "Both implement java.util.Map. The advantage is internal concurrency strategy, not the interface." },
+    ],
+    explanation: "`Hashtable` and `Collections.synchronizedMap` wrap every method in a single `synchronized (this)` lock, serialising all access. `ConcurrentHashMap` (Java 8+) uses CAS operations for reads and fine-grained bucket locking for writes, allowing full concurrent reads and high write parallelism.",
+  },
+  endQ1: {
+    id: "cc-end-1",
+    type: "predict_output",
+    difficulty: "medium",
+    code: `import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        BlockingQueue<String> queue = new ArrayBlockingQueue<>(2);
+        queue.put("first");
+        queue.put("second");
+
+        System.out.println(queue.poll());
+        System.out.println(queue.poll());
+        System.out.println(queue.poll());
+    }
+}`,
+    expectedOutput: "first\nsecond\nnull",
+    explanation: "`ArrayBlockingQueue` is FIFO. `poll()` removes and returns the head, or returns `null` immediately if the queue is empty (unlike `take()` which blocks). The first two polls return `\"first\"` and `\"second\"`; the third finds the queue empty and returns `null`.",
+  },
+  endQ2: {
+    id: "cc-end-2",
+    type: "fill_in_blank",
+    difficulty: "easy",
+    prompt: "Complete the atomic put-if-absent on a ConcurrentHashMap:",
+    code: `ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();
+map.___(\"key\", 42);   // only inserts if key is not already present`,
+    correctAnswers: ["putIfAbsent"],
+    caseSensitive: true,
+    explanation: "`putIfAbsent(key, value)` is an atomic check-then-insert operation on `ConcurrentHashMap`. It returns the existing value if the key was already present, or `null` if the insertion happened. This is safer than a separate `containsKey` + `put` sequence, which would have a race between the two calls.",
+  },
+  endQ3: {
+    id: "cc-end-3",
+    type: "find_the_bug",
+    difficulty: "medium",
+    code: `import java.util.*;
+
+public class Main {
+    static List<String> list = new CopyOnWriteArrayList<>();
+
+    public static void main(String[] args) {
+        list.add("a");
+        list.add("b");
+        list.add("c");
+
+        for (String s : list) {
+            if (s.equals("b")) list.remove(s);  // bug?
+        }
+        System.out.println(list);
+    }
+}`,
+    buggyLine: 10,
+    issue: "This is actually safe with CopyOnWriteArrayList — iteration uses a snapshot and does not throw ConcurrentModificationException. However, a regular ArrayList would throw. The code is only correct because CopyOnWriteArrayList is used; it would be a bug with any other List implementation.",
+    explanation: "`CopyOnWriteArrayList` iterates over an immutable snapshot taken at the start of the for-each loop. Modifications (remove, add) create a new internal array and do not affect the snapshot. This avoids `ConcurrentModificationException`. With a regular `ArrayList`, modifying during iteration throws immediately.",
+  },
+};
+
+Shared mutable collections are one of the most common sources of bugs in concurrent Java code. A plain `ArrayList` or `HashMap` is emphatically not thread-safe: concurrent modifications corrupt their internal state in unpredictable ways — `ConcurrentModificationException` is the benign outcome; silent data corruption or infinite loops are the dangerous ones. Java's `java.util.concurrent` package provides thread-safe collection alternatives that are both correct *and* high-performance, designed specifically for concurrent access patterns.
+
+## ConcurrentHashMap
+
+`ConcurrentHashMap` is the go-to replacement for `HashMap` in multi-threaded code. Unlike the old `Hashtable`, it does not lock the entire map on every operation:
+
+```java
+import java.util.concurrent.ConcurrentHashMap;
+
+ConcurrentHashMap<String, Integer> wordCount = new ConcurrentHashMap<>();
+
+// Thread-safe put, get, putIfAbsent
+wordCount.put("java", 1);
+wordCount.putIfAbsent("java", 99);          // no-op — "java" already exists
+wordCount.merge("java", 1, Integer::sum);   // atomic increment
+
+System.out.println(wordCount.get("java")); // 2
+```
+
+Key atomic operations:
+- `putIfAbsent(key, value)` — inserts only if absent.
+- `computeIfAbsent(key, fn)` — computes and inserts if absent.
+- `merge(key, value, fn)` — atomically combines existing and new values.
+- `compute(key, fn)` — atomically updates a mapping.
+
+<Note>`ConcurrentHashMap` does not allow `null` keys or `null` values. A `null` value is used internally to signal "key absent", so allowing nulls would be ambiguous. If you need null support, use a sentinel object instead.</Note>
+
+## CopyOnWriteArrayList
+
+`CopyOnWriteArrayList` is ideal for collections that are read far more often than written:
+
+```java
+import java.util.concurrent.CopyOnWriteArrayList;
+
+CopyOnWriteArrayList<String> listeners = new CopyOnWriteArrayList<>();
+listeners.add("listener-1");
+listeners.add("listener-2");
+
+// Safe to iterate while another thread is adding — uses a snapshot
+for (String l : listeners) {
+    System.out.println(l);
+}
+```
+
+Every write (add, remove, set) creates a **new copy** of the underlying array. Iterators use the array snapshot taken at their creation time, so they never throw `ConcurrentModificationException` and are not affected by concurrent modifications.
+
+The trade-off: writes are O(n) due to copying. Use `CopyOnWriteArrayList` when writes are rare and the list is small-to-medium (e.g. an event listener registry).
+
+## BlockingQueue — producer-consumer made easy
+
+`BlockingQueue` is the standard interface for producer-consumer patterns:
+
+```java
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+
+BlockingQueue<String> queue = new ArrayBlockingQueue<>(10);  // bounded
+
+// Producer — blocks if queue is full
+queue.put("task-1");
+
+// Consumer — blocks if queue is empty
+String task = queue.take();
+```
+
+| Method | Behaviour when full/empty |
+|---|---|
+| `put(e)` | Blocks until space is available |
+| `take()` | Blocks until an element is available |
+| `offer(e, t, u)` | Times out |
+| `poll(t, u)` | Times out |
+| `add(e)` / `remove()` | Throws exception |
+
+`LinkedBlockingQueue` is unbounded (or optionally bounded); `ArrayBlockingQueue` is always bounded, which adds back-pressure that prevents unbounded queue growth.
+
+<Quiz data={quizzes.midLesson} label="quick check" />
+
+## ConcurrentLinkedQueue
+
+`ConcurrentLinkedQueue` is a lock-free, unbounded FIFO queue built on CAS operations. It is appropriate when you need high-throughput, non-blocking polling and can tolerate an unbounded queue:
+
+```java
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
+queue.offer("a");
+queue.offer("b");
+System.out.println(queue.poll());  // "a"
+System.out.println(queue.size());  // 1
+```
+
+Use `ConcurrentLinkedQueue` over `BlockingQueue` when producers should never block (tasks can pile up) and consumers poll opportunistically.
+
+## When to use each
+
+| Collection | Use when |
+|---|---|
+| `ConcurrentHashMap` | Shared map with concurrent reads and writes |
+| `CopyOnWriteArrayList` | Mostly-read list (e.g. listener registries) |
+| `ArrayBlockingQueue` | Bounded producer-consumer with back-pressure |
+| `LinkedBlockingQueue` | Unbounded (or large) producer-consumer |
+| `ConcurrentLinkedQueue` | Non-blocking, high-throughput queue |
+
+## Try it
+
+Implement a producer-consumer pair using `ArrayBlockingQueue`:
+
+```java
+import java.util.concurrent.*;
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        BlockingQueue<String> queue = new ArrayBlockingQueue<>(5);
+
+        Thread producer = new Thread(() -> {
+            try {
+                for (int i = 1; i <= 8; i++) {
+                    String item = "item-" + i;
+                    queue.put(item);
+                    System.out.println("Produced: " + item);
+                    Thread.sleep(50);
+                }
+                queue.put("DONE");   // poison pill to signal completion
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        Thread consumer = new Thread(() -> {
+            try {
+                while (true) {
+                    String item = queue.take();
+                    if ("DONE".equals(item)) break;
+                    System.out.println("Consumed: " + item);
+                    Thread.sleep(100);
+                }
+                System.out.println("Consumer finished");
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+
+        producer.start();
+        consumer.start();
+        producer.join();
+        consumer.join();
+    }
+}
+```
+
+The queue's capacity of 5 creates natural back-pressure: the producer blocks when the queue is full, waiting for the consumer to catch up.
+
+## End-of-lesson quiz
+
+<Quiz data={quizzes.endQ1} label="question 1 of 3" />
+
+<Quiz data={quizzes.endQ2} label="question 2 of 3" />
+
+<Quiz data={quizzes.endQ3} label="question 3 of 3" />
+
+---
+
+## Common mistakes
+
+- **Using `Collections.synchronizedList` and iterating without external synchronisation** — the wrapper synchronises individual calls, but iteration requires manually locking the list for the entire loop. `CopyOnWriteArrayList` handles this transparently.
+- **Calling `size()` then `take()` as a pair** — `size() > 0` then `take()` is not atomic; another thread can drain the queue between the two calls. Use `poll()` and check for null, or just `take()` with a timeout.
+- **Using `CopyOnWriteArrayList` for write-heavy workloads** — every write copies the entire array; on a large, frequently modified list this is a severe performance problem.
+- **Not using `putIfAbsent` or `computeIfAbsent`** — a separate `containsKey` + `put` has a race window. Always use the atomic compound methods on `ConcurrentHashMap`.
+
+## Recap
+
+- `ConcurrentHashMap` allows high-concurrency reads and writes via fine-grained locking; prefer it over `Hashtable` or `synchronizedMap`. No null keys/values.
+- `CopyOnWriteArrayList` is safe for concurrent iteration; writes copy the array, so it's best for rarely-modified lists.
+- `BlockingQueue` implementations (`ArrayBlockingQueue`, `LinkedBlockingQueue`) provide blocking `put`/`take` for producer-consumer patterns.
+- `ConcurrentLinkedQueue` is a non-blocking, unbounded FIFO queue for high-throughput polling.
+
+**Up next:** Lesson 10 introduces `ReentrantLock`, `ReadWriteLock`, and `Condition` — explicit locking primitives that give you more control than `synchronized`.
