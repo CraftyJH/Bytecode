@@ -8,29 +8,55 @@ interface ModuleProgressProps {
   lessons: LessonMeta[];
   trackSlug: string;
   moduleSlug: string;
+  initialCompletedSlugs?: string[];
 }
 
-export function ModuleProgress({ lessons, trackSlug, moduleSlug }: ModuleProgressProps) {
+export function ModuleProgress({
+  lessons,
+  trackSlug,
+  moduleSlug,
+  initialCompletedSlugs = [],
+}: ModuleProgressProps) {
   const storageKey = `bytecode:progress:${trackSlug}:${moduleSlug}`;
-  const [completed, setCompleted] = useState<string[]>([]);
+  const [completed, setCompleted] = useState<string[]>(initialCompletedSlugs);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    function load() {
+    function loadFromLocal() {
       try {
         const val = localStorage.getItem(storageKey);
-        setCompleted(val ? (JSON.parse(val) as string[]) : []);
+        setCompleted(val ? (JSON.parse(val) as string[]) : initialCompletedSlugs);
       } catch {
-        setCompleted([]);
+        setCompleted(initialCompletedSlugs);
       }
     }
-    load();
+
+    let active = true;
+    async function loadFromRemote() {
+      try {
+        const res = await fetch("/api/progress", { cache: "no-store" });
+        if (!res.ok) throw new Error("failed");
+        const data = (await res.json()) as { completedLessonSlugs?: string[] };
+        if (!active) return;
+        const remote = data.completedLessonSlugs ?? [];
+        setCompleted(remote);
+        localStorage.setItem(storageKey, JSON.stringify(remote));
+      } catch {
+        if (active) loadFromLocal();
+      }
+    }
+
+    loadFromRemote();
+
     function onStorage(e: StorageEvent) {
-      if (e.key === storageKey) load();
+      if (e.key === storageKey) loadFromLocal();
     }
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [storageKey]);
+    return () => {
+      active = false;
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [initialCompletedSlugs, storageKey]);
 
   const total = lessons.length;
   const count = completed.length;

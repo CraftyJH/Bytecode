@@ -69,19 +69,44 @@ export function LessonSidebar({
 
   useEffect(() => {
     const storageKey = `bytecode:progress:${trackSlug}:${moduleSlug}`;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) setCompletedSlugs(JSON.parse(raw) as string[]);
-    } catch { /* ignore */ }
+    let active = true;
+
+    const loadFromLocal = () => {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        setCompletedSlugs(raw ? (JSON.parse(raw) as string[]) : initialCompleted);
+      } catch {
+        setCompletedSlugs(initialCompleted);
+      }
+    };
+
+    const loadFromRemote = async () => {
+      try {
+        const res = await fetch("/api/progress", { cache: "no-store" });
+        if (!res.ok) throw new Error("failed");
+        const data = (await res.json()) as { completedLessonSlugs?: string[] };
+        if (!active) return;
+        const remote = data.completedLessonSlugs ?? [];
+        setCompletedSlugs(remote);
+        localStorage.setItem(storageKey, JSON.stringify(remote));
+      } catch {
+        if (active) loadFromLocal();
+      }
+    };
+
+    loadFromRemote();
 
     const handler = (e: StorageEvent) => {
-      if (e.key === storageKey && e.newValue) {
-        try { setCompletedSlugs(JSON.parse(e.newValue) as string[]); } catch { /* ignore */ }
+      if (e.key === storageKey) {
+        loadFromLocal();
       }
     };
     window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, [trackSlug, moduleSlug]);
+    return () => {
+      active = false;
+      window.removeEventListener("storage", handler);
+    };
+  }, [initialCompleted, moduleSlug, trackSlug]);
 
   const nav = (
     <nav aria-label="Lesson navigation" className="py-4 px-3">

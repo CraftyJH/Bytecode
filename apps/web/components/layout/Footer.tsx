@@ -6,7 +6,6 @@ export function Footer() {
     { href: "/pricing", label: "Pricing" },
     { href: "/why-bytecode", label: "Why Bytecode?" },
     { href: "/forum", label: "Forum" },
-    { href: "/about", label: "About" },
     { href: "/privacy", label: "Privacy" },
     { href: "/terms", label: "Terms" },
   ];

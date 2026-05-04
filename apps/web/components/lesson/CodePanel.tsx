@@ -43,6 +43,26 @@ export function CodePanel({ lessonSlug, trackSlug, moduleSlug, starterCode, expe
   const [code, setCode] = useState(starterCode);
   const [result, setResult] = useState<RunResult | null>(null);
   const [runState, setRunState] = useState<RunState>("idle");
+  const storageKey = `bytecode:progress:${trackSlug}:${moduleSlug}`;
+
+  async function markLessonComplete() {
+    try {
+      const prev = JSON.parse(localStorage.getItem(storageKey) ?? "[]") as string[];
+      if (!prev.includes(lessonSlug)) {
+        const next = [...prev, lessonSlug];
+        localStorage.setItem(storageKey, JSON.stringify(next));
+        window.dispatchEvent(new StorageEvent("storage", { key: storageKey, newValue: JSON.stringify(next) }));
+      }
+    } catch {
+      // ignore localStorage issues
+    }
+
+    try {
+      await fetch(`/api/progress/${encodeURIComponent(lessonSlug)}`, { method: "POST" });
+    } catch {
+      // keep UX responsive even when remote save fails
+    }
+  }
 
   async function handleRun() {
     setRunState("running");
@@ -82,15 +102,7 @@ export function CodePanel({ lessonSlug, trackSlug, moduleSlug, starterCode, expe
         const passed = gradeOutput(data.stdout, expectedOutput);
         setRunState(passed ? "passed" : "failed");
         if (passed) {
-          try {
-            const key = `bytecode:progress:${trackSlug}:${moduleSlug}`;
-            const prev = JSON.parse(localStorage.getItem(key) ?? "[]") as string[];
-            if (!prev.includes(lessonSlug)) {
-              const next = [...prev, lessonSlug];
-              localStorage.setItem(key, JSON.stringify(next));
-              window.dispatchEvent(new StorageEvent("storage", { key, newValue: JSON.stringify(next) }));
-            }
-          } catch { /* ignore */ }
+          await markLessonComplete();
         }
       } else {
         setRunState("idle");

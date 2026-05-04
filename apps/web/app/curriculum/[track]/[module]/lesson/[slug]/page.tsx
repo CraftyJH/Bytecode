@@ -13,10 +13,13 @@ import { ModuleProgress } from "@/components/lesson/ModuleProgress";
 import { Pill } from "@/components/ui/Pill";
 import { Clock, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import { askFromLessonHref } from "@/lib/forum";
+import { createClient } from "@/lib/supabase/server";
 
 interface LessonPageProps {
   params: Promise<{ track: string; module: string; slug: string }>;
 }
+
+const BYTECODE_API_URL = process.env.BYTECODE_API_URL ?? "http://localhost:8080";
 
 export async function generateStaticParams() {
   const { curriculum } = await import("@/lib/curriculum");
@@ -58,6 +61,29 @@ export default async function LessonPage({ params }: LessonPageProps) {
   if (!source) notFound();
 
   const { prev, next } = getPrevNext(trackSlug, moduleSlug, lessonSlug);
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  let completedSlugs: string[] = [];
+  if (session?.access_token) {
+    try {
+      const res = await fetch(`${BYTECODE_API_URL}/api/progress`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { completedLessonSlugs?: string[] };
+        completedSlugs = data.completedLessonSlugs ?? [];
+      }
+    } catch {
+      // keep rendering even if progress API is unavailable
+    }
+  }
 
   const components = buildMdxComponents();
 
@@ -68,7 +94,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
         moduleSlug={moduleSlug}
         module={mod}
         currentSlug={lessonSlug}
-        completedSlugs={[]}
+        completedSlugs={completedSlugs}
       />
 
       {/* ── Main two-column area ── */}
@@ -168,7 +194,12 @@ export default async function LessonPage({ params }: LessonPageProps) {
         </article>
       </LessonColumns>
 
-      <ModuleProgress lessons={mod.lessons} trackSlug={trackSlug} moduleSlug={moduleSlug} />
+      <ModuleProgress
+        lessons={mod.lessons}
+        trackSlug={trackSlug}
+        moduleSlug={moduleSlug}
+        initialCompletedSlugs={completedSlugs}
+      />
     </div>
   );
 }
