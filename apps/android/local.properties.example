@@ -1,0 +1,7 @@
+## Copy to local.properties (do not commit secrets)
+#sdk.dir=/path/to/Android/Sdk
+
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+BYTECODE_API_URL=https://your-api-domain
+WEB_BASE_URL=https://bytecode-web.craftyjhs-projects.vercel.app
