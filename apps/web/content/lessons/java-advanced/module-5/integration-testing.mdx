@@ -424,6 +424,115 @@ In a microservices architecture, Service A (consumer) depends on Service B's (pr
 
 This catches breaking API changes at the earliest possible point — in CI before deployment — rather than in an integration environment at 2am.
 
+<Exercise>
+Challenge — end-to-end collaboration: simulate `UserService` and `TaskService` working together. Write an end-to-end check that creates a user, assigns a task to that user, and verifies the task appears in the user's task list.
+
+```java
+import java.util.*;
+
+public class Main {
+    static void check(boolean cond, String msg) {
+        if (!cond) throw new AssertionError(msg);
+        System.out.println("PASS: " + msg);
+    }
+
+    // --- Domain ---
+    static class User {
+        Long id;
+        String name;
+        final List<Long> taskIds = new ArrayList<>();
+        User(String name) { this.name = name; }
+    }
+
+    static class Task {
+        Long id;
+        String title;
+        Long assignedUserId;
+        Task(String title) { this.title = title; }
+    }
+
+    // --- Repositories ---
+    static class UserRepo {
+        private final Map<Long, User> store = new HashMap<>();
+        private long nextId = 1;
+        User save(User u) { if (u.id == null) u.id = nextId++; store.put(u.id, u); return u; }
+        Optional<User> findById(Long id) { return Optional.ofNullable(store.get(id)); }
+    }
+
+    static class TaskRepo {
+        private final Map<Long, Task> store = new HashMap<>();
+        private long nextId = 1;
+        Task save(Task t) { if (t.id == null) t.id = nextId++; store.put(t.id, t); return t; }
+        Optional<Task> findById(Long id) { return Optional.ofNullable(store.get(id)); }
+    }
+
+    // --- Services ---
+    static class UserService {
+        private final UserRepo repo;
+        UserService(UserRepo repo) { this.repo = repo; }
+
+        User register(String name) { return repo.save(new User(name)); }
+
+        void assignTask(Long userId, Long taskId) {
+            User u = repo.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("User not found"));
+            u.taskIds.add(taskId);
+            repo.save(u);
+        }
+
+        List<Long> getTaskIds(Long userId) {
+            return repo.findById(userId)
+                .map(u -> Collections.unmodifiableList(u.taskIds))
+                .orElse(Collections.emptyList());
+        }
+    }
+
+    static class TaskService {
+        private final TaskRepo repo;
+        TaskService(TaskRepo repo) { this.repo = repo; }
+
+        Task create(String title) {
+            if (title == null || title.isBlank())
+                throw new IllegalArgumentException("Title required");
+            return repo.save(new Task(title));
+        }
+    }
+
+    public static void main(String[] args) {
+        // Wire up real collaborators — no mocks
+        UserRepo    userRepo    = new UserRepo();
+        TaskRepo    taskRepo    = new TaskRepo();
+        UserService userService = new UserService(userRepo);
+        TaskService taskService = new TaskService(taskRepo);
+
+        // Step 1: create a user
+        User alice = userService.register("Alice");
+        check(alice.id != null, "user Alice was created with an id");
+
+        // Step 2: create a task
+        Task task = taskService.create("Implement login");
+        check(task.id != null, "task was created with an id");
+
+        // Step 3: assign the task to the user
+        userService.assignTask(alice.id, task.id);
+
+        // Step 4: verify the task appears in the user's task list
+        List<Long> taskIds = userService.getTaskIds(alice.id);
+        check(taskIds.contains(task.id),
+              "task id appears in Alice's task list after assignment");
+        check(taskIds.size() == 1,
+              "Alice has exactly 1 task assigned");
+    }
+}
+```
+
+**What to verify:**
+- All 4 checks print `PASS:` — demonstrating a complete end-to-end integration path with two collaborating services and two repositories
+- The test uses zero mocks: every component is a real object
+
+<Note>Hint: if a check fails, read its description — the message tells you exactly which step of the end-to-end flow broke, making debugging straightforward even without a framework.</Note>
+</Exercise>
+
 ## Try it
 
 Write a complete integration test for a `TaskService` backed by an in-memory `TaskRepository` — no mocks, no Spring context:
