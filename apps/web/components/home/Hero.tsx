@@ -1,66 +1,94 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/Button";
-import { CodeBlock, type CodeLine } from "@/components/ui/CodeBlock";
+import type { CodeLine } from "@/components/ui/CodeBlock";
+
+const AnimatedCodeBlock = dynamic(
+  () => import("@/components/home/AnimatedCodeBlock").then(m => m.AnimatedCodeBlock),
+  { ssr: false }
+);
 
 const heroCode: CodeLine[] = [
-  [{ text: "// a taste of modern Java", type: "comment" }],
+  [{ text: "// modern Java — records + pattern matching", type: "comment" }],
+  [],
+  [
+    { text: "sealed interface ", type: "keyword" },
+    { text: "Shape ", type: "type" },
+    { text: "permits ", type: "keyword" },
+    { text: "Circle", type: "type" },
+    { text: ", " },
+    { text: "Rect", type: "type" },
+    { text: " {}" },
+  ],
   [],
   [
     { text: "record ", type: "keyword" },
-    { text: "Coffee", type: "type" },
+    { text: "Circle", type: "type" },
     { text: "(" },
-    { text: "String ", type: "type" },
-    { text: "name" },
+    { text: "double ", type: "type" },
+    { text: "r" },
+    { text: ")   " },
+    { text: "implements ", type: "keyword" },
+    { text: "Shape ", type: "type" },
+    { text: "{}" },
+  ],
+  [
+    { text: "record ", type: "keyword" },
+    { text: "Rect", type: "type" },
+    { text: "(" },
+    { text: "double ", type: "type" },
+    { text: "w" },
     { text: ", " },
-    { text: "int ", type: "type" },
-    { text: "oz" },
-    { text: ") {}" },
+    { text: "double ", type: "type" },
+    { text: "h" },
+    { text: ") " },
+    { text: "implements ", type: "keyword" },
+    { text: "Shape ", type: "type" },
+    { text: "{}" },
   ],
   [],
   [
-    { text: "var ", type: "keyword" },
-    { text: "espresso " },
-    { text: "= " },
-    { text: "new ", type: "keyword" },
-    { text: "Coffee", type: "type" },
+    { text: "double ", type: "type" },
+    { text: "area", type: "method" },
     { text: "(" },
-    { text: '"Espresso"', type: "string" },
-    { text: ", " },
-    { text: "2", type: "number" },
-    { text: ");" },
+    { text: "Shape ", type: "type" },
+    { text: "s) {" },
   ],
   [
-    { text: "System", type: "type" },
-    { text: ".out." },
-    { text: "println", type: "method" },
-    { text: "(" },
-    { text: "espresso", type: "method" },
-    { text: "." },
-    { text: "name", type: "method" },
-    { text: "() + " },
-    { text: '" — "', type: "string" },
-    { text: " + espresso." },
-    { text: "oz", type: "method" },
-    { text: "() + " },
-    { text: '"oz"', type: "string" },
-    { text: ");" },
+    { text: "  return ", type: "keyword" },
+    { text: "switch ", type: "keyword" },
+    { text: "(s) {" },
   ],
+  [
+    { text: "    case ", type: "keyword" },
+    { text: "Circle ", type: "type" },
+    { text: "c -> " },
+    { text: "Math", type: "type" },
+    { text: ".PI * c." },
+    { text: "r", type: "method" },
+    { text: "() * c." },
+    { text: "r", type: "method" },
+    { text: "();" },
+  ],
+  [
+    { text: "    case ", type: "keyword" },
+    { text: "Rect ", type: "type" },
+    { text: "r   -> r." },
+    { text: "w", type: "method" },
+    { text: "() * r." },
+    { text: "h", type: "method" },
+    { text: "();" },
+  ],
+  [{ text: "  };" }],
+  [{ text: "}" }],
 ];
 
 export function Hero() {
   return (
     <section className="relative overflow-hidden">
-      {/* Subtle grid texture */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 60% 20%, rgba(199,123,58,0.06) 0%, transparent 60%)",
-        }}
-        aria-hidden="true"
-      />
-
-      <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-20 lg:pt-32 lg:pb-28">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+      <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-16 lg:pt-28 lg:pb-24">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           {/* Left — copy */}
           <div>
             <p
@@ -101,11 +129,7 @@ export function Hero() {
 
             {/* Trust signals */}
             <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2">
-              {[
-                "No credit card",
-                "No ads",
-                "No mistake limits",
-              ].map((signal) => (
+              {["No credit card", "No ads", "No mistake limits"].map((signal) => (
                 <span
                   key={signal}
                   className="flex items-center gap-1.5 text-xs text-prose-faint"
@@ -118,13 +142,13 @@ export function Hero() {
             </div>
           </div>
 
-          {/* Right — live code block (desktop only) */}
-          <div className="hidden lg:block lg:pl-4">
-            <CodeBlock
+          {/* Right — animated code editor */}
+          <div className="lg:pl-4">
+            <AnimatedCodeBlock
               lines={heroCode}
-              output={"Espresso — 2oz"}
+              output={"78.53981633974483\n12.0"}
               language="java"
-              showRunButton
+              typingSpeedMs={26}
             />
           </div>
         </div>

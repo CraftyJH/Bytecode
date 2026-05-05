@@ -74,9 +74,9 @@ export function BinaryBackground() {
                           0.058 + Math.random() * 0.042;   // Near: visible
 
           const speed =
-            layer === 0 ? 0.05 + Math.random() * 0.08 :   // Far:  slow
-            layer === 1 ? 0.14 + Math.random() * 0.14 :   // Mid:  medium
-                          0.32 + Math.random() * 0.24;    // Near: fast
+            layer === 0 ? 0.03 + Math.random() * 0.04 :   // Far:  slow
+            layer === 1 ? 0.07 + Math.random() * 0.07 :   // Mid:  medium
+                          0.16 + Math.random() * 0.12;    // Near: fast
 
           // Horizontal drift increases with nearness
           const vx =
@@ -107,7 +107,7 @@ export function BinaryBackground() {
           bits: BYTE_PATTERNS[Math.floor(Math.random() * BYTE_PATTERNS.length)],
           opacity: 0.022 + Math.random() * 0.028,
           cellSize,
-          speed: 0.04 + Math.random() * 0.07,
+          speed: 0.02 + Math.random() * 0.03,
           style,
         });
       }

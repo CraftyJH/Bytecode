@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { BinaryBackground } from "@/components/layout/BinaryBackground";
 import { Hero } from "@/components/home/Hero";
 import { WhyBytecode } from "@/components/home/WhyBytecode";
 import { ThePath } from "@/components/home/ThePath";
@@ -13,6 +14,7 @@ import { AppDownload } from "@/components/home/AppDownload";
 export default function HomePage() {
   return (
     <>
+      <BinaryBackground />
       <Navbar />
       <main>
         <Hero />
