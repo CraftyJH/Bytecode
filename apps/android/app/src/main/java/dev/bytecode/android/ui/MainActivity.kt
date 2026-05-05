@@ -62,6 +62,7 @@ import dev.bytecode.android.ui.theme.BytecodeTheme
 private object AppRoutes {
     const val AuthGraph = "auth"
     const val AppGraph = "app"
+    const val Welcome = "auth/welcome"
     const val SignIn = "auth/sign-in"
     const val Main = "app/main"
     const val LessonPattern = "app/lesson/{track}/{module}/{lesson}"
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity() {
                     val state by viewModel.uiState.collectAsStateWithLifecycle()
                     AppScreen(
                         state = state,
+                        onContinueWelcome = { viewModel.completeWelcome() },
                         onSignIn = { email, password -> viewModel.signIn(email, password) },
                         onSignOut = { viewModel.signOut() },
                         onRefresh = { viewModel.refresh() },
@@ -111,6 +113,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppScreen(
     state: AppUiState,
+    onContinueWelcome: () -> Unit,
     onSignIn: (String, String) -> Unit,
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
@@ -135,10 +138,18 @@ private fun AppScreen(
                     }
                 }
             }
+            AppUiState.Welcome -> {
+                if (currentRoute != AppRoutes.Welcome) {
+                    navController.navigate(AppRoutes.Welcome) {
+                        popUpTo(AppRoutes.AppGraph) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
             is AppUiState.LoggedOut,
             is AppUiState.Error,
             -> {
-                if (currentRoute == null || !currentRoute.startsWith(AppRoutes.AuthGraph)) {
+                if (currentRoute != AppRoutes.SignIn) {
                     navController.navigate(AppRoutes.SignIn) {
                         popUpTo(AppRoutes.AppGraph) { inclusive = true }
                         launchSingleTop = true
@@ -155,8 +166,21 @@ private fun AppScreen(
     ) {
         navigation(
             route = AppRoutes.AuthGraph,
-            startDestination = AppRoutes.SignIn,
+            startDestination = AppRoutes.Welcome,
         ) {
+            composable(AppRoutes.Welcome) {
+                when (state) {
+                    AppUiState.Welcome -> {
+                        WelcomeScreen(onContinue = onContinueWelcome)
+                    }
+                    AppUiState.Loading -> LoadingScreen("Preparing welcome…")
+                    is AppUiState.LoggedOut,
+                    is AppUiState.Error,
+                    -> LoadingScreen("Opening sign in…")
+                    is AppUiState.LoggedIn -> LoadingScreen("Opening dashboard…")
+                }
+            }
+
             composable(AppRoutes.SignIn) {
                 when (state) {
                     is AppUiState.LoggedOut -> {
@@ -173,6 +197,7 @@ private fun AppScreen(
                             onSignIn = onSignIn,
                         )
                     }
+                    AppUiState.Welcome -> LoadingScreen("Opening welcome…")
                     AppUiState.Loading -> LoadingScreen("Loading…")
                     is AppUiState.LoggedIn -> LoadingScreen("Opening dashboard…")
                 }
@@ -258,9 +283,93 @@ private fun LoadingScreen(message: String) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CircularProgressIndicator()
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(message)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 420.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 2.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "BYTECODE",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = "Mobile Learning Companion",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                CircularProgressIndicator()
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeScreen(
+    onContinue: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 460.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 2.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Welcome to Bytecode",
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                Text(
+                    text = "Learn Java and Kotlin in focused lessons, then practice directly in-app.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Text(
+                        text = "Get set up in seconds, then continue straight into your learning dashboard.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    onClick = onContinue,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Get started")
+                }
+            }
+        }
     }
 }
 

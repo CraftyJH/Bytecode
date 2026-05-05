@@ -138,7 +138,11 @@ class AuthRepository(context: android.content.Context) {
         }
 
     suspend fun signOut() {
+        val hasSeenWelcome = sessionStore.hasSeenWelcome()
         sessionStore.clear()
+        if (hasSeenWelcome) {
+            sessionStore.markWelcomeSeen()
+        }
     }
 
     private fun mapAuthError(throwable: Throwable): Throwable {

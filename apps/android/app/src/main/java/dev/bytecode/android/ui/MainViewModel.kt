@@ -7,6 +7,7 @@ import dev.bytecode.android.data.model.MobileLessonContent
 import dev.bytecode.android.data.model.MobileCurriculumState
 import dev.bytecode.android.data.repository.AuthRepository
 import dev.bytecode.android.data.repository.RepositoryFailure
+import dev.bytecode.android.data.repository.SessionStore
 import dev.bytecode.android.data.repository.UserRepository
 import dev.bytecode.android.ui.state.AppUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val authRepository = AuthRepository(application)
     private val userRepository = UserRepository(application)
+    private val sessionStore = SessionStore(application)
 
     private val _uiState = MutableStateFlow<AppUiState>(AppUiState.Loading)
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -29,6 +31,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun bootstrap() {
         viewModelScope.launch {
+            if (!sessionStore.hasSeenWelcome()) {
+                _uiState.value = AppUiState.Welcome
+                return@launch
+            }
             when (val tokenResult = authRepository.validAccessTokenResult()) {
                 is AuthRepository.AccessTokenResult.Success -> {
                     refreshWithToken(tokenResult.accessToken)
@@ -47,6 +53,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun completeWelcome() {
+        sessionStore.markWelcomeSeen()
+        refresh()
     }
 
     fun signIn(email: String, password: String) {

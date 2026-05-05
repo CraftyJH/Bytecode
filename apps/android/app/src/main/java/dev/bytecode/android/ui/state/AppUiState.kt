@@ -11,6 +11,7 @@ import dev.bytecode.android.data.model.RunCodeResult
 
 sealed interface AppUiState {
     data object Loading : AppUiState
+    data object Welcome : AppUiState
     data class LoggedOut(
         val loading: Boolean = false,
         val error: String? = null,

@@ -51,7 +51,13 @@ class SessionStore(context: Context) {
     }
 
     fun clear() {
-        prefs.edit { clear() }
+        prefs.edit {
+            remove(KEY_ACCESS_TOKEN)
+            remove(KEY_REFRESH_TOKEN)
+            remove(KEY_EXPIRES_AT_MS)
+            remove(KEY_USER_ID)
+            remove(KEY_USER_EMAIL)
+        }
     }
 
     fun saveMobileRuntimeConfig(config: MobileRuntimeConfig) {
@@ -61,6 +67,12 @@ class SessionStore(context: Context) {
             putString(KEY_MOBILE_BYTECODE_API_URL, config.bytecodeApiUrl)
             putString(KEY_MOBILE_WEB_BASE_URL, config.webBaseUrl)
         }
+    }
+
+    fun hasSeenWelcome(): Boolean = prefs.getBoolean(KEY_HAS_SEEN_WELCOME, false)
+
+    fun markWelcomeSeen() {
+        prefs.edit { putBoolean(KEY_HAS_SEEN_WELCOME, true) }
     }
 
     fun readMobileRuntimeConfig(): MobileRuntimeConfig? {
@@ -89,5 +101,6 @@ class SessionStore(context: Context) {
         private const val KEY_MOBILE_SUPABASE_PUBLISHABLE_KEY = "mobile_supabase_publishable_key"
         private const val KEY_MOBILE_BYTECODE_API_URL = "mobile_bytecode_api_url"
         private const val KEY_MOBILE_WEB_BASE_URL = "mobile_web_base_url"
+        private const val KEY_HAS_SEEN_WELCOME = "has_seen_welcome"
     }
 }
