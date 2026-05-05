@@ -106,14 +106,22 @@ export default async function AndroidDownloadPage() {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 items-start">
               {releaseMeta?.apkUrl ? (
-                <a
-                  href={releaseMeta.apkUrl}
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium bg-accent text-inverse hover:bg-accent-warm transition-colors duration-100"
-                >
-                  Download Android APK
-                </a>
+                <div className="flex flex-col gap-1">
+                  <a
+                    href={releaseMeta.apkUrl}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium bg-accent text-inverse hover:bg-accent-warm transition-colors duration-100"
+                  >
+                    Download Android APK
+                  </a>
+                  <p
+                    className="text-xs text-prose-faint pl-1"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    {releaseMeta.label} · {releaseMeta.updated}
+                  </p>
+                </div>
               ) : (
                 <span
                   className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium border text-prose-faint"

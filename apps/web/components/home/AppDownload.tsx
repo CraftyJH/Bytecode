@@ -1,6 +1,38 @@
 import { Smartphone, QrCode } from "lucide-react";
 
-export function AppDownload() {
+const GITHUB_RELEASE_API_URL =
+  "https://api.github.com/repos/CraftyJH/Bytecode/releases/tags/android-latest";
+
+interface ReleaseMeta {
+  label: string;
+  updated: string;
+}
+
+async function fetchReleaseMeta(): Promise<ReleaseMeta | null> {
+  try {
+    const res = await fetch(GITHUB_RELEASE_API_URL, {
+      next: { revalidate: 300 },
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const label: string = data.name ?? data.tag_name ?? "android-latest";
+    const updated: string = data.published_at
+      ? new Intl.DateTimeFormat("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }).format(new Date(data.published_at))
+      : "";
+    return { label, updated };
+  } catch {
+    return null;
+  }
+}
+
+export async function AppDownload() {
+  const release = await fetchReleaseMeta();
+
   return (
     <section className="border-t" style={{ borderColor: "var(--border-subtle)" }}>
       <div className="mx-auto max-w-6xl px-6 py-20 lg:py-24">
@@ -27,8 +59,8 @@ export function AppDownload() {
               your pocket.
             </p>
 
-            <div className="flex flex-wrap gap-3">
-              {/* Placeholder download buttons */}
+            <div className="flex flex-wrap gap-3 items-start">
+              {/* iOS — coming soon */}
               <a
                 href="#"
                 aria-label="Download on the App Store (coming soon)"
@@ -39,15 +71,28 @@ export function AppDownload() {
                 App Store
                 <span className="text-xs text-prose-faint">(soon)</span>
               </a>
-              <a
-                href="/get-the-app/android"
-                aria-label="Download Bytecode Android APK and install instructions"
-                className="flex items-center gap-2.5 px-5 py-3 rounded-md text-sm font-medium bg-accent text-inverse hover:bg-accent-warm transition-colors duration-100"
-              >
-                <Smartphone size={16} />
-                Android APK
-                <span className="text-xs opacity-80">(download)</span>
-              </a>
+
+              {/* Android APK */}
+              <div className="flex flex-col gap-1">
+                <a
+                  href="/get-the-app/android"
+                  aria-label="Download Bytecode Android APK and install instructions"
+                  className="flex items-center gap-2.5 px-5 py-3 rounded-md text-sm font-medium bg-accent text-inverse hover:bg-accent-warm transition-colors duration-100"
+                >
+                  <Smartphone size={16} />
+                  Android APK
+                  <span className="text-xs opacity-80">(download)</span>
+                </a>
+                {release && (
+                  <p
+                    className="text-xs text-prose-faint pl-1"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    {release.label}
+                    {release.updated ? ` · ${release.updated}` : ""}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
