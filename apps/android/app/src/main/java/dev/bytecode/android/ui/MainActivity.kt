@@ -7,26 +7,43 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -59,6 +76,7 @@ import dev.bytecode.android.data.model.OnboardingProfile
 import dev.bytecode.android.ui.state.AppUiState
 import dev.bytecode.android.ui.state.selectedLessonSummary
 import dev.bytecode.android.ui.theme.BytecodeTheme
+import dev.bytecode.android.ui.theme.JetBrainsMonoFamily
 
 private object AppRoutes {
     const val AuthGraph = "auth"
@@ -326,28 +344,28 @@ private fun LoadingScreen(message: String) {
                 .widthIn(max = 420.dp),
             color = MaterialTheme.colorScheme.surface,
             shape = MaterialTheme.shapes.large,
-            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = "BYTECODE",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = "Mobile Learning Companion",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "Mobile Learning",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(8.dp))
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 Text(
                     text = message,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -372,33 +390,30 @@ private fun WelcomeScreen(
                 .widthIn(max = 460.dp),
             color = MaterialTheme.colorScheme.surface,
             shape = MaterialTheme.shapes.large,
-            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
         ) {
             Column(
-                modifier = Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(28.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 Text(
-                    text = "Welcome to Bytecode",
-                    style = MaterialTheme.typography.headlineSmall,
+                    text = "BYTECODE",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Learn Java and Kotlin in focused lessons, then practice directly in-app.",
+                    text = "Learn Java. Write real code. Ship.",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Focused lessons, interactive exercises, and a built-in code runner — all on your phone.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Text(
-                        text = "Get set up in seconds, then continue straight into your learning dashboard.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 Button(
                     onClick = onContinue,
                     modifier = Modifier.fillMaxWidth(),
@@ -457,7 +472,7 @@ private fun OnboardingScreen(
                 .widthIn(max = 500.dp),
             color = MaterialTheme.colorScheme.surface,
             shape = MaterialTheme.shapes.large,
-            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
         ) {
             Column(
                 modifier = Modifier.padding(22.dp),
@@ -583,10 +598,10 @@ private fun SignInScreen(
                 .widthIn(max = 420.dp),
             color = MaterialTheme.colorScheme.surface,
             shape = MaterialTheme.shapes.large,
-            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Bytecode Android", style = MaterialTheme.typography.headlineSmall)
+                Text("BYTECODE", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     "Sign in to continue your learning path",
@@ -683,77 +698,83 @@ private fun MainShellScreen(
     onResetEditorCode: () -> Unit,
 ) {
     var activeTab by remember { mutableStateOf(MainTab.Home) }
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Surface(
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Content area — pad bottom so it doesn't hide behind the nav bar
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, start = 12.dp, end = 12.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 2.dp,
+                .fillMaxSize()
+                .padding(bottom = 64.dp),
         ) {
-            AppBottomNav(
-                activeTab = activeTab,
-                onSelectTab = { activeTab = it },
-            )
+            when (activeTab) {
+                MainTab.Home -> HomeScreen(
+                    state = state,
+                    onSignOut = onSignOut,
+                    onRefresh = onRefresh,
+                    onOpenProfile = { activeTab = MainTab.Account },
+                    onOpenBillingDetails = { activeTab = MainTab.Account },
+                    onOpenLesson = onOpenLesson,
+                    onOpenBilling = onOpenBilling,
+                )
+                MainTab.Curriculum -> CurriculumScreen(
+                    state = state,
+                    onOpenLesson = onOpenLesson,
+                )
+                MainTab.Account -> AccountScreen(
+                    state = state,
+                    onSignOut = onSignOut,
+                    onRefresh = onRefresh,
+                    onOpenBilling = onOpenBilling,
+                )
+            }
         }
 
-        when (activeTab) {
-            MainTab.Home -> HomeScreen(
-                state = state,
-                onSignOut = onSignOut,
-                onRefresh = onRefresh,
-                onOpenProfile = { activeTab = MainTab.Account },
-                onOpenBillingDetails = { activeTab = MainTab.Account },
-                onOpenLesson = onOpenLesson,
-                onOpenBilling = onOpenBilling,
-            )
-            MainTab.Curriculum -> CurriculumScreen(
-                state = state,
-                onOpenLesson = onOpenLesson,
-            )
-            MainTab.Account -> AccountScreen(
-                state = state,
-                onSignOut = onSignOut,
-                onRefresh = onRefresh,
-                onOpenBilling = onOpenBilling,
-            )
-        }
+        // Bottom nav bar pinned to the bottom
+        AppBottomNav(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            activeTab = activeTab,
+            onSelectTab = { activeTab = it },
+        )
     }
 }
 
 @Composable
 private fun AppBottomNav(
+    modifier: Modifier = Modifier,
     activeTab: MainTab,
     onSelectTab: (MainTab) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
+    val navItems = listOf(
+        Triple(MainTab.Home, "Home", Icons.Outlined.Home),
+        Triple(MainTab.Curriculum, "Learn", Icons.Outlined.MenuBook),
+        Triple(MainTab.Account, "Account", Icons.Outlined.AccountCircle),
+    )
+    NavigationBar(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .windowInsetsPadding(WindowInsets.navigationBars),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
     ) {
-        listOf(
-            MainTab.Home to "Home",
-            MainTab.Curriculum to "Curriculum",
-            MainTab.Account to "Account",
-        ).forEach { (tab, label) ->
-            val selected = activeTab == tab
-            val buttonModifier = Modifier.weight(1f)
-            if (selected) {
-                Button(
-                    onClick = { onSelectTab(tab) },
-                    modifier = buttonModifier,
-                ) { Text(label) }
-            } else {
-                OutlinedButton(
-                    onClick = { onSelectTab(tab) },
-                    modifier = buttonModifier,
-                ) { Text(label) }
-            }
+        navItems.forEach { (tab, label, icon) ->
+            NavigationBarItem(
+                selected = activeTab == tab,
+                onClick = { onSelectTab(tab) },
+                icon = {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        modifier = Modifier.size(22.dp),
+                    )
+                },
+                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            )
         }
     }
 }
@@ -1055,7 +1076,7 @@ private fun EditorPanel(state: AppUiState.LoggedIn) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp),
-            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = JetBrainsMonoFamily),
             label = { Text("Code editor (interactive editor opens in lesson screen)") },
         )
         if (!expected.isNullOrBlank()) {
@@ -1079,7 +1100,7 @@ private fun EditorPanel(state: AppUiState.LoggedIn) {
                     text = output,
                     modifier = Modifier.padding(10.dp),
                     style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = JetBrainsMonoFamily,
                 )
             }
         }
@@ -1194,29 +1215,63 @@ private fun LessonButtons(
     lessons: List<MobileLessonSummary>,
     onOpenLesson: (String, String, String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        lessons.forEach { lesson ->
-            OutlinedButton(
-                onClick = { onOpenLesson(trackSlug, moduleSlug, lesson.slug) },
-                enabled = !lesson.isLocked,
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        lessons.forEachIndexed { index, lesson ->
+            val isFirst = index == 0
+            val isLast = index == lessons.size - 1
+            val onClick: () -> Unit = { if (!lesson.isLocked) onOpenLesson(trackSlug, moduleSlug, lesson.slug) }
+            Surface(
+                onClick = onClick,
                 modifier = Modifier.fillMaxWidth(),
+                color = if (lesson.isLocked)
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                else
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = when {
+                    isFirst && isLast -> MaterialTheme.shapes.small
+                    isFirst -> androidx.compose.foundation.shape.RoundedCornerShape(
+                        topStart = 12.dp, topEnd = 12.dp, bottomStart = 4.dp, bottomEnd = 4.dp,
+                    )
+                    isLast -> androidx.compose.foundation.shape.RoundedCornerShape(
+                        topStart = 4.dp, topEnd = 4.dp, bottomStart = 12.dp, bottomEnd = 12.dp,
+                    )
+                    else -> androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                },
+                enabled = !lesson.isLocked,
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        "${lesson.title} (${lesson.duration}m)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (lesson.isLocked) {
-                        AccessBadge(label = "Locked", tone = BadgeTone.Warning)
-                    } else if (lesson.isPremium) {
-                        AccessBadge(label = "Premium", tone = BadgeTone.Success)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            lesson.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (lesson.isLocked)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else
+                                MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            "${lesson.duration} min",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    when {
+                        lesson.isLocked -> AccessBadge(label = "Locked", tone = BadgeTone.Warning)
+                        lesson.isPremium -> AccessBadge(label = "Premium", tone = BadgeTone.Success)
                     }
                 }
+            }
+            if (!isLast) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                )
             }
         }
     }
@@ -1234,7 +1289,10 @@ private fun BytecodeSectionCard(content: @Composable () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
-        tonalElevation = 2.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -1280,7 +1338,7 @@ private fun KeyValueRow(label: String, value: String) {
 private fun AccessBadge(label: String, tone: BadgeTone) {
     val (container, content) = when (tone) {
         BadgeTone.Default -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-        BadgeTone.Success -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f) to MaterialTheme.colorScheme.tertiary
+        BadgeTone.Success -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) to MaterialTheme.colorScheme.primary
         BadgeTone.Warning -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f) to MaterialTheme.colorScheme.error
     }
     Surface(
@@ -1306,8 +1364,8 @@ private fun AppScaffold(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(vertical = 20.dp),
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
@@ -1315,17 +1373,24 @@ private fun AppScaffold(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surface,
                 shape = MaterialTheme.shapes.medium,
-                tonalElevation = 2.dp,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                ),
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(start = 4.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedButton(onClick = onBack) {
-                        Text("Back")
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.Outlined.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                     }
                     Column {
                         Text(title, style = MaterialTheme.typography.titleLarge)
@@ -1354,7 +1419,7 @@ private fun InfoBanner(
 ) {
     val (container, content) = when (tone) {
         BadgeTone.Default -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) to MaterialTheme.colorScheme.onSurfaceVariant
-        BadgeTone.Success -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f) to MaterialTheme.colorScheme.tertiary
+        BadgeTone.Success -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) to MaterialTheme.colorScheme.primary
         BadgeTone.Warning -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f) to MaterialTheme.colorScheme.error
     }
     Surface(
@@ -1544,21 +1609,30 @@ private fun LessonScreen(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
             shape = MaterialTheme.shapes.medium,
-            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(onClick = onBack) {
-                    Text("Back to curriculum")
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Outlined.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
                 }
+                Text(
+                    lessonTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
                 if (isLockedPremium) {
                     Button(onClick = onOpenBilling) {
-                        Text("Unlock with premium")
+                        Text("Unlock")
                     }
                 }
             }
@@ -1570,7 +1644,7 @@ private fun LessonScreen(
                 .widthIn(max = 860.dp),
             color = MaterialTheme.colorScheme.surface,
             shape = MaterialTheme.shapes.large,
-            tonalElevation = 1.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
         ) {
             Column(
                 modifier = Modifier
@@ -1678,7 +1752,7 @@ private fun LessonScreen(
                                         .padding(10.dp),
                                     textStyle = TextStyle(
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        fontFamily = FontFamily.Monospace,
+                                        fontFamily = JetBrainsMonoFamily,
                                         fontSize = MaterialTheme.typography.bodySmall.fontSize,
                                     ),
                                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -1743,7 +1817,7 @@ private fun LessonScreen(
                                         Text(
                                             text = outputText.ifBlank { "No output" },
                                             style = MaterialTheme.typography.bodySmall,
-                                            fontFamily = FontFamily.Monospace,
+                                            fontFamily = JetBrainsMonoFamily,
                                         )
                                     }
                                 }
@@ -1965,9 +2039,9 @@ private fun parseLessonBlocks(content: String): List<LessonBlock> {
 @Composable
 private fun CodeEditorLikeBlock(language: String?, code: String) {
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.background,
         shape = MaterialTheme.shapes.small,
-        tonalElevation = 1.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -1975,34 +2049,38 @@ private fun CodeEditorLikeBlock(language: String?, code: String) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = language?.ifBlank { "code" } ?: "code",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = JetBrainsMonoFamily,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    repeat(3) {
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf(
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
+                    ).forEach { dotColor ->
                         Surface(
-                            modifier = Modifier
-                                .width(8.dp)
-                                .height(8.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                            modifier = Modifier.size(8.dp),
+                            color = dotColor,
                             shape = MaterialTheme.shapes.extraSmall,
                         ) {}
                     }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
             Text(
                 text = code,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                 style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = JetBrainsMonoFamily,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
