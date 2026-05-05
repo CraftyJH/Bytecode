@@ -2,7 +2,7 @@ package dev.bytecode.android.data.repository
 
 import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.AuthSession
-import dev.bytecode.android.data.model.MobileClientConfig
+import dev.bytecode.android.data.model.MobileRuntimeConfig
 import dev.bytecode.android.data.model.PersistedSession
 import dev.bytecode.android.data.model.RefreshRequest
 import dev.bytecode.android.data.model.SignInRequest
@@ -170,11 +170,11 @@ class AuthRepository(context: android.content.Context) {
         )
     }
 
-    private suspend fun fetchMobileClientConfig(): MobileClientConfig? =
+    private suspend fun fetchMobileClientConfig(): MobileRuntimeConfig? =
         runCatching {
             client.get("${AppConfig.WEB_BASE_URL}/api/mobile/config") {
                 header(HttpHeaders.Accept, ContentType.Application.Json.toString())
-            }.body<MobileClientConfig>()
+            }.body<MobileRuntimeConfig>()
         }.getOrNull()
 
     private fun isLikelyRealSupabaseConfig(url: String, key: String): Boolean {
