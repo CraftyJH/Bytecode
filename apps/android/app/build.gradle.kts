@@ -97,9 +97,6 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
-    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -123,8 +120,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.navigation:navigation-compose:2.8.5")
 
-    implementation("io.github.jan-tennert.supabase:supabase-kt:3.1.2")
-    implementation("io.github.jan-tennert.supabase:auth-kt:3.1.2")
     implementation("io.ktor:ktor-client-okhttp:3.0.2")
     implementation("io.ktor:ktor-client-content-negotiation:3.0.2")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.2")

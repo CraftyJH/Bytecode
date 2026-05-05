@@ -46,8 +46,6 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: 8.10.2
 
       - name: Inject Android app env
         env:
@@ -75,12 +73,8 @@ jobs:
             echo "ANDROID_SIGNING_KEY_PASSWORD=${SIGNING_KEY_PASSWORD}"
           } >> "${GITHUB_ENV}"
 
-      - name: Ensure Gradle wrapper exists
-        run: |
-          if [ ! -f "./gradlew" ] || [ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]; then
-            gradle wrapper --gradle-version 8.10.2
-          fi
-          chmod +x ./gradlew
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
 
       - name: Lint and unit tests
         run: ./gradlew --stacktrace :app:lintDebug :app:testDebugUnitTest
