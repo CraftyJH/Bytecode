@@ -152,11 +152,11 @@ export default async function AndroidDownloadPage() {
             </h2>
             <ol className="space-y-4 list-decimal pl-5 text-prose-muted">
               <li>Tap the download button above from your Android phone.</li>
+              <li>Open the downloaded APK file and tap Install.</li>
               <li>
-                When Android blocks the install, open the prompt and allow installs from your browser
+                If Android blocks the install, open the prompt and allow installs from your browser
                 (or file manager) for this one-time install.
               </li>
-              <li>Open the downloaded APK file and tap Install.</li>
               <li>Launch Bytecode and sign in with your account.</li>
             </ol>
 
