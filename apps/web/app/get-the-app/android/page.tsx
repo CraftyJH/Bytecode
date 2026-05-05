@@ -3,10 +3,49 @@ import { Footer } from "@/components/layout/Footer";
 
 const APK_DOWNLOAD_URL =
   "https://github.com/CraftyJH/Bytecode/releases/download/android-latest/bytecode-android-release.apk";
+const GITHUB_RELEASE_API_URL =
+  "https://api.github.com/repos/CraftyJH/Bytecode/releases/tags/android-latest";
 
 export const metadata = { title: "Android Download — Bytecode" };
 
-export default function AndroidDownloadPage() {
+interface GitHubReleaseResponse {
+  tag_name?: string;
+  name?: string;
+  published_at?: string;
+}
+
+function formatReleaseDate(isoDate: string): string {
+  const parsed = Date.parse(isoDate);
+  if (!Number.isFinite(parsed)) return isoDate;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(parsed));
+}
+
+async function fetchAndroidReleaseMeta(): Promise<{ label: string; updated: string } | null> {
+  try {
+    const response = await fetch(GITHUB_RELEASE_API_URL, {
+      next: { revalidate: 300 },
+      headers: {
+        Accept: "application/vnd.github+json",
+      },
+    });
+    if (!response.ok) return null;
+
+    const release = (await response.json()) as GitHubReleaseResponse;
+    const label = release.name ?? release.tag_name ?? "android-latest";
+    const updated = release.published_at ? formatReleaseDate(release.published_at) : "Unknown";
+    return { label, updated };
+  } catch {
+    return null;
+  }
+}
+
+export default async function AndroidDownloadPage() {
+  const releaseMeta = await fetchAndroidReleaseMeta();
+
   return (
     <>
       <Navbar />
@@ -29,6 +68,24 @@ export default function AndroidDownloadPage() {
               Install the latest Bytecode Android APK directly to your phone, then sign in with your
               Bytecode account.
             </p>
+
+            <div
+              className="mb-8 p-4 rounded-md border text-sm text-prose-muted"
+              style={{
+                borderColor: "var(--border-subtle)",
+                backgroundColor: "var(--bg-elevated)",
+              }}
+            >
+              <p className="text-prose font-medium mb-1">Latest build info</p>
+              {releaseMeta ? (
+                <p>
+                  Version: <span className="text-prose">{releaseMeta.label}</span> • Last updated:{" "}
+                  <span className="text-prose">{releaseMeta.updated}</span>
+                </p>
+              ) : (
+                <p>Version metadata currently unavailable. The APK link still points to the latest release.</p>
+              )}
+            </div>
 
             <div className="flex flex-wrap gap-3">
               <a
