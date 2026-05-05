@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     }
 
     const requestOrigin = resolveRequestOrigin(request);
-    const originFallback = resolveOriginFallback() || resolveVercelOrigin() || requestOrigin;
+    const originFallback = requestOrigin || resolveOriginFallback() || resolveVercelOrigin();
     let bytecodeApiUrl = process.env.BYTECODE_API_URL?.trim() ?? "";
     let webBaseUrl = originFallback;
 
