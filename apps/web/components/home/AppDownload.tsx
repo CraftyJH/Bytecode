@@ -1,37 +1,8 @@
 import { Smartphone, QrCode } from "lucide-react";
-
-const GITHUB_RELEASE_API_URL =
-  "https://api.github.com/repos/CraftyJH/Bytecode/releases/tags/android-latest";
-
-interface ReleaseMeta {
-  label: string;
-  updated: string;
-}
-
-async function fetchReleaseMeta(): Promise<ReleaseMeta | null> {
-  try {
-    const res = await fetch(GITHUB_RELEASE_API_URL, {
-      next: { revalidate: 300 },
-      headers: { Accept: "application/vnd.github+json" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const label: string = data.name ?? data.tag_name ?? "android-latest";
-    const updated: string = data.published_at
-      ? new Intl.DateTimeFormat("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }).format(new Date(data.published_at))
-      : "";
-    return { label, updated };
-  } catch {
-    return null;
-  }
-}
+import { fetchAndroidReleaseMeta } from "@/lib/android-release";
 
 export async function AppDownload() {
-  const release = await fetchReleaseMeta();
+  const release = await fetchAndroidReleaseMeta();
 
   return (
     <section className="border-t" style={{ borderColor: "var(--border-subtle)" }}>
@@ -88,8 +59,7 @@ export async function AppDownload() {
                     className="text-xs text-prose-faint pl-1"
                     style={{ fontFamily: "var(--font-mono)" }}
                   >
-                    {release.label}
-                    {release.updated ? ` · ${release.updated}` : ""}
+                    v{release.version} · {release.builtAt}
                   </p>
                 )}
               </div>
@@ -105,7 +75,6 @@ export async function AppDownload() {
                 borderColor: "var(--border-subtle)",
               }}
             >
-              {/* QR placeholder */}
               <div
                 className="w-40 h-40 rounded-lg flex items-center justify-center border-2 border-dashed"
                 style={{ borderColor: "var(--border-emphasis)" }}

@@ -1,69 +1,11 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-
-const GITHUB_RELEASE_API_URL =
-  "https://api.github.com/repos/CraftyJH/Bytecode/releases/tags/android-latest";
+import { fetchAndroidReleaseMeta } from "@/lib/android-release";
 
 export const metadata = { title: "Android Download — Bytecode" };
 
-interface GitHubReleaseResponse {
-  tag_name?: string;
-  name?: string;
-  published_at?: string;
-  html_url?: string;
-  assets?: Array<{
-    name?: string;
-    browser_download_url?: string;
-  }>;
-}
-
-function formatReleaseDate(isoDate: string): string {
-  const parsed = Date.parse(isoDate);
-  if (!Number.isFinite(parsed)) return isoDate;
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(parsed));
-}
-
-interface AndroidReleaseMeta {
-  label: string;
-  updated: string;
-  apkUrl: string | null;
-  releaseUrl: string | null;
-}
-
-async function fetchAndroidReleaseMeta(): Promise<AndroidReleaseMeta | null> {
-  try {
-    const response = await fetch(GITHUB_RELEASE_API_URL, {
-      next: { revalidate: 300 },
-      headers: {
-        Accept: "application/vnd.github+json",
-      },
-    });
-    if (!response.ok) return null;
-
-    const release = (await response.json()) as GitHubReleaseResponse;
-    const label = release.name ?? release.tag_name ?? "android-latest";
-    const updated = release.published_at ? formatReleaseDate(release.published_at) : "Unknown";
-    const apkAsset = release.assets?.find((asset) => {
-      const name = asset.name?.toLowerCase() ?? "";
-      return name.endsWith(".apk");
-    });
-    return {
-      label,
-      updated,
-      apkUrl: apkAsset?.browser_download_url ?? null,
-      releaseUrl: release.html_url ?? null,
-    };
-  } catch {
-    return null;
-  }
-}
-
 export default async function AndroidDownloadPage() {
-  const releaseMeta = await fetchAndroidReleaseMeta();
+  const release = await fetchAndroidReleaseMeta();
 
   return (
     <>
@@ -88,29 +30,11 @@ export default async function AndroidDownloadPage() {
               Bytecode account.
             </p>
 
-            <div
-              className="mb-8 p-4 rounded-md border text-sm text-prose-muted"
-              style={{
-                borderColor: "var(--border-subtle)",
-                backgroundColor: "var(--bg-elevated)",
-              }}
-            >
-              <p className="text-prose font-medium mb-1">Latest build info</p>
-              {releaseMeta ? (
-                <p>
-                  Version: <span className="text-prose">{releaseMeta.label}</span> • Last updated:{" "}
-                  <span className="text-prose">{releaseMeta.updated}</span>
-                </p>
-              ) : (
-                <p>Version metadata currently unavailable. APK publishing may still be in progress.</p>
-              )}
-            </div>
-
             <div className="flex flex-wrap gap-3 items-start">
-              {releaseMeta?.apkUrl ? (
-                <div className="flex flex-col gap-1">
+              {release?.apkUrl ? (
+                <div className="flex flex-col gap-1.5">
                   <a
-                    href={releaseMeta.apkUrl}
+                    href={release.apkUrl}
                     className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium bg-accent text-inverse hover:bg-accent-warm transition-colors duration-100"
                   >
                     Download Android APK
@@ -119,16 +43,24 @@ export default async function AndroidDownloadPage() {
                     className="text-xs text-prose-faint pl-1"
                     style={{ fontFamily: "var(--font-mono)" }}
                   >
-                    {releaseMeta.label} · {releaseMeta.updated}
+                    v{release.version} · built {release.builtAt}
                   </p>
                 </div>
               ) : (
-                <span
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium border text-prose-faint"
-                  style={{ borderColor: "var(--border-emphasis)" }}
-                >
-                  APK not published yet
-                </span>
+                <div className="flex flex-col gap-1.5">
+                  <span
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium border text-prose-faint"
+                    style={{ borderColor: "var(--border-emphasis)" }}
+                  >
+                    APK not published yet
+                  </span>
+                  <p
+                    className="text-xs text-prose-faint pl-1"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                  >
+                    Build may be in progress — check back shortly.
+                  </p>
+                </div>
               )}
               <a
                 href="/get-the-app"
@@ -137,9 +69,9 @@ export default async function AndroidDownloadPage() {
               >
                 Back to Get the app
               </a>
-              {releaseMeta?.releaseUrl ? (
+              {release?.releaseUrl ? (
                 <a
-                  href={releaseMeta.releaseUrl}
+                  href={release.releaseUrl}
                   className="inline-flex items-center gap-2 px-5 py-3 rounded-md border text-sm font-medium text-prose-muted hover:text-prose hover:bg-subtle transition-colors duration-100"
                   style={{ borderColor: "var(--border-emphasis)" }}
                 >
