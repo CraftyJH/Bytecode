@@ -7,11 +7,16 @@ import dev.bytecode.android.data.model.MobileLessonContent
 import dev.bytecode.android.data.model.MobileLessonSummary
 import dev.bytecode.android.data.model.MobileModuleSummary
 import dev.bytecode.android.data.model.MobileTrackSummary
+import dev.bytecode.android.data.model.OnboardingProfile
 import dev.bytecode.android.data.model.RunCodeResult
 
 sealed interface AppUiState {
     data object Loading : AppUiState
     data object Welcome : AppUiState
+    data class Onboarding(
+        val step: Int = 0,
+        val profile: OnboardingProfile = OnboardingProfile(),
+    ) : AppUiState
     data class LoggedOut(
         val loading: Boolean = false,
         val error: String? = null,

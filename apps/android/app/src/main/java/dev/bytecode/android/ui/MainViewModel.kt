@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.bytecode.android.data.model.MobileLessonContent
 import dev.bytecode.android.data.model.MobileCurriculumState
+import dev.bytecode.android.data.model.OnboardingProfile
 import dev.bytecode.android.data.repository.AuthRepository
 import dev.bytecode.android.data.repository.RepositoryFailure
 import dev.bytecode.android.data.repository.SessionStore
@@ -40,16 +41,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     refreshWithToken(tokenResult.accessToken)
                 }
                 is AuthRepository.AccessTokenResult.MissingSession -> {
-                    _uiState.value = AppUiState.LoggedOut()
+                    if (sessionStore.isOnboardingComplete()) {
+                        _uiState.value = AppUiState.LoggedOut()
+                    } else {
+                        _uiState.value = AppUiState.Onboarding(
+                            step = 0,
+                            profile = sessionStore.readOnboardingProfile(),
+                        )
+                    }
                 }
                 is AuthRepository.AccessTokenResult.SessionExpired -> {
-                    _uiState.value = AppUiState.LoggedOut(error = sessionExpiredMessage)
+                    if (sessionStore.isOnboardingComplete()) {
+                        _uiState.value = AppUiState.LoggedOut(error = sessionExpiredMessage)
+                    } else {
+                        _uiState.value = AppUiState.Onboarding(
+                            step = 0,
+                            profile = sessionStore.readOnboardingProfile(),
+                        )
+                    }
                 }
                 is AuthRepository.AccessTokenResult.NetworkError -> {
-                    _uiState.value = AppUiState.LoggedOut(error = tokenResult.message)
+                    if (sessionStore.isOnboardingComplete()) {
+                        _uiState.value = AppUiState.LoggedOut(error = tokenResult.message)
+                    } else {
+                        _uiState.value = AppUiState.Onboarding(
+                            step = 0,
+                            profile = sessionStore.readOnboardingProfile(),
+                        )
+                    }
                 }
                 is AuthRepository.AccessTokenResult.UnknownError -> {
-                    _uiState.value = AppUiState.LoggedOut(error = tokenResult.message)
+                    if (sessionStore.isOnboardingComplete()) {
+                        _uiState.value = AppUiState.LoggedOut(error = tokenResult.message)
+                    } else {
+                        _uiState.value = AppUiState.Onboarding(
+                            step = 0,
+                            profile = sessionStore.readOnboardingProfile(),
+                        )
+                    }
                 }
             }
         }
@@ -57,6 +86,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun completeWelcome() {
         sessionStore.markWelcomeSeen()
+        if (sessionStore.isOnboardingComplete()) {
+            refresh()
+        } else {
+            _uiState.value = AppUiState.Onboarding(
+                step = 0,
+                profile = sessionStore.readOnboardingProfile(),
+            )
+        }
+    }
+
+    fun onboardingNext(updatedProfile: OnboardingProfile, currentStep: Int) {
+        val nextStep = (currentStep + 1).coerceAtMost(3)
+        _uiState.value = AppUiState.Onboarding(step = nextStep, profile = updatedProfile)
+    }
+
+    fun onboardingBack(updatedProfile: OnboardingProfile, currentStep: Int) {
+        val previous = (currentStep - 1).coerceAtLeast(0)
+        _uiState.value = AppUiState.Onboarding(step = previous, profile = updatedProfile)
+    }
+
+    fun completeOnboarding(profile: OnboardingProfile) {
+        sessionStore.saveOnboardingProfile(profile)
         refresh()
     }
 

@@ -180,3 +180,10 @@ data class RunCodeResult(
     val memory: Int? = null,
     val status: RunCodeStatus = RunCodeStatus(),
 )
+
+data class OnboardingProfile(
+    val motivation: String = "",
+    val goal: String = "",
+    val experienceLevel: String = "",
+    val preferredLanguage: String = "",
+)

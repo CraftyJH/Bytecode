@@ -55,6 +55,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.MobileLessonSummary
+import dev.bytecode.android.data.model.OnboardingProfile
 import dev.bytecode.android.ui.state.AppUiState
 import dev.bytecode.android.ui.state.selectedLessonSummary
 import dev.bytecode.android.ui.theme.BytecodeTheme
@@ -63,6 +64,7 @@ private object AppRoutes {
     const val AuthGraph = "auth"
     const val AppGraph = "app"
     const val Welcome = "auth/welcome"
+    const val Onboarding = "auth/onboarding"
     const val SignIn = "auth/sign-in"
     const val Main = "app/main"
     const val LessonPattern = "app/lesson/{track}/{module}/{lesson}"
@@ -86,6 +88,9 @@ class MainActivity : ComponentActivity() {
                     AppScreen(
                         state = state,
                         onContinueWelcome = { viewModel.completeWelcome() },
+                        onOnboardingNext = { profile, step -> viewModel.onboardingNext(profile, step) },
+                        onOnboardingBack = { profile, step -> viewModel.onboardingBack(profile, step) },
+                        onCompleteOnboarding = { profile -> viewModel.completeOnboarding(profile) },
                         onSignIn = { email, password -> viewModel.signIn(email, password) },
                         onSignOut = { viewModel.signOut() },
                         onRefresh = { viewModel.refresh() },
@@ -114,6 +119,9 @@ class MainActivity : ComponentActivity() {
 private fun AppScreen(
     state: AppUiState,
     onContinueWelcome: () -> Unit,
+    onOnboardingNext: (OnboardingProfile, Int) -> Unit,
+    onOnboardingBack: (OnboardingProfile, Int) -> Unit,
+    onCompleteOnboarding: (OnboardingProfile) -> Unit,
     onSignIn: (String, String) -> Unit,
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
@@ -146,6 +154,14 @@ private fun AppScreen(
                     }
                 }
             }
+            is AppUiState.Onboarding -> {
+                if (currentRoute != AppRoutes.Onboarding) {
+                    navController.navigate(AppRoutes.Onboarding) {
+                        popUpTo(AppRoutes.AppGraph) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
             is AppUiState.LoggedOut,
             is AppUiState.Error,
             -> {
@@ -173,7 +189,27 @@ private fun AppScreen(
                     AppUiState.Welcome -> {
                         WelcomeScreen(onContinue = onContinueWelcome)
                     }
+                    is AppUiState.Onboarding -> LoadingScreen("Opening onboarding…")
                     AppUiState.Loading -> LoadingScreen("Preparing welcome…")
+                    is AppUiState.LoggedOut,
+                    is AppUiState.Error,
+                    -> LoadingScreen("Opening sign in…")
+                    is AppUiState.LoggedIn -> LoadingScreen("Opening dashboard…")
+                }
+            }
+
+            composable(AppRoutes.Onboarding) {
+                when (state) {
+                    is AppUiState.Onboarding -> {
+                        OnboardingScreen(
+                            onboarding = state,
+                            onBack = onOnboardingBack,
+                            onNext = onOnboardingNext,
+                            onFinish = onCompleteOnboarding,
+                        )
+                    }
+                    AppUiState.Welcome -> LoadingScreen("Opening welcome…")
+                    AppUiState.Loading -> LoadingScreen("Preparing onboarding…")
                     is AppUiState.LoggedOut,
                     is AppUiState.Error,
                     -> LoadingScreen("Opening sign in…")
@@ -198,6 +234,7 @@ private fun AppScreen(
                         )
                     }
                     AppUiState.Welcome -> LoadingScreen("Opening welcome…")
+                    is AppUiState.Onboarding -> LoadingScreen("Opening onboarding…")
                     AppUiState.Loading -> LoadingScreen("Loading…")
                     is AppUiState.LoggedIn -> LoadingScreen("Opening dashboard…")
                 }
@@ -370,6 +407,157 @@ private fun WelcomeScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OnboardingScreen(
+    onboarding: AppUiState.Onboarding,
+    onBack: (OnboardingProfile, Int) -> Unit,
+    onNext: (OnboardingProfile, Int) -> Unit,
+    onFinish: (OnboardingProfile) -> Unit,
+) {
+    var profile by remember(onboarding.profile) { mutableStateOf(onboarding.profile) }
+    val step = onboarding.step.coerceIn(0, 3)
+
+    val title = when (step) {
+        0 -> "Why did you choose Bytecode?"
+        1 -> "What do you want from the app?"
+        2 -> "Your current experience level"
+        else -> "Preferred language to start with"
+    }
+    val subtitle = "Step ${step + 1} of 4"
+
+    val options = when (step) {
+        0 -> listOf("Career growth", "Exam prep", "Build side projects", "Curiosity")
+        1 -> listOf("Structured curriculum", "Daily practice", "Build confidence", "Job readiness")
+        2 -> listOf("Brand new", "Beginner", "Intermediate", "Advanced")
+        else -> listOf("Java", "Kotlin")
+    }
+
+    val selected = when (step) {
+        0 -> profile.motivation
+        1 -> profile.goal
+        2 -> profile.experienceLevel
+        else -> profile.preferredLanguage
+    }
+
+    val canContinue = selected.isNotBlank()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 500.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 2.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                Text(
+                    text = "Your answers shape the home and curriculum experience.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                options.forEach { option ->
+                    val isSelected = option == selected
+                    OnboardingChoiceRow(
+                        label = option,
+                        selected = isSelected,
+                        onSelect = {
+                            profile = when (step) {
+                                0 -> profile.copy(motivation = option)
+                                1 -> profile.copy(goal = option)
+                                2 -> profile.copy(experienceLevel = option)
+                                else -> profile.copy(preferredLanguage = option)
+                            }
+                        },
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { onBack(profile, step) },
+                        enabled = step > 0,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Back")
+                    }
+                    if (step < 3) {
+                        Button(
+                            onClick = { onNext(profile, step) },
+                            enabled = canContinue,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Next")
+                        }
+                    } else {
+                        Button(
+                            onClick = { onFinish(profile) },
+                            enabled = canContinue,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Finish")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingChoiceRow(
+    label: String,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    val buttonColors = if (selected) {
+        androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+            contentColor = MaterialTheme.colorScheme.primary,
+        )
+    } else {
+        androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+
+    OutlinedButton(
+        onClick = onSelect,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = buttonColors,
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(vertical = 2.dp),
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 

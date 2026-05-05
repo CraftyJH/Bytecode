@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import dev.bytecode.android.data.model.AuthSession
 import dev.bytecode.android.data.model.MobileRuntimeConfig
+import dev.bytecode.android.data.model.OnboardingProfile
 import dev.bytecode.android.data.model.PersistedSession
 import dev.bytecode.android.data.model.UserSummary
 
@@ -75,6 +76,32 @@ class SessionStore(context: Context) {
         prefs.edit { putBoolean(KEY_HAS_SEEN_WELCOME, true) }
     }
 
+    fun saveOnboardingProfile(profile: OnboardingProfile) {
+        prefs.edit {
+            putString(KEY_ONBOARDING_MOTIVATION, profile.motivation)
+            putString(KEY_ONBOARDING_GOAL, profile.goal)
+            putString(KEY_ONBOARDING_EXPERIENCE_LEVEL, profile.experienceLevel)
+            putString(KEY_ONBOARDING_PREFERRED_LANGUAGE, profile.preferredLanguage)
+        }
+    }
+
+    fun readOnboardingProfile(): OnboardingProfile {
+        return OnboardingProfile(
+            motivation = prefs.getString(KEY_ONBOARDING_MOTIVATION, "").orEmpty(),
+            goal = prefs.getString(KEY_ONBOARDING_GOAL, "").orEmpty(),
+            experienceLevel = prefs.getString(KEY_ONBOARDING_EXPERIENCE_LEVEL, "").orEmpty(),
+            preferredLanguage = prefs.getString(KEY_ONBOARDING_PREFERRED_LANGUAGE, "").orEmpty(),
+        )
+    }
+
+    fun isOnboardingComplete(): Boolean {
+        val profile = readOnboardingProfile()
+        return profile.motivation.isNotBlank() &&
+            profile.goal.isNotBlank() &&
+            profile.experienceLevel.isNotBlank() &&
+            profile.preferredLanguage.isNotBlank()
+    }
+
     fun readMobileRuntimeConfig(): MobileRuntimeConfig? {
         val supabaseUrl = prefs.getString(KEY_MOBILE_SUPABASE_URL, null) ?: return null
         val supabasePublishableKey = prefs.getString(KEY_MOBILE_SUPABASE_PUBLISHABLE_KEY, null) ?: return null
@@ -102,5 +129,9 @@ class SessionStore(context: Context) {
         private const val KEY_MOBILE_BYTECODE_API_URL = "mobile_bytecode_api_url"
         private const val KEY_MOBILE_WEB_BASE_URL = "mobile_web_base_url"
         private const val KEY_HAS_SEEN_WELCOME = "has_seen_welcome"
+        private const val KEY_ONBOARDING_MOTIVATION = "onboarding_motivation"
+        private const val KEY_ONBOARDING_GOAL = "onboarding_goal"
+        private const val KEY_ONBOARDING_EXPERIENCE_LEVEL = "onboarding_experience_level"
+        private const val KEY_ONBOARDING_PREFERRED_LANGUAGE = "onboarding_preferred_language"
     }
 }
