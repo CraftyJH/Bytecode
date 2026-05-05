@@ -1,24 +1,20 @@
-"use client";
-
-import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/Button";
+import { AnimatedCodeBlock } from "@/components/home/AnimatedCodeBlock";
+import type { Snippet } from "@/components/home/AnimatedCodeBlock";
 import type { CodeLine } from "@/components/ui/CodeBlock";
 
-const AnimatedCodeBlock = dynamic(
-  () => import("@/components/home/AnimatedCodeBlock").then(m => m.AnimatedCodeBlock),
-  { ssr: false }
-);
+// ── Snippet 1: Java records + sealed interfaces + pattern matching ────────────
 
-const heroCode: CodeLine[] = [
-  [{ text: "// modern Java — records + pattern matching", type: "comment" }],
+const javaSealed: CodeLine[] = [
+  [{ text: "// sealed types + pattern matching", type: "comment" }],
   [],
   [
     { text: "sealed interface ", type: "keyword" },
-    { text: "Shape ", type: "type" },
-    { text: "permits ", type: "keyword" },
+    { text: "Shape", type: "type" },
+    { text: " permits " },
     { text: "Circle", type: "type" },
     { text: ", " },
-    { text: "Rect", type: "type" },
+    { text: "Square", type: "type" },
     { text: " {}" },
   ],
   [],
@@ -28,20 +24,17 @@ const heroCode: CodeLine[] = [
     { text: "(" },
     { text: "double ", type: "type" },
     { text: "r" },
-    { text: ")   " },
+    { text: ") " },
     { text: "implements ", type: "keyword" },
     { text: "Shape ", type: "type" },
     { text: "{}" },
   ],
   [
     { text: "record ", type: "keyword" },
-    { text: "Rect", type: "type" },
+    { text: "Square", type: "type" },
     { text: "(" },
     { text: "double ", type: "type" },
-    { text: "w" },
-    { text: ", " },
-    { text: "double ", type: "type" },
-    { text: "h" },
+    { text: "side" },
     { text: ") " },
     { text: "implements ", type: "keyword" },
     { text: "Shape ", type: "type" },
@@ -73,15 +66,167 @@ const heroCode: CodeLine[] = [
   ],
   [
     { text: "    case ", type: "keyword" },
-    { text: "Rect ", type: "type" },
-    { text: "r   -> r." },
-    { text: "w", type: "method" },
-    { text: "() * r." },
-    { text: "h", type: "method" },
+    { text: "Square ", type: "type" },
+    { text: "q -> q." },
+    { text: "side", type: "method" },
+    { text: "() * q." },
+    { text: "side", type: "method" },
     { text: "();" },
   ],
   [{ text: "  };" }],
   [{ text: "}" }],
+];
+
+// ── Snippet 2: Java Streams ───────────────────────────────────────────────────
+
+const javaStreams: CodeLine[] = [
+  [{ text: "// functional pipelines with Streams", type: "comment" }],
+  [],
+  [
+    { text: "var ", type: "keyword" },
+    { text: "words " },
+    { text: "= " },
+    { text: "List", type: "type" },
+    { text: ".of(" },
+  ],
+  [
+    { text: "    " },
+    { text: '"hello"', type: "string" },
+    { text: ", " },
+    { text: '"world"', type: "string" },
+    { text: ", " },
+    { text: '"java"', type: "string" },
+    { text: ", " },
+    { text: '"streams"', type: "string" },
+  ],
+  [{ text: ");" }],
+  [],
+  [
+    { text: "var ", type: "keyword" },
+    { text: "result " },
+    { text: "= words." },
+    { text: "stream", type: "method" },
+    { text: "()" },
+  ],
+  [
+    { text: "    ." },
+    { text: "filter", type: "method" },
+    { text: "(w -> w." },
+    { text: "length", type: "method" },
+    { text: "() > " },
+    { text: "4", type: "number" },
+    { text: ")" },
+  ],
+  [
+    { text: "    ." },
+    { text: "map", type: "method" },
+    { text: "(" },
+    { text: "String", type: "type" },
+    { text: "::" },
+    { text: "toUpperCase", type: "method" },
+    { text: ")" },
+  ],
+  [
+    { text: "    ." },
+    { text: "sorted", type: "method" },
+    { text: "()" },
+  ],
+  [
+    { text: "    ." },
+    { text: "toList", type: "method" },
+    { text: "();" },
+  ],
+  [],
+  [
+    { text: "// [JAVA, STREAMS, WORLD]", type: "comment" },
+  ],
+];
+
+// ── Snippet 3: Kotlin data class + extension function ─────────────────────────
+
+const kotlinExtensions: CodeLine[] = [
+  [{ text: "// Kotlin — concise & expressive", type: "comment" }],
+  [],
+  [
+    { text: "data class ", type: "keyword" },
+    { text: "User", type: "type" },
+    { text: "(" },
+    { text: "val ", type: "keyword" },
+    { text: "name" },
+    { text: ": " },
+    { text: "String", type: "type" },
+    { text: ", " },
+    { text: "val ", type: "keyword" },
+    { text: "score" },
+    { text: ": " },
+    { text: "Int", type: "type" },
+    { text: ")" },
+  ],
+  [],
+  [
+    { text: "fun ", type: "keyword" },
+    { text: "List", type: "type" },
+    { text: "<" },
+    { text: "User", type: "type" },
+    { text: ">." },
+    { text: "top", type: "method" },
+    { text: "(n: " },
+    { text: "Int", type: "type" },
+    { text: ") =" },
+  ],
+  [
+    { text: "    sortedByDescending", type: "method" },
+    { text: " { it.score }." },
+    { text: "take", type: "method" },
+    { text: "(n)" },
+  ],
+  [],
+  [
+    { text: "val ", type: "keyword" },
+    { text: "users " },
+    { text: "= listOf(" },
+  ],
+  [
+    { text: "    " },
+    { text: "User", type: "type" },
+    { text: "(" },
+    { text: '"Alice"', type: "string" },
+    { text: ", " },
+    { text: "92", type: "number" },
+    { text: "), " },
+    { text: "User", type: "type" },
+    { text: "(" },
+    { text: '"Bob"', type: "string" },
+    { text: ", " },
+    { text: "85", type: "number" },
+    { text: ")," },
+  ],
+  [
+    { text: "    " },
+    { text: "User", type: "type" },
+    { text: "(" },
+    { text: '"Carol"', type: "string" },
+    { text: ", " },
+    { text: "97", type: "number" },
+    { text: ")," },
+  ],
+  [{ text: ")" }],
+  [],
+  [
+    { text: "users." },
+    { text: "top", type: "method" },
+    { text: "(" },
+    { text: "2", type: "number" },
+    { text: ")." },
+    { text: "forEach", type: "method" },
+    { text: " { println(it.name) }" },
+  ],
+];
+
+const heroSnippets: Snippet[] = [
+  { code: javaSealed,      filename: "Main.java"    },
+  { code: javaStreams,     filename: "Streams.java" },
+  { code: kotlinExtensions, filename: "Main.kt"    },
 ];
 
 export function Hero() {
@@ -127,7 +272,6 @@ export function Hero() {
               </Button>
             </div>
 
-            {/* Trust signals */}
             <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2">
               {["No credit card", "No ads", "No mistake limits"].map((signal) => (
                 <span
@@ -142,14 +286,11 @@ export function Hero() {
             </div>
           </div>
 
-          {/* Right — animated code editor */}
-          <div className="lg:pl-4">
-            <AnimatedCodeBlock
-              lines={heroCode}
-              output={"78.53981633974483\n12.0"}
-              language="java"
-              typingSpeedMs={26}
-            />
+          {/* Right — animated code panel.
+              min-w-0 prevents the grid cell from expanding beyond its track.
+              overflow-hidden clips any code line that would bleed out. */}
+          <div className="min-w-0 overflow-hidden lg:pl-4">
+            <AnimatedCodeBlock snippets={heroSnippets} />
           </div>
         </div>
       </div>
