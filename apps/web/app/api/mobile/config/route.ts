@@ -25,7 +25,25 @@ function resolveOriginFallback(): string {
   );
 }
 
-export async function GET() {
+function sanitizeOrigin(value: string): string {
+  return value.trim().replace(/\/$/, "");
+}
+
+function resolveRequestOrigin(request: Request): string {
+  try {
+    return sanitizeOrigin(new URL(request.url).origin);
+  } catch {
+    return "";
+  }
+}
+
+function resolveVercelOrigin(): string {
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (!vercelUrl) return "";
+  return sanitizeOrigin(`https://${vercelUrl}`);
+}
+
+export async function GET(request: Request) {
   try {
     const supabasePublishableKey =
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ??
@@ -37,7 +55,8 @@ export async function GET() {
       );
     }
 
-    const originFallback = resolveOriginFallback();
+    const requestOrigin = resolveRequestOrigin(request);
+    const originFallback = resolveOriginFallback() || resolveVercelOrigin() || requestOrigin;
     let bytecodeApiUrl = process.env.BYTECODE_API_URL?.trim() ?? "";
     let webBaseUrl = originFallback;
 
