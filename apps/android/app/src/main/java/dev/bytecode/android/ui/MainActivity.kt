@@ -9,6 +9,7 @@ import androidx.activity.viewModels
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material3.Button
@@ -1217,55 +1218,42 @@ private fun LessonButtons(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
         lessons.forEachIndexed { index, lesson ->
-            val isFirst = index == 0
             val isLast = index == lessons.size - 1
-            val onClick: () -> Unit = { if (!lesson.isLocked) onOpenLesson(trackSlug, moduleSlug, lesson.slug) }
-            Surface(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth(),
-                color = if (lesson.isLocked)
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                else
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shape = when {
-                    isFirst && isLast -> MaterialTheme.shapes.small
-                    isFirst -> androidx.compose.foundation.shape.RoundedCornerShape(
-                        topStart = 12.dp, topEnd = 12.dp, bottomStart = 4.dp, bottomEnd = 4.dp,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !lesson.isLocked) {
+                        onOpenLesson(trackSlug, moduleSlug, lesson.slug)
+                    }
+                    .background(
+                        color = if (lesson.isLocked)
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     )
-                    isLast -> androidx.compose.foundation.shape.RoundedCornerShape(
-                        topStart = 4.dp, topEnd = 4.dp, bottomStart = 12.dp, bottomEnd = 12.dp,
-                    )
-                    else -> androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                },
-                enabled = !lesson.isLocked,
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            lesson.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (lesson.isLocked)
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            else
-                                MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            "${lesson.duration} min",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    when {
-                        lesson.isLocked -> AccessBadge(label = "Locked", tone = BadgeTone.Warning)
-                        lesson.isPremium -> AccessBadge(label = "Premium", tone = BadgeTone.Success)
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        lesson.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (lesson.isLocked)
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        else
+                            MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "${lesson.duration} min",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                when {
+                    lesson.isLocked -> AccessBadge(label = "Locked", tone = BadgeTone.Warning)
+                    lesson.isPremium -> AccessBadge(label = "Premium", tone = BadgeTone.Success)
                 }
             }
             if (!isLast) {
@@ -1387,7 +1375,7 @@ private fun AppScaffold(
                 ) {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            Icons.Outlined.ArrowBack,
                             contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.primary,
                         )
@@ -1620,7 +1608,7 @@ private fun LessonScreen(
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        Icons.Outlined.ArrowBack,
                         contentDescription = "Back",
                         tint = MaterialTheme.colorScheme.primary,
                     )
