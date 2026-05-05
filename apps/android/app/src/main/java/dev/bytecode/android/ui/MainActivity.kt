@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -315,73 +317,126 @@ private fun DashboardScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        contentPadding = PaddingValues(vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Text("Welcome back", style = MaterialTheme.typography.headlineMedium)
-        }
-        item {
-            Text(state.user.email ?: "Unknown user", style = MaterialTheme.typography.bodyLarge)
-        }
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Account", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
+            BytecodeSectionCard {
+                Text("Welcome back", style = MaterialTheme.typography.headlineSmall)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    state.user.email ?: "Unknown user",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val billingRole = state.billing?.role ?: state.user.role
                     val billingPlan = state.billing?.plan ?: "free"
-                    Text("Role: $billingRole")
-                    Text("Plan: ${if (billingPlan == "premium") "Premium" else "Free"}")
-                    Text("Streak: ${state.user.streakCount} days")
-                }
-            }
-        }
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Billing", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val billing = state.billing
-                    Text("Subscription status: ${billing?.subscription?.status ?: "none"}")
-                    Text("Subscription plan: ${billing?.plan ?: "free"}")
-                    Text("Premium until: ${billing?.premiumUntil ?: state.user.premiumUntil ?: "—"}")
-                    billing?.subscription?.graceExpiresAt?.let { Text("Grace ends: $it") }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(onClick = onOpenBilling, modifier = Modifier.fillMaxWidth()) {
-                        Text("Manage billing on web")
-                    }
-                }
-            }
-        }
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Curriculum", style = MaterialTheme.typography.titleMedium)
-                    if (state.curriculumError != null) {
-                        Text(
-                            text = "Curriculum sync issue: ${state.curriculumError}",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    CurriculumBrowser(
-                        state = state,
-                        onOpenLesson = onOpenLesson,
+                    AccessBadge(
+                        label = if (billingPlan == "premium") "Premium" else "Free",
+                        tone = if (billingPlan == "premium") BadgeTone.Success else BadgeTone.Default,
+                    )
+                    AccessBadge(
+                        label = billingRole.replaceFirstChar { it.titlecase() },
+                        tone = BadgeTone.Default,
                     )
                 }
             }
         }
         item {
+            BytecodeSectionCard {
+                SectionHeader(
+                    title = "Account",
+                    subtitle = "Your profile and learning streak",
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                KeyValueRow("Role", state.user.role.replaceFirstChar { it.titlecase() })
+                KeyValueRow(
+                    "Streak",
+                    "${state.user.streakCount} day${if (state.user.streakCount == 1) "" else "s"}",
+                )
+                KeyValueRow("Premium until", state.user.premiumUntil ?: "—")
+            }
+        }
+        item {
+            BytecodeSectionCard {
+                SectionHeader(
+                    title = "Billing",
+                    subtitle = "Manage subscription and premium access",
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                val billing = state.billing
+                val subscriptionStatus = billing?.subscription?.status ?: "none"
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Subscription status",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    AccessBadge(
+                        label = subscriptionStatus,
+                        tone = when {
+                            subscriptionStatus.equals("active", ignoreCase = true) -> BadgeTone.Success
+                            subscriptionStatus.equals("past_due", ignoreCase = true) -> BadgeTone.Warning
+                            else -> BadgeTone.Default
+                        },
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                KeyValueRow("Plan", billing?.plan ?: "free")
+                KeyValueRow("Premium until", billing?.premiumUntil ?: state.user.premiumUntil ?: "—")
+                billing?.subscription?.graceExpiresAt?.let { KeyValueRow("Grace ends", it) }
+                Spacer(modifier = Modifier.height(14.dp))
+                Button(onClick = onOpenBilling, modifier = Modifier.fillMaxWidth()) {
+                    Text("Manage billing on web")
+                }
+            }
+        }
+        item {
+            BytecodeSectionCard {
+                SectionHeader(
+                    title = "Curriculum",
+                    subtitle = "Continue from where you left off",
+                )
+                if (state.curriculumError != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Text(
+                            text = "Sync issue: ${state.curriculumError}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                CurriculumBrowser(
+                    state = state,
+                    onOpenLesson = onOpenLesson,
+                )
+            }
+        }
+        item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Button(onClick = onRefresh) {
+                Button(
+                    onClick = onRefresh,
+                    modifier = Modifier.weight(1f),
+                ) {
                     Text("Refresh")
                 }
-                Button(onClick = onSignOut) {
+                OutlinedButton(
+                    onClick = onSignOut,
+                    modifier = Modifier.weight(1f),
+                ) {
                     Text("Sign out")
                 }
             }
@@ -395,44 +450,94 @@ private fun CurriculumBrowser(
     onOpenLesson: (String, String, String) -> Unit,
 ) {
     if (state.curriculum.tracks.isEmpty()) {
-        Text("No curriculum loaded yet.")
+        Text(
+            "No curriculum loaded yet.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
         return
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         state.curriculum.tracks.forEach { track ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                shape = MaterialTheme.shapes.medium,
+            ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    val trackAccess = when {
-                        track.isLocked -> "Premium locked"
-                        track.isPremium -> "Premium"
-                        else -> "Free"
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = track.title,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        AccessBadge(
+                            label = when {
+                                track.isLocked -> "Locked"
+                                track.isPremium -> "Premium"
+                                else -> "Free"
+                            },
+                            tone = when {
+                                track.isLocked -> BadgeTone.Warning
+                                track.isPremium -> BadgeTone.Success
+                                else -> BadgeTone.Default
+                            },
+                        )
                     }
                     Text(
-                        text = "${track.title} • $trackAccess",
-                        style = MaterialTheme.typography.titleSmall,
+                        track.tagline,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(track.tagline, style = MaterialTheme.typography.bodySmall)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
 
                     track.modules.forEach { module ->
-                        val moduleAccess = when {
-                            module.isLocked -> "Premium locked"
-                            module.isPremium -> "Premium"
-                            else -> "Free"
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = MaterialTheme.shapes.small,
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = module.title,
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+                                    AccessBadge(
+                                        label = when {
+                                            module.isLocked -> "Locked"
+                                            module.isPremium -> "Premium"
+                                            else -> "Free"
+                                        },
+                                        tone = when {
+                                            module.isLocked -> BadgeTone.Warning
+                                            module.isPremium -> BadgeTone.Success
+                                            else -> BadgeTone.Default
+                                        },
+                                    )
+                                }
+                                LessonButtons(
+                                    trackSlug = track.slug,
+                                    moduleSlug = module.slug,
+                                    lessons = module.lessons,
+                                    onOpenLesson = onOpenLesson,
+                                )
+                            }
                         }
-                        Text(
-                            text = "${module.title} • $moduleAccess",
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                        LessonButtons(
-                            trackSlug = track.slug,
-                            moduleSlug = module.slug,
-                            lessons = module.lessons,
-                            onOpenLesson = onOpenLesson,
-                        )
                     }
                 }
             }
@@ -454,14 +559,98 @@ private fun LessonButtons(
                 enabled = !lesson.isLocked,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                val premiumLabel = when {
-                    lesson.isLocked -> " • Locked"
-                    lesson.isPremium -> " • Premium"
-                    else -> ""
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${lesson.title} (${lesson.duration}m)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (lesson.isLocked) {
+                        AccessBadge(label = "Locked", tone = BadgeTone.Warning)
+                    } else if (lesson.isPremium) {
+                        AccessBadge(label = "Premium", tone = BadgeTone.Success)
+                    }
                 }
-                Text("${lesson.title} (${lesson.duration}m)$premiumLabel")
             }
         }
+    }
+}
+
+private enum class BadgeTone {
+    Default,
+    Success,
+    Warning,
+}
+
+@Composable
+private fun BytecodeSectionCard(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            content = { content() },
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, subtitle: String) {
+    Text(title, style = MaterialTheme.typography.titleLarge)
+    Spacer(modifier = Modifier.height(2.dp))
+    Text(
+        subtitle,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun KeyValueRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun AccessBadge(label: String, tone: BadgeTone) {
+    val (container, content) = when (tone) {
+        BadgeTone.Default -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+        BadgeTone.Success -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f) to MaterialTheme.colorScheme.tertiary
+        BadgeTone.Warning -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f) to MaterialTheme.colorScheme.error
+    }
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = container,
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = content,
+        )
     }
 }
 
