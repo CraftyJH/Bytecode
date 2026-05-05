@@ -1,8 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
-const APK_DOWNLOAD_URL =
-  "https://github.com/CraftyJH/Bytecode/releases/download/android-latest/bytecode-android-release.apk";
 const GITHUB_RELEASE_API_URL =
   "https://api.github.com/repos/CraftyJH/Bytecode/releases/tags/android-latest";
 
@@ -12,6 +10,11 @@ interface GitHubReleaseResponse {
   tag_name?: string;
   name?: string;
   published_at?: string;
+  html_url?: string;
+  assets?: Array<{
+    name?: string;
+    browser_download_url?: string;
+  }>;
 }
 
 function formatReleaseDate(isoDate: string): string {
@@ -24,7 +27,14 @@ function formatReleaseDate(isoDate: string): string {
   }).format(new Date(parsed));
 }
 
-async function fetchAndroidReleaseMeta(): Promise<{ label: string; updated: string } | null> {
+interface AndroidReleaseMeta {
+  label: string;
+  updated: string;
+  apkUrl: string | null;
+  releaseUrl: string | null;
+}
+
+async function fetchAndroidReleaseMeta(): Promise<AndroidReleaseMeta | null> {
   try {
     const response = await fetch(GITHUB_RELEASE_API_URL, {
       next: { revalidate: 300 },
@@ -37,7 +47,16 @@ async function fetchAndroidReleaseMeta(): Promise<{ label: string; updated: stri
     const release = (await response.json()) as GitHubReleaseResponse;
     const label = release.name ?? release.tag_name ?? "android-latest";
     const updated = release.published_at ? formatReleaseDate(release.published_at) : "Unknown";
-    return { label, updated };
+    const apkAsset = release.assets?.find((asset) => {
+      const name = asset.name?.toLowerCase() ?? "";
+      return name.endsWith(".apk");
+    });
+    return {
+      label,
+      updated,
+      apkUrl: apkAsset?.browser_download_url ?? null,
+      releaseUrl: release.html_url ?? null,
+    };
   } catch {
     return null;
   }
@@ -83,17 +102,26 @@ export default async function AndroidDownloadPage() {
                   <span className="text-prose">{releaseMeta.updated}</span>
                 </p>
               ) : (
-                <p>Version metadata currently unavailable. The APK link still points to the latest release.</p>
+                <p>Version metadata currently unavailable. APK publishing may still be in progress.</p>
               )}
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <a
-                href={APK_DOWNLOAD_URL}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium bg-accent text-inverse hover:bg-accent-warm transition-colors duration-100"
-              >
-                Download Android APK
-              </a>
+              {releaseMeta?.apkUrl ? (
+                <a
+                  href={releaseMeta.apkUrl}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium bg-accent text-inverse hover:bg-accent-warm transition-colors duration-100"
+                >
+                  Download Android APK
+                </a>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium border text-prose-faint"
+                  style={{ borderColor: "var(--border-emphasis)" }}
+                >
+                  APK not published yet
+                </span>
+              )}
               <a
                 href="/get-the-app"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-md border text-sm font-medium text-prose-muted hover:text-prose hover:bg-subtle transition-colors duration-100"
@@ -101,6 +129,15 @@ export default async function AndroidDownloadPage() {
               >
                 Back to Get the app
               </a>
+              {releaseMeta?.releaseUrl ? (
+                <a
+                  href={releaseMeta.releaseUrl}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-md border text-sm font-medium text-prose-muted hover:text-prose hover:bg-subtle transition-colors duration-100"
+                  style={{ borderColor: "var(--border-emphasis)" }}
+                >
+                  View release details
+                </a>
+              ) : null}
             </div>
           </div>
         </section>
