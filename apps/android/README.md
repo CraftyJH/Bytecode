@@ -47,6 +47,7 @@ gradle wrapper
 ## Notes
 
 - The app uses direct Supabase Auth REST endpoints for login.
+- If an APK is built with placeholder Supabase values, the app fetches runtime mobile config from `GET /api/mobile/config` on your web deployment and caches it locally before auth calls.
 - Backend API calls use the Supabase access token as bearer auth.
 - Billing checkout/portal remains web-driven and is opened via browser.
 

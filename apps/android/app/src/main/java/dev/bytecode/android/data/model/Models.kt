@@ -10,6 +10,14 @@ data class SignInRequest(
 )
 
 @Serializable
+data class MobileRuntimeConfig(
+    val supabaseUrl: String,
+    val supabasePublishableKey: String,
+    val bytecodeApiUrl: String,
+    val webBaseUrl: String,
+)
+
+@Serializable
 data class RefreshRequest(
     @SerialName("refresh_token")
     val refreshToken: String,

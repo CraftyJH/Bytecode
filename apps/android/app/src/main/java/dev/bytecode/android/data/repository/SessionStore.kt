@@ -3,6 +3,7 @@ package dev.bytecode.android.data.repository
 import android.content.Context
 import androidx.core.content.edit
 import dev.bytecode.android.data.model.AuthSession
+import dev.bytecode.android.data.model.MobileRuntimeConfig
 import dev.bytecode.android.data.model.PersistedSession
 import dev.bytecode.android.data.model.UserSummary
 
@@ -53,6 +54,28 @@ class SessionStore(context: Context) {
         prefs.edit { clear() }
     }
 
+    fun saveMobileRuntimeConfig(config: MobileRuntimeConfig) {
+        prefs.edit {
+            putString(KEY_MOBILE_SUPABASE_URL, config.supabaseUrl)
+            putString(KEY_MOBILE_SUPABASE_PUBLISHABLE_KEY, config.supabasePublishableKey)
+            putString(KEY_MOBILE_BYTECODE_API_URL, config.bytecodeApiUrl)
+            putString(KEY_MOBILE_WEB_BASE_URL, config.webBaseUrl)
+        }
+    }
+
+    fun readMobileRuntimeConfig(): MobileRuntimeConfig? {
+        val supabaseUrl = prefs.getString(KEY_MOBILE_SUPABASE_URL, null) ?: return null
+        val supabasePublishableKey = prefs.getString(KEY_MOBILE_SUPABASE_PUBLISHABLE_KEY, null) ?: return null
+        val bytecodeApiUrl = prefs.getString(KEY_MOBILE_BYTECODE_API_URL, null) ?: return null
+        val webBaseUrl = prefs.getString(KEY_MOBILE_WEB_BASE_URL, null) ?: return null
+        return MobileRuntimeConfig(
+            supabaseUrl = supabaseUrl,
+            supabasePublishableKey = supabasePublishableKey,
+            bytecodeApiUrl = bytecodeApiUrl,
+            webBaseUrl = webBaseUrl,
+        )
+    }
+
     fun nowEpochMs(): Long = System.currentTimeMillis()
 
     companion object {
@@ -62,5 +85,9 @@ class SessionStore(context: Context) {
         private const val KEY_EXPIRES_AT_MS = "expires_at_ms"
         private const val KEY_USER_ID = "user_id"
         private const val KEY_USER_EMAIL = "user_email"
+        private const val KEY_MOBILE_SUPABASE_URL = "mobile_supabase_url"
+        private const val KEY_MOBILE_SUPABASE_PUBLISHABLE_KEY = "mobile_supabase_publishable_key"
+        private const val KEY_MOBILE_BYTECODE_API_URL = "mobile_bytecode_api_url"
+        private const val KEY_MOBILE_WEB_BASE_URL = "mobile_web_base_url"
     }
 }
