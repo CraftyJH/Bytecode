@@ -54,7 +54,7 @@ export default function RootLayout({
         } as React.CSSProperties
       }
     >
-      <body className="min-h-screen flex flex-col bg-canvas text-prose antialiased">
+      <body className="min-h-screen flex flex-col text-prose antialiased">
         <BinaryBackground />
         <PageGlows />
         {children}

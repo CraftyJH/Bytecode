@@ -198,7 +198,7 @@ export function BinaryBackground() {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none select-none"
-      style={{ zIndex: -1 }}
+      style={{ zIndex: 1 }}
       aria-hidden="true"
     />
   );

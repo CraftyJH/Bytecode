@@ -2,7 +2,7 @@ export function PageGlows() {
   return (
     <div
       className="fixed inset-0 pointer-events-none overflow-hidden"
-      style={{ zIndex: 0 }}
+      style={{ zIndex: 1 }}
       aria-hidden="true"
     >
       {/* Hero / top — warm accent bloom from upper-left */}
