@@ -16,6 +16,9 @@ Native Android client for Bytecode, built with Kotlin + Jetpack Compose.
 - In-app curriculum browser (tracks/modules/lessons) with premium lock states
 - Lesson reader view with web billing deep-link for locked premium lessons
 - "Manage billing" button that opens the web billing page in browser
+- Dedicated in-app Profile and Billing screens for account details and subscription status
+- Styled lesson reader with code block rendering and clearer loading/error/premium states
+- Visual parity checklist for iterative UI QA: `apps/android/visual-parity-checklist.md`
 
 ## Setup
 

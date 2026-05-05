@@ -6,11 +6,18 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +27,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -36,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -59,6 +68,8 @@ private object AppRoutes {
     const val AppGraph = "app"
     const val SignIn = "auth/sign-in"
     const val Dashboard = "app/dashboard"
+    const val Profile = "app/profile"
+    const val Billing = "app/billing"
     const val LessonPattern = "app/lesson/{track}/{module}/{lesson}"
 
     fun lesson(track: String, module: String, lesson: String): String =
@@ -181,6 +192,16 @@ private fun AppScreen(
                         state = loggedInState,
                         onSignOut = onSignOut,
                         onRefresh = onRefresh,
+                        onOpenProfile = {
+                            navController.navigate(AppRoutes.Profile) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenBillingDetails = {
+                            navController.navigate(AppRoutes.Billing) {
+                                launchSingleTop = true
+                            }
+                        },
                         onOpenLesson = { trackSlug, moduleSlug, lessonSlug ->
                             onOpenLesson(trackSlug, moduleSlug, lessonSlug)
                             navController.navigate(
@@ -189,6 +210,31 @@ private fun AppScreen(
                                 launchSingleTop = true
                             }
                         },
+                        onOpenBilling = onOpenBilling,
+                    )
+                }
+            }
+
+            composable(AppRoutes.Profile) {
+                val loggedInState = state as? AppUiState.LoggedIn
+                if (loggedInState == null) {
+                    LoadingScreen("Loading profile…")
+                } else {
+                    ProfileScreen(
+                        state = loggedInState,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+            }
+
+            composable(AppRoutes.Billing) {
+                val loggedInState = state as? AppUiState.LoggedIn
+                if (loggedInState == null) {
+                    LoadingScreen("Loading billing…")
+                } else {
+                    BillingScreen(
+                        state = loggedInState,
+                        onBack = { navController.popBackStack() },
                         onOpenBilling = onOpenBilling,
                     )
                 }
@@ -335,6 +381,8 @@ private fun DashboardScreen(
     state: AppUiState.LoggedIn,
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onOpenBillingDetails: () -> Unit,
     onOpenLesson: (String, String, String) -> Unit,
     onOpenBilling: () -> Unit,
 ) {
@@ -366,6 +414,24 @@ private fun DashboardScreen(
                         label = billingRole.replaceFirstChar { it.titlecase() },
                         tone = BadgeTone.Default,
                     )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onOpenProfile,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Profile")
+                    }
+                    OutlinedButton(
+                        onClick = onOpenBillingDetails,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Billing details")
+                    }
                 }
             }
         }
@@ -414,8 +480,19 @@ private fun DashboardScreen(
                 KeyValueRow("Premium until", billing?.premiumUntil ?: state.user.premiumUntil ?: "—")
                 billing?.subscription?.graceExpiresAt?.let { KeyValueRow("Grace ends", it) }
                 Spacer(modifier = Modifier.height(14.dp))
-                Button(onClick = onOpenBilling, modifier = Modifier.fillMaxWidth()) {
-                    Text("Manage billing on web")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onOpenBillingDetails,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Open in app")
+                    }
+                    Button(onClick = onOpenBilling, modifier = Modifier.weight(1f)) {
+                        Text("Manage on web")
+                    }
                 }
             }
         }
@@ -675,6 +752,186 @@ private fun AccessBadge(label: String, tone: BadgeTone) {
             style = MaterialTheme.typography.labelMedium,
             color = content,
         )
+    }
+}
+
+@Composable
+private fun AppScaffold(
+    title: String,
+    subtitle: String? = null,
+    onBack: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = 2.dp,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(onClick = onBack) {
+                        Text("Back")
+                    }
+                    Column {
+                        Text(title, style = MaterialTheme.typography.titleLarge)
+                        if (!subtitle.isNullOrBlank()) {
+                            Text(
+                                subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun InfoBanner(
+    text: String,
+    tone: BadgeTone,
+    modifier: Modifier = Modifier,
+) {
+    val (container, content) = when (tone) {
+        BadgeTone.Default -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) to MaterialTheme.colorScheme.onSurfaceVariant
+        BadgeTone.Success -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f) to MaterialTheme.colorScheme.tertiary
+        BadgeTone.Warning -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f) to MaterialTheme.colorScheme.error
+    }
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        color = container,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            text = text,
+            color = content,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun LoadingPlaceholder(lines: Int = 3) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        repeat(lines) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (it == 0) 18.dp else 14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                shape = MaterialTheme.shapes.small,
+            ) {}
+        }
+    }
+}
+
+@Composable
+private fun ProfileScreen(
+    state: AppUiState.LoggedIn,
+    onBack: () -> Unit,
+) {
+    AppScaffold(
+        title = "Profile",
+        subtitle = "Identity and progress",
+        onBack = onBack,
+    ) {
+        BytecodeSectionCard {
+            SectionHeader(
+                title = "Account details",
+                subtitle = "Pulled from your authenticated session",
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            KeyValueRow("Email", state.user.email ?: "—")
+            KeyValueRow("Role", state.user.role.replaceFirstChar { it.titlecase() })
+            KeyValueRow("Streak", "${state.user.streakCount} day${if (state.user.streakCount == 1) "" else "s"}")
+            KeyValueRow("Premium until", state.user.premiumUntil ?: "—")
+        }
+    }
+}
+
+@Composable
+private fun BillingScreen(
+    state: AppUiState.LoggedIn,
+    onBack: () -> Unit,
+    onOpenBilling: () -> Unit,
+) {
+    val billing = state.billing
+    val status = billing?.subscription?.status ?: "none"
+    AppScaffold(
+        title = "Billing",
+        subtitle = "Subscription and entitlement status",
+        onBack = onBack,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            BytecodeSectionCard {
+                SectionHeader(
+                    title = "Current plan",
+                    subtitle = "Status synchronized from backend billing",
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (billing == null) {
+                    LoadingPlaceholder(lines = 4)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    InfoBanner(
+                        text = "Billing is still syncing. Pull to refresh shortly.",
+                        tone = BadgeTone.Default,
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AccessBadge(
+                            label = "Plan: ${billing.plan}",
+                            tone = if (billing.plan == "premium") BadgeTone.Success else BadgeTone.Default,
+                        )
+                        AccessBadge(
+                            label = status,
+                            tone = when {
+                                status.equals("active", ignoreCase = true) -> BadgeTone.Success
+                                status.equals("past_due", ignoreCase = true) -> BadgeTone.Warning
+                                else -> BadgeTone.Default
+                            },
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    KeyValueRow("Premium until", billing.premiumUntil ?: state.user.premiumUntil ?: "—")
+                    billing.subscription?.graceExpiresAt?.let { KeyValueRow("Grace ends", it) }
+                }
+            }
+            InfoBanner(
+                text = "Billing changes are completed on web to keep checkout and card management secure.",
+                tone = BadgeTone.Default,
+            )
+            Button(
+                onClick = onOpenBilling,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Open billing on web")
+            }
+        }
     }
 }
 
