@@ -33,27 +33,29 @@ class UserRepository {
     }
 
     suspend fun fetchProfile(accessToken: String): Result<BackendUserState> =
-        runCatching {
-            client.get("${AppConfig.BYTECODE_API_URL}/api/users/me") {
+        try {
+            val payload: BackendUserState = client.get("${AppConfig.BYTECODE_API_URL}/api/users/me") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
             }.body()
-        }.recoverCatching { throwable ->
-            throw mapRepositoryError("profile", throwable)
+            Result.success(payload)
+        } catch (throwable: Throwable) {
+            Result.failure(mapRepositoryError("profile", throwable))
         }
 
     suspend fun fetchBilling(accessToken: String): Result<BillingState> =
-        runCatching {
-            client.get("${AppConfig.BYTECODE_API_URL}/api/users/me/billing") {
+        try {
+            val payload: BillingState = client.get("${AppConfig.BYTECODE_API_URL}/api/users/me/billing") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
             }.body()
-        }.recoverCatching { throwable ->
-            throw mapRepositoryError("billing", throwable)
+            Result.success(payload)
+        } catch (throwable: Throwable) {
+            Result.failure(mapRepositoryError("billing", throwable))
         }
 
     suspend fun fetchCurriculum(accessToken: String): Result<MobileCurriculumState> =
-        runCatching {
+        try {
             val response = client.get("${AppConfig.BYTECODE_API_URL}/api/mobile/curriculum") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
@@ -61,9 +63,10 @@ class UserRepository {
             if (response.status.value !in 200..299) {
                 throw mapHttpFailure("curriculum", response.status, response.bodyAsText())
             }
-            response.body()
-        }.recoverCatching { throwable ->
-            throw mapRepositoryError("curriculum", throwable)
+            val payload: MobileCurriculumState = response.body()
+            Result.success(payload)
+        } catch (throwable: Throwable) {
+            Result.failure(mapRepositoryError("curriculum", throwable))
         }
 
     suspend fun fetchLesson(
@@ -72,7 +75,7 @@ class UserRepository {
         moduleSlug: String,
         lessonSlug: String,
     ): Result<MobileLessonContent> =
-        runCatching {
+        try {
             val response = client.get("${AppConfig.BYTECODE_API_URL}/api/mobile/lesson/$trackSlug/$moduleSlug/$lessonSlug") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
@@ -83,9 +86,10 @@ class UserRepository {
             if (response.status.value !in 200..299) {
                 throw mapHttpFailure("lesson", response.status, response.bodyAsText())
             }
-            response.body<MobileLessonContent>()
-        }.recoverCatching { throwable ->
-            throw mapRepositoryError("lesson", throwable)
+            val payload: MobileLessonContent = response.body()
+            Result.success(payload)
+        } catch (throwable: Throwable) {
+            Result.failure(mapRepositoryError("lesson", throwable))
         }
 
     private fun mapRepositoryError(scope: String, throwable: Throwable): Throwable {
