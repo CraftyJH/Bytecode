@@ -12,6 +12,7 @@ const BYTE_PATTERNS = [
 interface Particle {
   x: number;
   y: number;
+  vx: number;
   char: string;
   size: number;
   opacity: number;
@@ -55,39 +56,48 @@ export function BinaryBackground() {
       particles.length = 0;
       byteGroups.length = 0;
 
-      // Density scales with screen area
-      const base = Math.floor((W * H) / 20000);
+      const base = Math.floor((W * H) / 18000);
 
-      // Three depth layers
+      // Three depth layers — far more differentiated in size, speed, and drift
       for (let layer = 0; layer < 3; layer++) {
         const count = layer === 0 ? base * 2 : layer === 1 ? base : Math.floor(base * 0.5);
         for (let i = 0; i < count; i++) {
+          // Size range: far (tiny) → near (large) for parallax depth illusion
           const size =
-            layer === 0 ? 7 + Math.random() * 2 :
-            layer === 1 ? 10 + Math.random() * 3 :
-                          13 + Math.random() * 4;
+            layer === 0 ? 6  + Math.random() * 3 :   // Far:  6–9 px
+            layer === 1 ? 12 + Math.random() * 6 :   // Mid: 12–18 px
+                          20 + Math.random() * 10;   // Near: 20–30 px
+
           const opacity =
-            layer === 0 ? 0.018 + Math.random() * 0.022 :
-            layer === 1 ? 0.030 + Math.random() * 0.030 :
-                          0.045 + Math.random() * 0.035;
+            layer === 0 ? 0.018 + Math.random() * 0.024 :  // Far: very faint
+            layer === 1 ? 0.034 + Math.random() * 0.030 :  // Mid: medium
+                          0.058 + Math.random() * 0.042;   // Near: visible
+
           const speed =
-            layer === 0 ? 0.06 + Math.random() * 0.10 :
-            layer === 1 ? 0.12 + Math.random() * 0.15 :
-                          0.20 + Math.random() * 0.20;
+            layer === 0 ? 0.05 + Math.random() * 0.08 :   // Far:  slow
+            layer === 1 ? 0.14 + Math.random() * 0.14 :   // Mid:  medium
+                          0.32 + Math.random() * 0.24;    // Near: fast
+
+          // Horizontal drift increases with nearness
+          const vx =
+            layer === 0 ? 0 :
+            layer === 1 ? (Math.random() - 0.5) * 0.05 :
+                          (Math.random() - 0.5) * 0.14;
+
           particles.push({
             x: Math.random() * W,
             y: Math.random() * H,
+            vx,
             char: Math.random() > 0.5 ? "0" : "1",
             size,
             opacity,
             speed,
-            accent: Math.random() > 0.82,
+            accent: Math.random() > 0.80,
           });
         }
       }
 
-      // Byte groups — far fewer, two styles
-      const byteCount = Math.max(4, Math.floor(base / 5));
+      const byteCount = Math.max(5, Math.floor(base / 4));
       for (let i = 0; i < byteCount; i++) {
         const style: "text" | "boxes" = Math.random() > 0.5 ? "boxes" : "text";
         const cellSize = style === "boxes" ? 10 + Math.random() * 6 : 9 + Math.random() * 4;
@@ -126,7 +136,6 @@ export function BinaryBackground() {
       ctx!.font = `${Math.round(cellSize)}px "JetBrains Mono", monospace`;
       ctx!.textAlign = "left";
       ctx!.textBaseline = "top";
-      // Render as "0100 1010" with a space in the middle
       const spaced = bits.slice(0, 4) + " " + bits.slice(4);
       ctx!.fillText(spaced, x, y);
     }
@@ -134,24 +143,29 @@ export function BinaryBackground() {
     function draw() {
       ctx!.clearRect(0, 0, W, H);
 
-      // Particles
       ctx!.textAlign = "left";
       ctx!.textBaseline = "top";
+
       for (const p of particles) {
         ctx!.font = `${p.size}px "JetBrains Mono", monospace`;
         ctx!.fillStyle = p.accent ? "#C77B3A" : "#FAFAF7";
         ctx!.globalAlpha = p.opacity;
         ctx!.fillText(p.char, p.x, p.y);
+
         p.y -= p.speed;
+        p.x += p.vx;
+
+        // Reset when particle floats off top
         if (p.y < -p.size * 2) {
           p.y = H + p.size;
           p.x = Math.random() * W;
-          // Occasionally swap 0/1 for variety
           if (Math.random() > 0.7) p.char = p.char === "0" ? "1" : "0";
         }
+        // Horizontal wrap
+        if (p.x < -p.size * 2) p.x = W + p.size;
+        if (p.x > W + p.size * 2) p.x = -p.size;
       }
 
-      // Byte groups
       for (const b of byteGroups) {
         if (b.style === "boxes") drawBoxedByte(b);
         else drawTextByte(b);

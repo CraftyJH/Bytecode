@@ -3,6 +3,7 @@ import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import "highlight.js/styles/github-dark.css";
 import "./globals.css";
 import { BinaryBackground } from "@/components/layout/BinaryBackground";
+import { PageGlows } from "@/components/layout/PageGlows";
 
 const inter = Inter({
   variable: "--font-body-loaded",
@@ -55,6 +56,7 @@ export default function RootLayout({
     >
       <body className="min-h-screen flex flex-col bg-canvas text-prose antialiased">
         <BinaryBackground />
+        <PageGlows />
         {children}
       </body>
     </html>
