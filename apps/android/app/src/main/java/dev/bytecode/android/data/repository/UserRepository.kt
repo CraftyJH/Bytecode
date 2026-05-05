@@ -21,7 +21,9 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
-class UserRepository {
+class UserRepository(context: android.content.Context) {
+    private val sessionStore = SessionStore(context)
+
     private val client = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             json(
@@ -34,10 +36,14 @@ class UserRepository {
 
     suspend fun fetchProfile(accessToken: String): Result<BackendUserState> =
         try {
-            val payload: BackendUserState = client.get("${AppConfig.BYTECODE_API_URL}/api/users/me") {
+            val response = client.get("${resolveWebApiBaseUrl()}/api/mobile/profile") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
-            }.body()
+            }
+            if (response.status.value !in 200..299) {
+                throw mapHttpFailure("profile", response.status, response.bodyAsText())
+            }
+            val payload: BackendUserState = response.body()
             Result.success(payload)
         } catch (throwable: Throwable) {
             Result.failure(mapRepositoryError("profile", throwable))
@@ -45,10 +51,14 @@ class UserRepository {
 
     suspend fun fetchBilling(accessToken: String): Result<BillingState> =
         try {
-            val payload: BillingState = client.get("${AppConfig.BYTECODE_API_URL}/api/users/me/billing") {
+            val response = client.get("${resolveWebApiBaseUrl()}/api/mobile/billing") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
-            }.body()
+            }
+            if (response.status.value !in 200..299) {
+                throw mapHttpFailure("billing", response.status, response.bodyAsText())
+            }
+            val payload: BillingState = response.body()
             Result.success(payload)
         } catch (throwable: Throwable) {
             Result.failure(mapRepositoryError("billing", throwable))
@@ -56,7 +66,7 @@ class UserRepository {
 
     suspend fun fetchCurriculum(accessToken: String): Result<MobileCurriculumState> =
         try {
-            val response = client.get("${AppConfig.BYTECODE_API_URL}/api/mobile/curriculum") {
+            val response = client.get("${resolveWebApiBaseUrl()}/api/mobile/curriculum") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
             }
@@ -76,7 +86,7 @@ class UserRepository {
         lessonSlug: String,
     ): Result<MobileLessonContent> =
         try {
-            val response = client.get("${AppConfig.BYTECODE_API_URL}/api/mobile/lesson/$trackSlug/$moduleSlug/$lessonSlug") {
+            val response = client.get("${resolveWebApiBaseUrl()}/api/mobile/lesson/$trackSlug/$moduleSlug/$lessonSlug") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
             }
@@ -120,5 +130,13 @@ class UserRepository {
                 "Unable to load $scope (${status.value}): $detail"
             },
         )
+    }
+
+    private fun resolveWebApiBaseUrl(): String {
+        val cached = sessionStore.readMobileRuntimeConfig()?.webBaseUrl?.trim().orEmpty()
+        if (cached.isNotBlank()) {
+            return cached.removeSuffix("/")
+        }
+        return AppConfig.WEB_BASE_URL.trim().removeSuffix("/")
     }
 }

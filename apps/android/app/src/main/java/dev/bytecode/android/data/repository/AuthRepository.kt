@@ -15,6 +15,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.ContentType
@@ -50,11 +51,35 @@ class AuthRepository(context: android.content.Context) {
     suspend fun signIn(email: String, password: String): Result<AuthSession> =
         runCatching {
             val config = resolveAuthConfig()
-            val session = client.post("${config.supabaseUrl}/auth/v1/token?grant_type=password") {
+            val response = client.post("${config.supabaseUrl}/auth/v1/token?grant_type=password") {
                 contentType(ContentType.Application.Json)
                 header("apikey", config.supabasePublishableKey)
                 setBody(SignInRequest(email = email, password = password))
-            }.body<AuthSession>()
+            }
+            if (
+                response.status == HttpStatusCode.BadRequest ||
+                response.status == HttpStatusCode.Unauthorized ||
+                response.status == HttpStatusCode.Forbidden
+            ) {
+                val errorBody = response.bodyAsText()
+                if (
+                    errorBody.contains("invalid_credentials", ignoreCase = true) ||
+                    errorBody.contains("invalid login credentials", ignoreCase = true)
+                ) {
+                    throw IllegalStateException(
+                        "Email or password is incorrect. Please check and try again.",
+                    )
+                }
+                throw IllegalStateException(
+                    "Sign in was rejected (${response.status.value}). Please verify your details.",
+                )
+            }
+            if (response.status.value !in 200..299) {
+                throw IllegalStateException(
+                    "Sign in failed (${response.status.value}). Please try again shortly.",
+                )
+            }
+            val session = response.body<AuthSession>()
             sessionStore.saveSession(session)
             session
         }.recoverCatching { throwable ->
