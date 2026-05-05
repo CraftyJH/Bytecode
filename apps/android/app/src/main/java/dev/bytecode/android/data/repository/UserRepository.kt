@@ -83,7 +83,7 @@ class UserRepository {
             if (response.status.value !in 200..299) {
                 throw mapHttpFailure("lesson", response.status, response.bodyAsText())
             }
-            response.body()
+            response.body<MobileLessonContent>()
         }.recoverCatching { throwable ->
             throw mapRepositoryError("lesson", throwable)
         }
@@ -110,7 +110,7 @@ class UserRepository {
         val detail = body?.take(120)?.trim()
         return RepositoryFailure.Http(
             statusCode = status.value,
-            message = if (detail.isNullOrBlank()) {
+            detail = if (detail.isNullOrBlank()) {
                 "Unable to load $scope (${status.value})."
             } else {
                 "Unable to load $scope (${status.value}): $detail"
