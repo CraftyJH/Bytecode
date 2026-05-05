@@ -7,17 +7,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,7 +21,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -44,7 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -82,7 +75,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            BytecodeTheme {
+            BytecodeTheme(darkTheme = true) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
@@ -1111,60 +1104,337 @@ private fun LessonScreen(
     }
 }
 
-private data class LessonSegment(
-    val isCode: Boolean,
-    val text: String,
-)
+private sealed interface LessonBlock {
+    data class Heading(val level: Int, val text: String) : LessonBlock
+    data class Paragraph(val text: String) : LessonBlock
+    data class BulletList(val items: List<String>) : LessonBlock
+    data class OrderedList(val items: List<String>) : LessonBlock
+    data class CodeBlock(val language: String?, val code: String) : LessonBlock
+    data class Note(val text: String) : LessonBlock
+    data class Divider(val ignored: Unit = Unit) : LessonBlock
+}
 
-private fun parseLessonSegments(content: String): List<LessonSegment> {
-    val segments = mutableListOf<LessonSegment>()
-    val buffer = StringBuilder()
+private fun normalizeInlineMarkdown(text: String): String =
+    text
+        .replace("**", "")
+        .replace("*", "")
+        .replace("`", "")
+        .trim()
+
+private fun parseLessonBlocks(content: String): List<LessonBlock> {
+    val blocks = mutableListOf<LessonBlock>()
+    val lines = content.lines()
+    var index = 0
     var inCode = false
+    var codeLanguage: String? = null
+    val codeBuffer = mutableListOf<String>()
+    var inNote = false
+    val noteBuffer = mutableListOf<String>()
 
-    fun flush() {
-        if (buffer.isNotEmpty()) {
-            val text = buffer.toString().trimEnd()
-            if (text.isNotBlank()) {
-                segments.add(LessonSegment(isCode = inCode, text = text))
+    fun flushParagraph(startIndex: Int): Int {
+        val paragraphLines = mutableListOf<String>()
+        var i = startIndex
+        while (i < lines.size) {
+            val raw = lines[i]
+            val trimmed = raw.trim()
+            if (
+                trimmed.isBlank() ||
+                trimmed.startsWith("```") ||
+                trimmed.startsWith("##") ||
+                trimmed.startsWith("- ") ||
+                trimmed.matches(Regex("^\\d+\\.\\s+.*")) ||
+                trimmed.startsWith("<Note>") ||
+                trimmed.startsWith("</Note>") ||
+                trimmed == "---"
+            ) {
+                break
             }
-            buffer.clear()
+            paragraphLines.add(raw)
+            i += 1
+        }
+        val paragraph = normalizeInlineMarkdown(paragraphLines.joinToString("\n").trim())
+        if (paragraph.isNotBlank()) {
+            blocks.add(LessonBlock.Paragraph(paragraph))
+        }
+        return i
+    }
+
+    while (index < lines.size) {
+        val rawLine = lines[index]
+        val trimmed = rawLine.trim()
+
+        if (inCode) {
+            if (trimmed.startsWith("```")) {
+                val code = codeBuffer.joinToString("\n").trimEnd()
+                if (code.isNotBlank()) {
+                    blocks.add(LessonBlock.CodeBlock(language = codeLanguage, code = code))
+                }
+                codeBuffer.clear()
+                inCode = false
+                codeLanguage = null
+            } else {
+                codeBuffer.add(rawLine)
+            }
+            index += 1
+            continue
+        }
+
+        if (inNote) {
+            if (trimmed.startsWith("</Note>")) {
+                val noteText = normalizeInlineMarkdown(noteBuffer.joinToString(" ").trim())
+                if (noteText.isNotBlank()) {
+                    blocks.add(LessonBlock.Note(noteText))
+                }
+                noteBuffer.clear()
+                inNote = false
+            } else {
+                noteBuffer.add(trimmed)
+            }
+            index += 1
+            continue
+        }
+
+        if (trimmed.isBlank()) {
+            index += 1
+            continue
+        }
+        if (trimmed == "---") {
+            blocks.add(LessonBlock.Divider())
+            index += 1
+            continue
+        }
+        if (trimmed.startsWith("<Note>")) {
+            val inline = trimmed.removePrefix("<Note>").removeSuffix("</Note>").trim()
+            if (trimmed.endsWith("</Note>")) {
+                val text = normalizeInlineMarkdown(inline)
+                if (text.isNotBlank()) {
+                    blocks.add(LessonBlock.Note(text))
+                }
+            } else {
+                inNote = true
+                if (inline.isNotBlank()) {
+                    noteBuffer.add(inline)
+                }
+            }
+            index += 1
+            continue
+        }
+        if (trimmed.startsWith("<Exercise>") || trimmed.startsWith("</Exercise>")) {
+            index += 1
+            continue
+        }
+        if (trimmed.startsWith("<Quiz")) {
+            index += 1
+            continue
+        }
+        if (trimmed.startsWith("```")) {
+            val language = trimmed.removePrefix("```").trim().ifBlank { null }
+            inCode = true
+            codeLanguage = language
+            codeBuffer.clear()
+            index += 1
+            continue
+        }
+        if (trimmed.startsWith("### ")) {
+            blocks.add(LessonBlock.Heading(3, normalizeInlineMarkdown(trimmed.removePrefix("### "))))
+            index += 1
+            continue
+        }
+        if (trimmed.startsWith("## ")) {
+            blocks.add(LessonBlock.Heading(2, normalizeInlineMarkdown(trimmed.removePrefix("## "))))
+            index += 1
+            continue
+        }
+        if (trimmed.startsWith("# ")) {
+            blocks.add(LessonBlock.Heading(1, normalizeInlineMarkdown(trimmed.removePrefix("# "))))
+            index += 1
+            continue
+        }
+
+        if (trimmed.startsWith("- ")) {
+            val items = mutableListOf<String>()
+            var i = index
+            while (i < lines.size) {
+                val candidate = lines[i].trim()
+                if (!candidate.startsWith("- ")) break
+                items.add(normalizeInlineMarkdown(candidate.removePrefix("- ")))
+                i += 1
+            }
+            if (items.isNotEmpty()) {
+                blocks.add(LessonBlock.BulletList(items))
+            }
+            index = i
+            continue
+        }
+
+        if (trimmed.matches(Regex("^\\d+\\.\\s+.*"))) {
+            val items = mutableListOf<String>()
+            var i = index
+            while (i < lines.size) {
+                val candidate = lines[i].trim()
+                if (!candidate.matches(Regex("^\\d+\\.\\s+.*"))) break
+                items.add(normalizeInlineMarkdown(candidate.replaceFirst(Regex("^\\d+\\.\\s+"), "")))
+                i += 1
+            }
+            if (items.isNotEmpty()) {
+                blocks.add(LessonBlock.OrderedList(items))
+            }
+            index = i
+            continue
+        }
+
+        val nextIndex = flushParagraph(index)
+        if (nextIndex == index) {
+            index += 1
+        } else {
+            index = nextIndex
         }
     }
 
-    content.lineSequence().forEach { line ->
-        if (line.trim().startsWith("```")) {
-            flush()
-            inCode = !inCode
-        } else {
-            buffer.append(line).append('\n')
+    if (inCode && codeBuffer.isNotEmpty()) {
+        blocks.add(
+            LessonBlock.CodeBlock(
+                language = codeLanguage,
+                code = codeBuffer.joinToString("\n").trimEnd(),
+            ),
+        )
+    }
+    if (inNote && noteBuffer.isNotEmpty()) {
+        val noteText = normalizeInlineMarkdown(noteBuffer.joinToString(" ").trim())
+        if (noteText.isNotBlank()) {
+            blocks.add(LessonBlock.Note(noteText))
         }
     }
-    flush()
-    return segments
+
+    return blocks
+}
+
+@Composable
+private fun CodeEditorLikeBlock(language: String?, code: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.small,
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = language?.ifBlank { "code" } ?: "code",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    repeat(3) {
+                        Surface(
+                            modifier = Modifier
+                                .width(8.dp)
+                                .height(8.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                            shape = MaterialTheme.shapes.extraSmall,
+                        ) {}
+                    }
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            Text(
+                text = code,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+            )
+        }
+    }
 }
 
 @Composable
 private fun LessonContentRenderer(content: String) {
-    val segments = remember(content) { parseLessonSegments(content) }
-    segments.forEach { segment ->
-        if (segment.isCode) {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shape = MaterialTheme.shapes.small,
-                tonalElevation = 1.dp,
-            ) {
+    val blocks = remember(content) { parseLessonBlocks(content) }
+    blocks.forEach { block ->
+        when (block) {
+            is LessonBlock.Heading -> {
+                val style = when (block.level) {
+                    1 -> MaterialTheme.typography.headlineSmall
+                    2 -> MaterialTheme.typography.titleLarge
+                    else -> MaterialTheme.typography.titleMedium
+                }
                 Text(
-                    text = segment.text,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
+                    text = block.text,
+                    style = style,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
-        } else {
-            Text(
-                text = segment.text,
-                style = MaterialTheme.typography.bodyLarge,
-            )
+            is LessonBlock.Paragraph -> {
+                Text(
+                    text = block.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            is LessonBlock.BulletList -> {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    block.items.forEach { item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Text(
+                                text = "•",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = item,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            }
+            is LessonBlock.OrderedList -> {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    block.items.forEachIndexed { idx, item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Text(
+                                text = "${idx + 1}.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = item,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            }
+            is LessonBlock.CodeBlock -> {
+                CodeEditorLikeBlock(language = block.language, code = block.code)
+            }
+            is LessonBlock.Note -> {
+                InfoBanner(text = block.text, tone = BadgeTone.Default)
+            }
+            is LessonBlock.Divider -> {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            }
         }
+        Spacer(modifier = Modifier.height(6.dp))
     }
 }
