@@ -5,6 +5,8 @@ import dev.bytecode.android.data.model.BackendUserState
 import dev.bytecode.android.data.model.BillingState
 import dev.bytecode.android.data.model.MobileCurriculumState
 import dev.bytecode.android.data.model.MobileLessonContent
+import dev.bytecode.android.data.model.RunCodeRequest
+import dev.bytecode.android.data.model.RunCodeResult
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -14,8 +16,10 @@ import io.ktor.client.plugins.ResponseException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.client.request.post
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -100,6 +104,29 @@ class UserRepository(context: android.content.Context) {
             Result.success(payload)
         } catch (throwable: Throwable) {
             Result.failure(mapRepositoryError("lesson", throwable))
+        }
+
+    suspend fun runCode(
+        code: String,
+        language: String,
+    ): Result<RunCodeResult> =
+        try {
+            val response = client.post("${resolveWebApiBaseUrl()}/api/run") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    RunCodeRequest(
+                        code = code,
+                        language = if (language.equals("kotlin", ignoreCase = true)) "kotlin" else "java",
+                    ),
+                )
+            }
+            if (response.status.value !in 200..299) {
+                throw mapHttpFailure("code run", response.status, response.bodyAsText())
+            }
+            val payload: RunCodeResult = response.body()
+            Result.success(payload)
+        } catch (throwable: Throwable) {
+            Result.failure(mapRepositoryError("code run", throwable))
         }
 
     private fun mapRepositoryError(scope: String, throwable: Throwable): Throwable {

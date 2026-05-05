@@ -143,6 +143,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             selectedTrackSlug = preservedSelection?.trackSlug,
             selectedModuleSlug = preservedSelection?.moduleSlug,
             selectedLessonSlug = preservedSelection?.lessonSlug,
+            editorCode = previousLoggedIn?.editorCode,
+            editorRunning = false,
+            editorResult = previousLoggedIn?.editorResult,
+            editorError = previousLoggedIn?.editorError,
             curriculumError = curriculumError?.message,
         )
         if (preservedSelection?.isComplete() == true) {
@@ -170,6 +174,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 selectedModuleSlug = moduleSlug,
                 selectedLessonSlug = lessonSlug,
                 selectedLesson = null,
+                editorCode = null,
+                editorRunning = false,
+                editorResult = null,
+                editorError = null,
                 curriculumError = null,
             )
             _uiState.value = selectedState
@@ -202,8 +210,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             val latestState = _uiState.value as? AppUiState.LoggedIn ?: return@launch
             lessonResult.onSuccess { lesson ->
+                val starterCode = lesson.lesson.starterCode
+                    ?: if (lesson.lesson.language.equals("kotlin", ignoreCase = true)) {
+                        "fun main() {\n    // write your code here\n}\n"
+                    } else {
+                        "public class Main {\n    public static void main(String[] args) {\n        // write your code here\n    }\n}"
+                    }
                 _uiState.value = latestState.copy(
                     selectedLesson = lesson,
+                    editorCode = starterCode,
+                    editorRunning = false,
+                    editorResult = null,
+                    editorError = null,
                     curriculumError = null,
                 )
             }.onFailure { error ->
@@ -214,7 +232,83 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _uiState.value = latestState.copy(
                     selectedLesson = lessonPlaceholderFromSelection(trackSlug, moduleSlug, lessonSlug),
+                    editorCode = null,
+                    editorRunning = false,
+                    editorResult = null,
+                    editorError = null,
                     curriculumError = error.message ?: "Unable to load lesson.",
+                )
+            }
+        }
+    }
+
+    fun updateEditorCode(code: String) {
+        val currentState = _uiState.value as? AppUiState.LoggedIn ?: return
+        _uiState.value = currentState.copy(
+            editorCode = code,
+            editorResult = null,
+            editorError = null,
+        )
+    }
+
+    fun resetEditorCode() {
+        val currentState = _uiState.value as? AppUiState.LoggedIn ?: return
+        val lesson = currentState.selectedLesson ?: return
+        val starterCode = lesson.lesson.starterCode
+            ?: if (lesson.lesson.language.equals("kotlin", ignoreCase = true)) {
+                "fun main() {\n    // write your code here\n}\n"
+            } else {
+                "public class Main {\n    public static void main(String[] args) {\n        // write your code here\n    }\n}"
+            }
+        _uiState.value = currentState.copy(
+            editorCode = starterCode,
+            editorResult = null,
+            editorError = null,
+        )
+    }
+
+    fun runEditorCode() {
+        viewModelScope.launch {
+            val currentState = _uiState.value as? AppUiState.LoggedIn ?: return@launch
+            val lesson = currentState.selectedLesson ?: return@launch
+            val code = currentState.editorCode?.trim().orEmpty()
+            if (code.isBlank()) {
+                _uiState.value = currentState.copy(editorError = "Add some code before running.")
+                return@launch
+            }
+
+            _uiState.value = currentState.copy(
+                editorRunning = true,
+                editorResult = null,
+                editorError = null,
+            )
+
+            val runResult = userRepository.runCode(
+                code = currentState.editorCode ?: "",
+                language = lesson.lesson.language,
+            )
+            val latestState = _uiState.value as? AppUiState.LoggedIn ?: return@launch
+            runResult.onSuccess { payload ->
+                val expected = lesson.lesson.expectedOutput
+                val passMessage = if (!expected.isNullOrBlank()) {
+                    if (outputsMatch(payload.stdout, expected)) {
+                        "Output matches expected result."
+                    } else {
+                        "Output does not match expected result yet."
+                    }
+                } else {
+                    null
+                }
+                _uiState.value = latestState.copy(
+                    editorRunning = false,
+                    editorResult = payload,
+                    editorError = passMessage,
+                )
+            }.onFailure { error ->
+                _uiState.value = latestState.copy(
+                    editorRunning = false,
+                    editorResult = null,
+                    editorError = error.message ?: "Run failed.",
                 )
             }
         }
@@ -235,6 +329,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             selectedModuleSlug = null,
             selectedLessonSlug = null,
             selectedLesson = null,
+            editorCode = null,
+            editorRunning = false,
+            editorResult = null,
+            editorError = null,
             curriculumError = null,
         )
     }
@@ -273,5 +371,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val lessonSlug: String?,
     ) {
         fun isComplete(): Boolean = trackSlug != null && moduleSlug != null && lessonSlug != null
+    }
+
+    private fun outputsMatch(stdout: String, expectedOutput: String): Boolean {
+        val got = stdout.trim()
+        val expected = expectedOutput.trim()
+        if (expected.contains("__any__")) {
+            val lines = got.split("\n")
+            val expectedLines = expected.split("\n")
+            if (lines.size < 2 || expectedLines.isEmpty()) return false
+            return lines[0].trim() == expectedLines[0].trim() && lines[1].trim().isNotEmpty()
+        }
+        return got == expected
     }
 }

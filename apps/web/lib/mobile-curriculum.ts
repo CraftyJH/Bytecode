@@ -55,6 +55,9 @@ export interface MobileLessonResponse {
     title: string;
     duration: number;
     isPremium: boolean;
+    language: "java" | "kotlin";
+    starterCode: string | null;
+    expectedOutput: string | null;
   };
   content: string;
 }
@@ -210,6 +213,9 @@ export async function buildMobileLessonResponse(
       title: lesson.title,
       duration: lesson.duration,
       isPremium: lesson.isPremium,
+      language: lesson.language ?? "java",
+      starterCode: lesson.starterCode ?? null,
+      expectedOutput: lesson.expectedOutput ?? null,
     },
     content: cleanLessonMarkdown(source),
   };

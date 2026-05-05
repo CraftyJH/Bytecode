@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -38,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -60,9 +63,7 @@ private object AppRoutes {
     const val AuthGraph = "auth"
     const val AppGraph = "app"
     const val SignIn = "auth/sign-in"
-    const val Dashboard = "app/dashboard"
-    const val Profile = "app/profile"
-    const val Billing = "app/billing"
+    const val Main = "app/main"
     const val LessonPattern = "app/lesson/{track}/{module}/{lesson}"
 
     fun lesson(track: String, module: String, lesson: String): String =
@@ -97,6 +98,9 @@ class MainActivity : ComponentActivity() {
                             )
                             startActivity(intent)
                         },
+                        onUpdateEditorCode = { code -> viewModel.updateEditorCode(code) },
+                        onRunEditorCode = { viewModel.runEditorCode() },
+                        onResetEditorCode = { viewModel.resetEditorCode() },
                     )
                 }
             }
@@ -113,6 +117,9 @@ private fun AppScreen(
     onOpenLesson: (String, String, String) -> Unit,
     onCloseLesson: () -> Unit,
     onOpenBilling: () -> Unit,
+    onUpdateEditorCode: (String) -> Unit,
+    onRunEditorCode: () -> Unit,
+    onResetEditorCode: () -> Unit,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -122,7 +129,7 @@ private fun AppScreen(
         when (state) {
             is AppUiState.LoggedIn -> {
                 if (currentRoute == null || !currentRoute.startsWith(AppRoutes.AppGraph)) {
-                    navController.navigate(AppRoutes.Dashboard) {
+                    navController.navigate(AppRoutes.Main) {
                         popUpTo(AppRoutes.AuthGraph) { inclusive = true }
                         launchSingleTop = true
                     }
@@ -174,27 +181,17 @@ private fun AppScreen(
 
         navigation(
             route = AppRoutes.AppGraph,
-            startDestination = AppRoutes.Dashboard,
+            startDestination = AppRoutes.Main,
         ) {
-            composable(AppRoutes.Dashboard) {
+            composable(AppRoutes.Main) {
                 val loggedInState = state as? AppUiState.LoggedIn
                 if (loggedInState == null) {
-                    LoadingScreen("Loading dashboard…")
+                    LoadingScreen("Loading app…")
                 } else {
-                    DashboardScreen(
+                    MainShellScreen(
                         state = loggedInState,
                         onSignOut = onSignOut,
                         onRefresh = onRefresh,
-                        onOpenProfile = {
-                            navController.navigate(AppRoutes.Profile) {
-                                launchSingleTop = true
-                            }
-                        },
-                        onOpenBillingDetails = {
-                            navController.navigate(AppRoutes.Billing) {
-                                launchSingleTop = true
-                            }
-                        },
                         onOpenLesson = { trackSlug, moduleSlug, lessonSlug ->
                             onOpenLesson(trackSlug, moduleSlug, lessonSlug)
                             navController.navigate(
@@ -204,31 +201,9 @@ private fun AppScreen(
                             }
                         },
                         onOpenBilling = onOpenBilling,
-                    )
-                }
-            }
-
-            composable(AppRoutes.Profile) {
-                val loggedInState = state as? AppUiState.LoggedIn
-                if (loggedInState == null) {
-                    LoadingScreen("Loading profile…")
-                } else {
-                    ProfileScreen(
-                        state = loggedInState,
-                        onBack = { navController.popBackStack() },
-                    )
-                }
-            }
-
-            composable(AppRoutes.Billing) {
-                val loggedInState = state as? AppUiState.LoggedIn
-                if (loggedInState == null) {
-                    LoadingScreen("Loading billing…")
-                } else {
-                    BillingScreen(
-                        state = loggedInState,
-                        onBack = { navController.popBackStack() },
-                        onOpenBilling = onOpenBilling,
+                        onUpdateEditorCode = onUpdateEditorCode,
+                        onRunEditorCode = onRunEditorCode,
+                        onResetEditorCode = onResetEditorCode,
                     )
                 }
             }
@@ -255,10 +230,13 @@ private fun AppScreen(
                         moduleSlug = moduleSlug,
                         lessonSlug = lessonSlug,
                         onOpenLesson = onOpenLesson,
+                        onUpdateEditorCode = onUpdateEditorCode,
+                        onRunEditorCode = onRunEditorCode,
+                        onResetEditorCode = onResetEditorCode,
                         onBack = {
                             onCloseLesson()
                             if (!navController.popBackStack()) {
-                                navController.navigate(AppRoutes.Dashboard) {
+                                navController.navigate(AppRoutes.Main) {
                                     launchSingleTop = true
                                 }
                             }
@@ -371,6 +349,120 @@ private fun SignInScreen(
 
 @Composable
 private fun DashboardScreen(
+    state: AppUiState.LoggedIn,
+    onSignOut: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onOpenBillingDetails: () -> Unit,
+    onOpenLesson: (String, String, String) -> Unit,
+    onOpenBilling: () -> Unit,
+) {
+    HomeScreen(
+        state = state,
+        onSignOut = onSignOut,
+        onRefresh = onRefresh,
+        onOpenProfile = onOpenProfile,
+        onOpenBillingDetails = onOpenBillingDetails,
+        onOpenLesson = onOpenLesson,
+        onOpenBilling = onOpenBilling,
+    )
+}
+
+private enum class MainTab {
+    Home,
+    Curriculum,
+    Account,
+}
+
+@Composable
+private fun MainShellScreen(
+    state: AppUiState.LoggedIn,
+    onSignOut: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpenLesson: (String, String, String) -> Unit,
+    onOpenBilling: () -> Unit,
+    onUpdateEditorCode: (String) -> Unit,
+    onRunEditorCode: () -> Unit,
+    onResetEditorCode: () -> Unit,
+) {
+    var activeTab by remember { mutableStateOf(MainTab.Home) }
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp, start = 12.dp, end = 12.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 2.dp,
+        ) {
+            AppBottomNav(
+                activeTab = activeTab,
+                onSelectTab = { activeTab = it },
+            )
+        }
+
+        when (activeTab) {
+            MainTab.Home -> HomeScreen(
+                state = state,
+                onSignOut = onSignOut,
+                onRefresh = onRefresh,
+                onOpenProfile = { activeTab = MainTab.Account },
+                onOpenBillingDetails = { activeTab = MainTab.Account },
+                onOpenLesson = onOpenLesson,
+                onOpenBilling = onOpenBilling,
+            )
+            MainTab.Curriculum -> CurriculumScreen(
+                state = state,
+                onOpenLesson = onOpenLesson,
+            )
+            MainTab.Account -> AccountScreen(
+                state = state,
+                onSignOut = onSignOut,
+                onRefresh = onRefresh,
+                onOpenBilling = onOpenBilling,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppBottomNav(
+    activeTab: MainTab,
+    onSelectTab: (MainTab) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf(
+            MainTab.Home to "Home",
+            MainTab.Curriculum to "Curriculum",
+            MainTab.Account to "Account",
+        ).forEach { (tab, label) ->
+            val selected = activeTab == tab
+            val buttonModifier = Modifier.weight(1f)
+            if (selected) {
+                Button(
+                    onClick = { onSelectTab(tab) },
+                    modifier = buttonModifier,
+                ) { Text(label) }
+            } else {
+                OutlinedButton(
+                    onClick = { onSelectTab(tab) },
+                    modifier = buttonModifier,
+                ) { Text(label) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeScreen(
     state: AppUiState.LoggedIn,
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
@@ -533,6 +625,165 @@ private fun DashboardScreen(
                 ) {
                     Text("Sign out")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurriculumScreen(
+    state: AppUiState.LoggedIn,
+    onOpenLesson: (String, String, String) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            BytecodeSectionCard {
+                SectionHeader(
+                    title = "Curriculum & editor",
+                    subtitle = "Browse tracks and run code like the web app",
+                )
+                if (!state.curriculumError.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    InfoBanner(
+                        text = "Sync issue: ${state.curriculumError}",
+                        tone = BadgeTone.Warning,
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                CurriculumBrowser(
+                    state = state,
+                    onOpenLesson = onOpenLesson,
+                )
+            }
+        }
+        val selectedLesson = state.selectedLesson
+        if (selectedLesson != null) {
+            item {
+                BytecodeSectionCard {
+                    SectionHeader(
+                        title = "Editor",
+                        subtitle = "${selectedLesson.lesson.title} (${selectedLesson.lesson.language})",
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    EditorPanel(state = state)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountScreen(
+    state: AppUiState.LoggedIn,
+    onSignOut: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpenBilling: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            BytecodeSectionCard {
+                SectionHeader(
+                    title = "Account overview",
+                    subtitle = state.user.email ?: "Unknown user",
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                val billing = state.billing
+                val status = billing?.subscription?.status ?: "none"
+                KeyValueRow("Role", state.user.role.replaceFirstChar { it.titlecase() })
+                KeyValueRow("Plan", billing?.plan ?: "free")
+                KeyValueRow("Subscription", status)
+                KeyValueRow("Streak", "${state.user.streakCount} day${if (state.user.streakCount == 1) "" else "s"}")
+                KeyValueRow("Premium until", billing?.premiumUntil ?: state.user.premiumUntil ?: "—")
+                billing?.subscription?.currentPeriodEnd?.let { KeyValueRow("Current period end", it) }
+                billing?.subscription?.graceExpiresAt?.let { KeyValueRow("Grace ends", it) }
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onOpenBilling,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Manage billing on web")
+                }
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Button(onClick = onRefresh, modifier = Modifier.weight(1f)) {
+                    Text("Refresh")
+                }
+                OutlinedButton(onClick = onSignOut, modifier = Modifier.weight(1f)) {
+                    Text("Sign out")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditorPanel(state: AppUiState.LoggedIn) {
+    val lesson = state.selectedLesson ?: return
+    val expected = lesson.lesson.expectedOutput
+    val output = remember(state.editorResult) {
+        val result = state.editorResult ?: return@remember null
+        (result.stdout.ifBlank { result.stderr }).ifBlank { null }
+    }
+    val runTone = when {
+        state.editorRunning -> BadgeTone.Default
+        !state.editorError.isNullOrBlank() && state.editorError.contains("match", ignoreCase = true) -> {
+            if (state.editorError.contains("does not", ignoreCase = true)) BadgeTone.Warning else BadgeTone.Success
+        }
+        !state.editorError.isNullOrBlank() -> BadgeTone.Warning
+        else -> BadgeTone.Default
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            value = state.editorCode.orEmpty(),
+            onValueChange = {},
+            enabled = false,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp),
+            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            label = { Text("Code editor (interactive editor opens in lesson screen)") },
+        )
+        if (!expected.isNullOrBlank()) {
+            InfoBanner(
+                text = "Expected output:\n$expected",
+                tone = BadgeTone.Default,
+            )
+        }
+        if (state.editorRunning) {
+            InfoBanner(text = "Running code…", tone = BadgeTone.Default)
+        }
+        if (!state.editorError.isNullOrBlank()) {
+            InfoBanner(text = state.editorError, tone = runTone)
+        }
+        if (!output.isNullOrBlank()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Text(
+                    text = output,
+                    modifier = Modifier.padding(10.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                )
             }
         }
     }
@@ -937,6 +1188,9 @@ private fun LessonRouteScreen(
     onOpenLesson: (String, String, String) -> Unit,
     onBack: () -> Unit,
     onOpenBilling: () -> Unit,
+    onUpdateEditorCode: (String) -> Unit,
+    onRunEditorCode: () -> Unit,
+    onResetEditorCode: () -> Unit,
 ) {
     LaunchedEffect(trackSlug, moduleSlug, lessonSlug) {
         if (
@@ -953,6 +1207,9 @@ private fun LessonRouteScreen(
         onBack = onBack,
         onRetry = { onOpenLesson(trackSlug, moduleSlug, lessonSlug) },
         onOpenBilling = onOpenBilling,
+        onUpdateEditorCode = onUpdateEditorCode,
+        onRunEditorCode = onRunEditorCode,
+        onResetEditorCode = onResetEditorCode,
     )
 }
 
@@ -962,6 +1219,9 @@ private fun LessonScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onOpenBilling: () -> Unit,
+    onUpdateEditorCode: (String) -> Unit,
+    onRunEditorCode: () -> Unit,
+    onResetEditorCode: () -> Unit,
 ) {
     val selectedSummary = state.selectedLessonSummary()
     val isLockedPremium = selectedSummary?.isLocked == true
@@ -1095,6 +1355,102 @@ private fun LessonScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             LessonContentRenderer(selectedContent.content)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                "Practice",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                text = "Run code on the same backend runner as the website.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            val editorCode = state.editorCode.orEmpty()
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = MaterialTheme.shapes.small,
+                            ) {
+                                BasicTextField(
+                                    value = editorCode,
+                                    onValueChange = onUpdateEditorCode,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(220.dp)
+                                        .padding(10.dp),
+                                    textStyle = TextStyle(
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = MaterialTheme.typography.bodySmall.fontSize,
+                                    ),
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                OutlinedButton(
+                                    onClick = onResetEditorCode,
+                                    modifier = Modifier.weight(1f),
+                                    enabled = !state.editorRunning,
+                                ) {
+                                    Text("Reset")
+                                }
+                                Button(
+                                    onClick = onRunEditorCode,
+                                    modifier = Modifier.weight(1f),
+                                    enabled = !state.editorRunning && editorCode.isNotBlank(),
+                                ) {
+                                    if (state.editorRunning) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.width(16.dp),
+                                            strokeWidth = 2.dp,
+                                        )
+                                    } else {
+                                        Text("Run code")
+                                    }
+                                }
+                            }
+
+                            selectedContent.lesson.expectedOutput?.takeIf { it.isNotBlank() }?.let { expected ->
+                                InfoBanner(
+                                    text = "Expected output:\n$expected",
+                                    tone = BadgeTone.Default,
+                                )
+                            }
+                            state.editorError?.takeIf { it.isNotBlank() }?.let { message ->
+                                val tone = if (message.contains("match", ignoreCase = true) &&
+                                    !message.contains("does not", ignoreCase = true)
+                                ) {
+                                    BadgeTone.Success
+                                } else {
+                                    BadgeTone.Warning
+                                }
+                                InfoBanner(text = message, tone = tone)
+                            }
+                            state.editorResult?.let { result ->
+                                val outputText = if (result.stderr.isNotBlank()) result.stderr else result.stdout
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = MaterialTheme.shapes.small,
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(
+                                            text = "Output (${result.status.description})",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = outputText.ifBlank { "No output" },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -147,6 +147,9 @@ data class MobileLessonMeta(
     val title: String,
     val duration: Int,
     val isPremium: Boolean,
+    val language: String = "java",
+    val starterCode: String? = null,
+    val expectedOutput: String? = null,
 )
 
 @Serializable
@@ -155,4 +158,25 @@ data class MobileLessonContent(
     val module: MobileLessonModuleRef,
     val lesson: MobileLessonMeta,
     val content: String,
+)
+
+@Serializable
+data class RunCodeRequest(
+    val code: String,
+    val language: String = "java",
+)
+
+@Serializable
+data class RunCodeStatus(
+    val id: Int = 0,
+    val description: String = "Unknown",
+)
+
+@Serializable
+data class RunCodeResult(
+    val stdout: String = "",
+    val stderr: String = "",
+    val time: String? = null,
+    val memory: Int? = null,
+    val status: RunCodeStatus = RunCodeStatus(),
 )
