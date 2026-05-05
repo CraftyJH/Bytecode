@@ -1,5 +1,19 @@
 export function Footer() {
   const year = new Date().getFullYear();
+  const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0";
+  const buildTimestamp = process.env.NEXT_PUBLIC_BUILD_TIMESTAMP ?? "";
+  const buildSha = process.env.NEXT_PUBLIC_BUILD_SHA ?? "local";
+
+  const shortSha = buildSha === "local" ? "local" : buildSha.slice(0, 7);
+  const buildDate = buildTimestamp
+    ? new Date(buildTimestamp).toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "unknown";
 
   const links = [
     { href: "/curriculum", label: "Curriculum" },
@@ -26,6 +40,9 @@ export function Footer() {
           </p>
           <p className="text-xs text-prose-faint">
             © {year} Bytecode. Java and Kotlin, mastered.
+          </p>
+          <p className="text-[11px] text-prose-faint mt-1">
+            Build v{appVersion} · {buildDate} · {shortSha}
           </p>
         </div>
 

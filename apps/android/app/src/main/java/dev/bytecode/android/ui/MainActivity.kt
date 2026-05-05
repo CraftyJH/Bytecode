@@ -16,11 +16,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -262,46 +263,69 @@ private fun SignInScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Bytecode Android", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Email") },
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { onSignIn(email.trim(), password) },
-            enabled = !loading && email.isNotBlank() && password.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 420.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 2.dp,
         ) {
-            if (loading) {
-                CircularProgressIndicator(modifier = Modifier.width(18.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Sign in")
-            }
-        }
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Bytecode Android", style = MaterialTheme.typography.headlineSmall)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "Sign in to continue your learning path",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-        if (!error.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Email") },
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = { onSignIn(email.trim(), password) },
+                    enabled = !loading && email.isNotBlank() && password.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (loading) {
+                        CircularProgressIndicator(modifier = Modifier.width(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Sign in")
+                    }
+                }
+
+                if (!error.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -693,78 +717,197 @@ private fun LessonScreen(
     val isLockedPremium = selectedSummary?.isLocked == true
     val selectedContent = state.selectedLesson
     val scrollState = rememberScrollState()
+    val lessonTitle = selectedContent?.lesson?.title ?: selectedSummary?.title ?: "Lesson"
+    val breadcrumb = buildString {
+        append(selectedContent?.track?.title ?: state.selectedTrackSlug ?: "")
+        if (!selectedContent?.module?.title.isNullOrBlank()) {
+            append(" / ")
+            append(selectedContent?.module?.title)
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = onBack) {
-                Text("Back to curriculum")
-            }
-            if (isLockedPremium) {
-                Button(onClick = onOpenBilling) {
-                    Text("Unlock with premium")
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 2.dp,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = onBack) {
+                    Text("Back to curriculum")
                 }
-            }
-        }
-
-        Text(
-            text = selectedContent?.lesson?.title ?: selectedSummary?.title ?: "Lesson",
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        val breadcrumb = buildString {
-            append(selectedContent?.track?.title ?: state.selectedTrackSlug ?: "")
-            if (!selectedContent?.module?.title.isNullOrBlank()) {
-                append(" / ")
-                append(selectedContent?.module?.title)
-            }
-        }
-        if (breadcrumb.isNotBlank()) {
-            Text(breadcrumb, style = MaterialTheme.typography.bodySmall)
-        }
-
-        when {
-            isLockedPremium -> {
-                Text(
-                    "This lesson is part of the premium curriculum. Upgrade on web billing to continue.",
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            state.curriculumError != null -> {
-                Text(
-                    text = state.curriculumError,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                OutlinedButton(onClick = onRetry) {
-                    Text("Retry lesson load")
-                }
-            }
-            selectedContent == null -> {
-                CircularProgressIndicator()
-                Text("Loading lesson…")
-            }
-            selectedContent.content.isBlank() -> {
-                Text("Lesson content is currently empty.")
-            }
-            else -> {
-                Card(modifier = Modifier.fillMaxSize()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                            .verticalScroll(scrollState),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(
-                            text = selectedContent.content,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
+                if (isLockedPremium) {
+                    Button(onClick = onOpenBilling) {
+                        Text("Unlock with premium")
                     }
                 }
             }
+        }
+
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 860.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 1.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+            Text(
+                text = lessonTitle,
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            if (breadcrumb.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    breadcrumb,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+
+            when {
+                isLockedPremium -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Text(
+                            "This lesson is part of premium. Upgrade on web billing to continue.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+                state.curriculumError != null -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Text(
+                            text = state.curriculumError,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(onClick = onRetry) {
+                        Text("Retry lesson load")
+                    }
+                }
+                selectedContent == null -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator()
+                        Text("Loading lesson…", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                selectedContent.content.isBlank() -> {
+                    Text(
+                        "Lesson content is currently empty.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                else -> {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                                .verticalScroll(scrollState),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            LessonContentRenderer(selectedContent.content)
+                        }
+                    }
+                }
+            }
+        }
+        }
+    }
+}
+
+private data class LessonSegment(
+    val isCode: Boolean,
+    val text: String,
+)
+
+private fun parseLessonSegments(content: String): List<LessonSegment> {
+    val segments = mutableListOf<LessonSegment>()
+    val buffer = StringBuilder()
+    var inCode = false
+
+    fun flush() {
+        if (buffer.isNotEmpty()) {
+            val text = buffer.toString().trimEnd()
+            if (text.isNotBlank()) {
+                segments.add(LessonSegment(isCode = inCode, text = text))
+            }
+            buffer.clear()
+        }
+    }
+
+    content.lineSequence().forEach { line ->
+        if (line.trim().startsWith("```")) {
+            flush()
+            inCode = !inCode
+        } else {
+            buffer.append(line).append('\n')
+        }
+    }
+    flush()
+    return segments
+}
+
+@Composable
+private fun LessonContentRenderer(content: String) {
+    val segments = remember(content) { parseLessonSegments(content) }
+    segments.forEach { segment ->
+        if (segment.isCode) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.small,
+                tonalElevation = 1.dp,
+            ) {
+                Text(
+                    text = segment.text,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+        } else {
+            Text(
+                text = segment.text,
+                style = MaterialTheme.typography.bodyLarge,
+            )
         }
     }
 }
