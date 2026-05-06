@@ -1,0 +1,54 @@
+name: API Build & Test
+
+on:
+  push:
+    branches:
+      - main
+      - "cursor/**"
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/api-build.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/api-build.yml"
+  workflow_dispatch:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Compile
+        run: ./gradlew --stacktrace compileKotlin compileTestKotlin
+
+      - name: Test
+        run: ./gradlew --stacktrace test
+
+      - name: Publish test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-report
+          path: apps/api/build/reports/tests/test/
+          if-no-files-found: ignore
