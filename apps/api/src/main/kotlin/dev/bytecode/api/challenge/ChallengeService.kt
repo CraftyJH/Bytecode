@@ -5,19 +5,24 @@ import dev.bytecode.api.execution.Grader
 import dev.bytecode.api.submission.SubmissionEntity
 import dev.bytecode.api.submission.SubmissionJpaRepository
 import dev.bytecode.api.user.UserEntity
+import dev.bytecode.api.user.UserRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 @Service
 class ChallengeService(
     val repo: ChallengeJpaRepository,
     private val submissionRepo: SubmissionJpaRepository,
+    private val userRepo: UserRepository,
     private val grader: Grader,
     private val objectMapper: ObjectMapper,
 ) {
     fun getToday(): ChallengeEntity? = repo.findByReleaseDate(LocalDate.now())
 
+    @Transactional
     fun submit(challenge: ChallengeEntity, user: UserEntity, sourceCode: String, language: String): SubmitResponse {
+        val alreadySolved = submissionRepo.existsByUserIdAndChallengeIdAndIsCorrectTrue(user.id, challenge.id)
         val result = grader.grade(challenge.id, sourceCode)
 
         submissionRepo.save(
@@ -36,6 +41,13 @@ class ChallengeService(
             )
         )
 
+        var xpAwarded: Int? = null
+        if (result.isCorrect && !alreadySolved) {
+            user.xpTotal += challenge.baseXp
+            userRepo.save(user)
+            xpAwarded = challenge.baseXp
+        }
+
         return SubmitResponse(
             isCorrect = result.isCorrect,
             visibleResults = result.visibleResults.map {
@@ -46,6 +58,7 @@ class ChallengeService(
             runtimeMs = result.runtimeMs,
             memoryKb = result.memoryKb,
             compileError = result.compileError,
+            xpAwarded = xpAwarded,
         )
     }
 
@@ -99,6 +112,7 @@ data class SubmitResponse(
     val runtimeMs: Int?,
     val memoryKb: Int?,
     val compileError: String?,
+    val xpAwarded: Int?,
 )
 
 data class TestCaseResultDto(

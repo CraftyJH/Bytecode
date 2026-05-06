@@ -37,6 +37,7 @@ data class UserResponse(
     val createdAt: Instant,
     val premiumUntil: Instant?,
     val streakCount: Int,
+    val xpTotal: Int,
     val isFoundingMember: Boolean,
     val role: String,
 )
@@ -49,6 +50,7 @@ fun UserEntity.toResponse() = UserResponse(
     createdAt = createdAt,
     premiumUntil = premiumUntil,
     streakCount = streakCount,
+    xpTotal = xpTotal,
     isFoundingMember = isFoundingMember,
     role = role.name.lowercase(),
 )

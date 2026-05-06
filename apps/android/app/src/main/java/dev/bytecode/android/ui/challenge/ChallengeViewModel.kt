@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.bytecode.android.data.model.ChallengeDto
 import dev.bytecode.android.data.model.ChallengeSubmitResponse
+import dev.bytecode.android.data.model.DailyLeaderboardResponse
 import dev.bytecode.android.data.repository.AuthRepository
 import dev.bytecode.android.data.repository.ChallengeRepository
 import dev.bytecode.android.data.repository.SessionStore
@@ -21,6 +22,8 @@ data class ChallengeUiState(
     val error: String? = null,
     val submitResult: ChallengeSubmitResponse? = null,
     val isSubmitting: Boolean = false,
+    val leaderboard: DailyLeaderboardResponse? = null,
+    val leaderboardLoading: Boolean = false,
 )
 
 class ChallengeViewModel(
@@ -53,6 +56,19 @@ class ChallengeViewModel(
         }
     }
 
+    fun loadLeaderboard() {
+        if (_uiState.value.leaderboardLoading) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(leaderboardLoading = true) }
+            val token = resolveToken() ?: return@launch
+            challengeRepository.fetchLeaderboard(token).fold(
+                onSuccess = { lb -> _uiState.update { it.copy(leaderboard = lb) } },
+                onFailure = { /* leaderboard failures are non-critical, ignore silently */ },
+            )
+            _uiState.update { it.copy(leaderboardLoading = false) }
+        }
+    }
+
     fun updateCode(code: String) {
         _uiState.update { it.copy(code = code) }
     }
@@ -73,7 +89,10 @@ class ChallengeViewModel(
                 language = challenge.language,
                 accessToken = token,
             ).fold(
-                onSuccess = { response -> _uiState.update { it.copy(submitResult = response) } },
+                onSuccess = { response ->
+                    _uiState.update { it.copy(submitResult = response) }
+                    if (response.isCorrect) loadLeaderboard()
+                },
                 onFailure = { t -> _uiState.update { it.copy(error = t.message) } },
             )
             _uiState.update { it.copy(isSubmitting = false) }

@@ -59,6 +59,8 @@ data class BackendUserState(
     val premiumUntil: String? = null,
     @SerialName("streakCount")
     val streakCount: Int = 0,
+    @SerialName("xpTotal")
+    val xpTotal: Int = 0,
 )
 
 @Serializable

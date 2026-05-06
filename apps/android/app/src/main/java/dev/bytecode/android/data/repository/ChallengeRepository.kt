@@ -4,6 +4,7 @@ import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.ChallengeDto
 import dev.bytecode.android.data.model.ChallengeSubmitRequest
 import dev.bytecode.android.data.model.ChallengeSubmitResponse
+import dev.bytecode.android.data.model.DailyLeaderboardResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -62,6 +63,19 @@ class ChallengeRepository(context: android.content.Context) {
             Result.success(response.body())
         } catch (t: Throwable) {
             Result.failure(mapRepositoryError("submission", t))
+        }
+
+    suspend fun fetchLeaderboard(accessToken: String): Result<DailyLeaderboardResponse> =
+        try {
+            val response = client.get("${resolveBaseUrl()}/api/leaderboard/daily") {
+                header(HttpHeaders.Authorization, "Bearer $accessToken")
+            }
+            if (response.status.value !in 200..299) {
+                throw mapHttpFailure("leaderboard", response.status, response.bodyAsText())
+            }
+            Result.success(response.body())
+        } catch (t: Throwable) {
+            Result.failure(mapRepositoryError("leaderboard", t))
         }
 
     private fun mapRepositoryError(scope: String, t: Throwable): Throwable {

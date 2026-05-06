@@ -143,6 +143,7 @@ class MainActivity : ComponentActivity() {
                         onSubmitChallenge = { challengeViewModel.submit() },
                         onResetChallengeCode = { challengeViewModel.resetCode() },
                         onClearSubmitResult = { challengeViewModel.clearSubmitResult() },
+                        onLoadLeaderboard = { challengeViewModel.loadLeaderboard() },
                     )
                 }
             }
@@ -172,6 +173,7 @@ private fun AppScreen(
     onSubmitChallenge: () -> Unit,
     onResetChallengeCode: () -> Unit,
     onClearSubmitResult: () -> Unit,
+    onLoadLeaderboard: () -> Unit,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -330,6 +332,7 @@ private fun AppScreen(
                             launchSingleTop = true
                         }
                     },
+                    onLoadLeaderboard = onLoadLeaderboard,
                 )
             }
 
@@ -934,6 +937,7 @@ private fun HomeScreen(
                     "Streak",
                     "${state.user.streakCount} day${if (state.user.streakCount == 1) "" else "s"}",
                 )
+                KeyValueRow("Total XP", "${state.user.xpTotal} XP")
                 KeyValueRow("Premium until", state.user.premiumUntil ?: "—")
             }
         }
@@ -1107,6 +1111,7 @@ private fun AccountScreen(
                 KeyValueRow("Plan", billing?.plan ?: "free")
                 KeyValueRow("Subscription", status)
                 KeyValueRow("Streak", "${state.user.streakCount} day${if (state.user.streakCount == 1) "" else "s"}")
+                KeyValueRow("Total XP", "${state.user.xpTotal} XP")
                 KeyValueRow("Premium until", billing?.premiumUntil ?: state.user.premiumUntil ?: "—")
                 billing?.subscription?.currentPeriodEnd?.let { KeyValueRow("Current period end", it) }
                 billing?.subscription?.graceExpiresAt?.let { KeyValueRow("Grace ends", it) }
@@ -1543,6 +1548,7 @@ private fun ProfileScreen(
             KeyValueRow("Email", state.user.email ?: "—")
             KeyValueRow("Role", state.user.role.replaceFirstChar { it.titlecase() })
             KeyValueRow("Streak", "${state.user.streakCount} day${if (state.user.streakCount == 1) "" else "s"}")
+            KeyValueRow("Total XP", "${state.user.xpTotal} XP")
             KeyValueRow("Premium until", state.user.premiumUntil ?: "—")
         }
     }
@@ -2310,8 +2316,14 @@ private fun ChallengeDetailScreen(
     challengeState: ChallengeUiState,
     onBack: () -> Unit,
     onOpenEditor: (String) -> Unit,
+    onLoadLeaderboard: () -> Unit,
 ) {
     val challenge = challengeState.challenge
+
+    LaunchedEffect(challenge?.id) {
+        if (challenge != null) onLoadLeaderboard()
+    }
+
     AppScaffold(
         title = challenge?.title ?: "Today's Challenge",
         subtitle = challenge?.let { "${it.difficulty.replaceFirstChar { c -> c.titlecase() }} · ${it.language.replaceFirstChar { c -> c.titlecase() }}" },
@@ -2360,6 +2372,73 @@ private fun ChallengeDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Open Editor")
+            }
+            // Leaderboard
+            BytecodeSectionCard {
+                SectionHeader(
+                    title = "Today's Leaderboard",
+                    subtitle = "First correct solves",
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                when {
+                    challengeState.leaderboardLoading -> LoadingPlaceholder(lines = 3)
+                    challengeState.leaderboard == null || challengeState.leaderboard.entries.isEmpty() -> {
+                        Text(
+                            "No solves yet — be the first!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    else -> {
+                        challengeState.leaderboard.entries.forEachIndexed { i, entry ->
+                            if (i > 0) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        "#${i + 1}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = when (i) {
+                                            0 -> MaterialTheme.colorScheme.primary
+                                            1 -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            2 -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                    )
+                                    Text(
+                                        entry.displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                }
+                                val timeStr = remember(entry.solvedAt) {
+                                    try {
+                                        val instant = java.time.Instant.parse(entry.solvedAt)
+                                        val local = instant.atZone(java.time.ZoneId.systemDefault())
+                                        "%02d:%02d".format(local.hour, local.minute)
+                                    } catch (_: Exception) { "" }
+                                }
+                                if (timeStr.isNotBlank()) {
+                                    Text(
+                                        timeStr,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -2486,11 +2565,20 @@ private fun CodeEditorScreen(
                     modifier = Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        if (result.isCorrect) "All tests passed!" else "Some tests failed",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = if (result.isCorrect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (result.isCorrect) "All tests passed!" else "Some tests failed",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = if (result.isCorrect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        )
+                        if (result.xpAwarded != null && result.xpAwarded > 0) {
+                            AccessBadge(label = "+${result.xpAwarded} XP", tone = BadgeTone.Success)
+                        }
+                    }
                     if (!result.compileError.isNullOrBlank()) {
                         Text(
                             "Compile error: ${result.compileError}",

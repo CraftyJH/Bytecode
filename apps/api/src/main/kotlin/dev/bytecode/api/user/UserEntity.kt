@@ -37,6 +37,9 @@ class UserEntity(
     @Column(name = "founding_locked_until")
     var foundingLockedUntil: Instant? = null,
 
+    @Column(name = "xp_total")
+    var xpTotal: Int = 0,
+
     @Enumerated(EnumType.STRING)
     var role: UserRole = UserRole.USER,
 )
