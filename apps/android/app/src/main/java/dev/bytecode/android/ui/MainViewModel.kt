@@ -16,10 +16,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val authRepository = AuthRepository(application)
-    private val userRepository = UserRepository(application)
-    private val sessionStore = SessionStore(application)
+class MainViewModel(
+    application: Application,
+    private val authRepository: AuthRepository,
+    private val userRepository: UserRepository,
+    private val sessionStore: SessionStore,
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow<AppUiState>(AppUiState.Loading)
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
