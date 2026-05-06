@@ -2,6 +2,7 @@ package dev.bytecode.api.challenge
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.bytecode.api.execution.Grader
+import dev.bytecode.api.leaderboard.RedisLeaderboardService
 import dev.bytecode.api.submission.SubmissionEntity
 import dev.bytecode.api.submission.SubmissionJpaRepository
 import dev.bytecode.api.user.UserEntity
@@ -17,6 +18,7 @@ class ChallengeService(
     private val userRepo: UserRepository,
     private val grader: Grader,
     private val objectMapper: ObjectMapper,
+    private val leaderboard: RedisLeaderboardService,
 ) {
     fun getToday(): ChallengeEntity? = repo.findByReleaseDate(LocalDate.now())
 
@@ -46,6 +48,7 @@ class ChallengeService(
             user.xpTotal += challenge.baseXp
             userRepo.save(user)
             xpAwarded = challenge.baseXp
+            leaderboard.onSolve(user.id, challenge.baseXp, challenge.language, challenge.difficulty)
         }
 
         return SubmitResponse(

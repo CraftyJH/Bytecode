@@ -63,3 +63,82 @@ data class TestCaseResultDto(
     val actual: String? = null,
     val error: String? = null,
 )
+
+// ── Phase 3: ranked leaderboard models ───────────────────────────────────────
+
+@Serializable
+data class RankedEntryDto(
+    val rank: Int,
+    val userId: String,
+    val displayName: String,
+    val score: Long,
+)
+
+@Serializable
+data class RankedBoardResponse(
+    val board: String,
+    val entries: List<RankedEntryDto> = emptyList(),
+    val aroundMe: List<RankedEntryDto>? = null,
+    val myRank: Int? = null,
+    val myScore: Long? = null,
+)
+
+@Serializable
+data class MyRanksResponse(
+    val globalRank: Int? = null,
+    val globalScore: Long? = null,
+    val weeklyRank: Int? = null,
+    val weeklyScore: Long? = null,
+    val isoWeek: String = "",
+)
+
+@Serializable
+data class FriendsBoardEntry(
+    val rank: Int = 0,
+    val userId: String,
+    val displayName: String,
+    val score: Long,
+    val isMe: Boolean,
+)
+
+@Serializable
+data class FriendsBoardResponse(
+    val isoWeek: String = "",
+    val entries: List<FriendsBoardEntry> = emptyList(),
+    val myRank: Int? = null,
+    val myScore: Long = 0,
+)
+
+@Serializable
+data class FriendDto(
+    val userId: String,
+    val displayName: String,
+    val email: String? = null,
+    val avatarUrl: String? = null,
+    val since: String,
+)
+
+@Serializable
+data class PendingRequestDto(
+    val edgeId: String,
+    val userId: String,
+    val displayName: String,
+    val email: String? = null,
+    val avatarUrl: String? = null,
+    val requestedAt: String,
+)
+
+@Serializable
+data class PendingResponse(
+    val incoming: List<PendingRequestDto> = emptyList(),
+    val outgoing: List<PendingRequestDto> = emptyList(),
+)
+
+@Serializable
+data class FriendActionResponse(
+    val status: String,
+    val message: String,
+)
+
+@Serializable
+data class FriendRequestBody(val handle: String)

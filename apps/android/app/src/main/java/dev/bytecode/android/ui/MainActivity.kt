@@ -70,13 +70,26 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.ui.text.style.TextOverflow
 import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.ChallengeSubmitResponse
+import dev.bytecode.android.data.model.FriendDto
 import dev.bytecode.android.data.model.MobileLessonSummary
 import dev.bytecode.android.data.model.OnboardingProfile
+import dev.bytecode.android.data.model.PendingRequestDto
+import dev.bytecode.android.data.model.RankedBoardResponse
 import dev.bytecode.android.data.model.TestCaseResultDto
 import dev.bytecode.android.ui.challenge.ChallengeUiState
 import dev.bytecode.android.ui.challenge.ChallengeViewModel
+import dev.bytecode.android.ui.friends.FriendsUiState
+import dev.bytecode.android.ui.friends.FriendsViewModel
+import dev.bytecode.android.ui.leaderboard.LeaderboardTab
+import dev.bytecode.android.ui.leaderboard.LeaderboardUiState
+import dev.bytecode.android.ui.leaderboard.LeaderboardViewModel
 import dev.bytecode.android.ui.state.AppUiState
 import dev.bytecode.android.ui.state.selectedLessonSummary
 import dev.bytecode.android.ui.theme.BytecodeTheme
@@ -92,6 +105,8 @@ private object AppRoutes {
     const val LessonPattern = "app/lesson/{track}/{module}/{lesson}"
     const val ChallengeDetailPattern = "app/challenge/{challengeId}"
     const val CodeEditorPattern = "app/challenge/{challengeId}/editor"
+    const val Leaderboards = "app/leaderboards"
+    const val Friends = "app/friends"
 
     fun lesson(track: String, module: String, lesson: String): String =
         "app/lesson/${Uri.encode(track)}/${Uri.encode(module)}/${Uri.encode(lesson)}"
@@ -103,6 +118,8 @@ private object AppRoutes {
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by koinViewModel()
     private val challengeViewModel: ChallengeViewModel by koinViewModel()
+    private val leaderboardViewModel: LeaderboardViewModel by koinViewModel()
+    private val friendsViewModel: FriendsViewModel by koinViewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,9 +131,13 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val state by viewModel.uiState.collectAsStateWithLifecycle()
                     val challengeState by challengeViewModel.uiState.collectAsStateWithLifecycle()
+                    val leaderboardState by leaderboardViewModel.uiState.collectAsStateWithLifecycle()
+                    val friendsState by friendsViewModel.uiState.collectAsStateWithLifecycle()
                     AppScreen(
                         state = state,
                         challengeState = challengeState,
+                        leaderboardState = leaderboardState,
+                        friendsState = friendsState,
                         onContinueWelcome = { viewModel.completeWelcome() },
                         onOnboardingNext = { profile, step -> viewModel.onboardingNext(profile, step) },
                         onOnboardingBack = { profile, step -> viewModel.onboardingBack(profile, step) },
@@ -144,6 +165,14 @@ class MainActivity : ComponentActivity() {
                         onResetChallengeCode = { challengeViewModel.resetCode() },
                         onClearSubmitResult = { challengeViewModel.clearSubmitResult() },
                         onLoadLeaderboard = { challengeViewModel.loadLeaderboard() },
+                        onSelectLeaderboardTab = { tab -> leaderboardViewModel.selectTab(tab) },
+                        onRefreshLeaderboard = { leaderboardViewModel.refresh() },
+                        onLoadMyRanks = { leaderboardViewModel.loadMyRanks() },
+                        onLoadFriends = { friendsViewModel.load() },
+                        onFriendHandleChange = { handle -> friendsViewModel.updateHandleInput(handle) },
+                        onSendFriendRequest = { friendsViewModel.sendRequest() },
+                        onAcceptFriendRequest = { id -> friendsViewModel.acceptRequest(id) },
+                        onRemoveFriend = { id -> friendsViewModel.removeFriend(id) },
                     )
                 }
             }
@@ -155,6 +184,8 @@ class MainActivity : ComponentActivity() {
 private fun AppScreen(
     state: AppUiState,
     challengeState: ChallengeUiState,
+    leaderboardState: LeaderboardUiState,
+    friendsState: FriendsUiState,
     onContinueWelcome: () -> Unit,
     onOnboardingNext: (OnboardingProfile, Int) -> Unit,
     onOnboardingBack: (OnboardingProfile, Int) -> Unit,
@@ -174,6 +205,14 @@ private fun AppScreen(
     onResetChallengeCode: () -> Unit,
     onClearSubmitResult: () -> Unit,
     onLoadLeaderboard: () -> Unit,
+    onSelectLeaderboardTab: (LeaderboardTab) -> Unit,
+    onRefreshLeaderboard: () -> Unit,
+    onLoadMyRanks: () -> Unit,
+    onLoadFriends: () -> Unit,
+    onFriendHandleChange: (String) -> Unit,
+    onSendFriendRequest: () -> Unit,
+    onAcceptFriendRequest: (String) -> Unit,
+    onRemoveFriend: (String) -> Unit,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -296,6 +335,8 @@ private fun AppScreen(
                     MainShellScreen(
                         state = loggedInState,
                         challengeState = challengeState,
+                        leaderboardState = leaderboardState,
+                        friendsState = friendsState,
                         onSignOut = onSignOut,
                         onRefresh = onRefresh,
                         onOpenLesson = { trackSlug, moduleSlug, lessonSlug ->
@@ -316,6 +357,14 @@ private fun AppScreen(
                                 launchSingleTop = true
                             }
                         },
+                        onSelectLeaderboardTab = onSelectLeaderboardTab,
+                        onRefreshLeaderboard = onRefreshLeaderboard,
+                        onLoadMyRanks = onLoadMyRanks,
+                        onLoadFriends = onLoadFriends,
+                        onFriendHandleChange = onFriendHandleChange,
+                        onSendFriendRequest = onSendFriendRequest,
+                        onAcceptFriendRequest = onAcceptFriendRequest,
+                        onRemoveFriend = onRemoveFriend,
                     )
                 }
             }
@@ -753,6 +802,7 @@ private fun DashboardScreen(
 private enum class MainTab {
     Home,
     Curriculum,
+    Leaderboards,
     Account,
 }
 
@@ -760,6 +810,8 @@ private enum class MainTab {
 private fun MainShellScreen(
     state: AppUiState.LoggedIn,
     challengeState: ChallengeUiState,
+    leaderboardState: LeaderboardUiState,
+    friendsState: FriendsUiState,
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
     onOpenLesson: (String, String, String) -> Unit,
@@ -769,6 +821,14 @@ private fun MainShellScreen(
     onResetEditorCode: () -> Unit,
     onLoadChallenge: () -> Unit,
     onOpenChallenge: (String) -> Unit,
+    onSelectLeaderboardTab: (LeaderboardTab) -> Unit,
+    onRefreshLeaderboard: () -> Unit,
+    onLoadMyRanks: () -> Unit,
+    onLoadFriends: () -> Unit,
+    onFriendHandleChange: (String) -> Unit,
+    onSendFriendRequest: () -> Unit,
+    onAcceptFriendRequest: (String) -> Unit,
+    onRemoveFriend: (String) -> Unit,
 ) {
     var activeTab by remember { mutableStateOf(MainTab.Home) }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -794,6 +854,18 @@ private fun MainShellScreen(
                 MainTab.Curriculum -> CurriculumScreen(
                     state = state,
                     onOpenLesson = onOpenLesson,
+                )
+                MainTab.Leaderboards -> LeaderboardsScreen(
+                    leaderboardState = leaderboardState,
+                    friendsState = friendsState,
+                    onSelectTab = onSelectLeaderboardTab,
+                    onRefresh = onRefreshLeaderboard,
+                    onLoadMyRanks = onLoadMyRanks,
+                    onLoadFriends = onLoadFriends,
+                    onFriendHandleChange = onFriendHandleChange,
+                    onSendFriendRequest = onSendFriendRequest,
+                    onAcceptFriendRequest = onAcceptFriendRequest,
+                    onRemoveFriend = onRemoveFriend,
                 )
                 MainTab.Account -> AccountScreen(
                     state = state,
@@ -822,6 +894,7 @@ private fun AppBottomNav(
     val navItems = listOf(
         Triple(MainTab.Home, "Home", Icons.Outlined.Home),
         Triple(MainTab.Curriculum, "Learn", Icons.Outlined.MenuBook),
+        Triple(MainTab.Leaderboards, "Ranks", Icons.Outlined.EmojiEvents),
         Triple(MainTab.Account, "Account", Icons.Outlined.AccountCircle),
     )
     NavigationBar(
@@ -2638,6 +2711,430 @@ private fun CodeEditorScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// ── Leaderboards screen ───────────────────────────────────────────────────────
+
+private val leaderboardTabs = listOf(
+    LeaderboardTab.Weekly,
+    LeaderboardTab.Global,
+    LeaderboardTab.Friends,
+    LeaderboardTab.Java,
+    LeaderboardTab.Kotlin,
+    LeaderboardTab.Easy,
+    LeaderboardTab.Intermediate,
+    LeaderboardTab.Hard,
+)
+
+private fun LeaderboardTab.label() = when (this) {
+    LeaderboardTab.Global -> "All-time"
+    LeaderboardTab.Weekly -> "This week"
+    LeaderboardTab.Java -> "Java"
+    LeaderboardTab.Kotlin -> "Kotlin"
+    LeaderboardTab.Easy -> "Easy"
+    LeaderboardTab.Intermediate -> "Intermediate"
+    LeaderboardTab.Hard -> "Hard"
+    LeaderboardTab.Friends -> "Friends"
+}
+
+@Composable
+private fun LeaderboardsScreen(
+    leaderboardState: LeaderboardUiState,
+    friendsState: FriendsUiState,
+    onSelectTab: (LeaderboardTab) -> Unit,
+    onRefresh: () -> Unit,
+    onLoadMyRanks: () -> Unit,
+    onLoadFriends: () -> Unit,
+    onFriendHandleChange: (String) -> Unit,
+    onSendFriendRequest: () -> Unit,
+    onAcceptFriendRequest: (String) -> Unit,
+    onRemoveFriend: (String) -> Unit,
+) {
+    LaunchedEffect(Unit) {
+        onSelectTab(leaderboardState.activeTab)
+        onLoadMyRanks()
+    }
+
+    val activeIndex = leaderboardTabs.indexOf(leaderboardState.activeTab).coerceAtLeast(0)
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Screen title
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp,
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                Text("Leaderboards", style = MaterialTheme.typography.headlineSmall)
+                leaderboardState.myRanks?.let { ranks ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ranks.globalRank?.let { rank ->
+                            Text(
+                                "Global #$rank",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        ranks.weeklyRank?.let { rank ->
+                            Text(
+                                "This week #$rank",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Tab row
+        ScrollableTabRow(
+            selectedTabIndex = activeIndex,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+            edgePadding = 16.dp,
+        ) {
+            leaderboardTabs.forEachIndexed { idx, tab ->
+                Tab(
+                    selected = idx == activeIndex,
+                    onClick = { onSelectTab(tab) },
+                    text = {
+                        Text(
+                            tab.label(),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                )
+            }
+        }
+
+        // Board content
+        if (leaderboardState.activeTab == LeaderboardTab.Friends) {
+            FriendsLeaderboardContent(
+                friendsState = friendsState,
+                onLoadFriends = onLoadFriends,
+                onFriendHandleChange = onFriendHandleChange,
+                onSendFriendRequest = onSendFriendRequest,
+                onAcceptFriendRequest = onAcceptFriendRequest,
+                onRemoveFriend = onRemoveFriend,
+            )
+        } else {
+            val board = leaderboardState.boards[leaderboardState.activeTab]
+            RankedBoardContent(
+                board = board,
+                isLoading = leaderboardState.isLoading,
+                error = leaderboardState.error,
+                onRefresh = onRefresh,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RankedBoardContent(
+    board: RankedBoardResponse?,
+    isLoading: Boolean,
+    error: String?,
+    onRefresh: () -> Unit,
+) {
+    when {
+        isLoading && board == null -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+        }
+        !error.isNullOrBlank() && board == null -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                InfoBanner(text = error, tone = BadgeTone.Warning)
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(onClick = onRefresh) { Text("Retry") }
+            }
+        }
+        else -> {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                // Around-me section (shown when user is not in top 50)
+                val aroundMe = board?.aroundMe
+                if (!aroundMe.isNullOrEmpty()) {
+                    item {
+                        Text(
+                            "Your position",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                    items(aroundMe) { entry ->
+                        val isMe = entry.userId == board.entries.firstOrNull()?.userId
+                        RankedEntryRow(
+                            rank = entry.rank,
+                            displayName = entry.displayName,
+                            score = entry.score,
+                            isHighlighted = board.myRank == entry.rank,
+                        )
+                    }
+                    item { HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp)) }
+                    item {
+                        Text(
+                            "Top 50",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                }
+
+                val entries = board?.entries ?: emptyList()
+                if (entries.isEmpty() && !isLoading) {
+                    item {
+                        Text(
+                            "No entries yet. Be the first!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 24.dp),
+                        )
+                    }
+                } else {
+                    items(entries) { entry ->
+                        RankedEntryRow(
+                            rank = entry.rank,
+                            displayName = entry.displayName,
+                            score = entry.score,
+                            isHighlighted = board?.myRank == entry.rank,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RankedEntryRow(
+    rank: Int,
+    displayName: String,
+    score: Long,
+    isHighlighted: Boolean,
+) {
+    val bgColor = if (isHighlighted)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    else
+        MaterialTheme.colorScheme.surface
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = bgColor,
+        shape = MaterialTheme.shapes.small,
+        border = if (isHighlighted) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) else null,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            val rankColor = when (rank) {
+                1 -> MaterialTheme.colorScheme.primary
+                2, 3 -> MaterialTheme.colorScheme.secondary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Text(
+                text = "#$rank",
+                style = MaterialTheme.typography.labelLarge,
+                color = rankColor,
+                modifier = Modifier.widthIn(min = 36.dp),
+            )
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "$score XP",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FriendsLeaderboardContent(
+    friendsState: FriendsUiState,
+    onLoadFriends: () -> Unit,
+    onFriendHandleChange: (String) -> Unit,
+    onSendFriendRequest: () -> Unit,
+    onAcceptFriendRequest: (String) -> Unit,
+    onRemoveFriend: (String) -> Unit,
+) {
+    LaunchedEffect(Unit) { onLoadFriends() }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Add friend
+        item {
+            BytecodeSectionCard {
+                SectionHeader(title = "Add a friend", subtitle = "Enter their email address")
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = friendsState.handleInput,
+                    onValueChange = onFriendHandleChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("email@example.com") },
+                )
+                if (!friendsState.actionMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    InfoBanner(text = friendsState.actionMessage, tone = BadgeTone.Success)
+                }
+                if (!friendsState.error.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    InfoBanner(text = friendsState.error, tone = BadgeTone.Warning)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onSendFriendRequest,
+                    enabled = friendsState.handleInput.isNotBlank() && !friendsState.isSending,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (friendsState.isSending) {
+                        CircularProgressIndicator(modifier = Modifier.width(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Send request")
+                    }
+                }
+            }
+        }
+
+        // Pending incoming
+        if (friendsState.incomingRequests.isNotEmpty()) {
+            item {
+                Text(
+                    "Pending requests (${friendsState.incomingRequests.size})",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(friendsState.incomingRequests) { req ->
+                FriendRequestRow(
+                    displayName = req.displayName,
+                    email = req.email,
+                    onAccept = { onAcceptFriendRequest(req.userId) },
+                )
+            }
+        }
+
+        // Friends list
+        if (friendsState.friends.isNotEmpty()) {
+            item {
+                Text(
+                    "Friends (${friendsState.friends.size})",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(friendsState.friends) { friend ->
+                FriendRow(
+                    friend = friend,
+                    onRemove = { onRemoveFriend(friend.userId) },
+                )
+            }
+        } else if (!friendsState.isLoading) {
+            item {
+                Text(
+                    "No friends yet. Add someone to compare scores!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+        }
+
+        if (friendsState.isLoading) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FriendRequestRow(
+    displayName: String,
+    email: String?,
+    onAccept: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(displayName, style = MaterialTheme.typography.bodyMedium)
+                if (!email.isNullOrBlank()) {
+                    Text(email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Button(onClick = onAccept) { Text("Accept") }
+        }
+    }
+}
+
+@Composable
+private fun FriendRow(
+    friend: FriendDto,
+    onRemove: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(friend.displayName, style = MaterialTheme.typography.bodyMedium)
+                if (!friend.email.isNullOrBlank()) {
+                    Text(friend.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            OutlinedButton(onClick = onRemove) { Text("Remove") }
         }
     }
 }
