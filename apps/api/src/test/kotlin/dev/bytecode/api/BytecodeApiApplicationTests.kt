@@ -3,9 +3,10 @@ package dev.bytecode.api
 import dev.bytecode.api.challenge.ChallengeBootstrap
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.TestPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 
 @SpringBootTest
 @TestPropertySource(
@@ -15,15 +16,19 @@ import org.springframework.test.context.TestPropertySource
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.flyway.enabled=false",
         "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:9999/auth/v1/keys",
+        "spring.data.redis.url=redis://localhost:6379",
     ]
 )
 class BytecodeApiApplicationTests {
 
-    @MockBean
+    @MockitoBean
     lateinit var jwtDecoder: JwtDecoder
 
-    @MockBean
+    @MockitoBean
     lateinit var challengeBootstrap: ChallengeBootstrap
+
+    @MockitoBean
+    lateinit var redisTemplate: StringRedisTemplate
 
     @Test
     fun contextLoads() {
