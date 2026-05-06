@@ -3,6 +3,7 @@ package dev.bytecode.api.challenge
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.bytecode.api.execution.Grader
 import dev.bytecode.api.leaderboard.RedisLeaderboardService
+import dev.bytecode.api.social.DuelService
 import dev.bytecode.api.submission.SubmissionEntity
 import dev.bytecode.api.submission.SubmissionJpaRepository
 import dev.bytecode.api.user.UserEntity
@@ -19,15 +20,22 @@ class ChallengeService(
     private val grader: Grader,
     private val objectMapper: ObjectMapper,
     private val leaderboard: RedisLeaderboardService,
+    private val duelService: DuelService,
 ) {
     fun getToday(): ChallengeEntity? = repo.findByReleaseDate(LocalDate.now())
 
     @Transactional
-    fun submit(challenge: ChallengeEntity, user: UserEntity, sourceCode: String, language: String): SubmitResponse {
+    fun submit(
+        challenge: ChallengeEntity,
+        user: UserEntity,
+        sourceCode: String,
+        language: String,
+        shareOnSubmit: Boolean = false,
+    ): SubmitResponse {
         val alreadySolved = submissionRepo.existsByUserIdAndChallengeIdAndIsCorrectTrue(user.id, challenge.id)
         val result = grader.grade(challenge.id, sourceCode)
 
-        submissionRepo.save(
+        val submission = submissionRepo.save(
             SubmissionEntity(
                 userId = user.id,
                 challengeId = challenge.id,
@@ -40,8 +48,11 @@ class ChallengeService(
                 runtimeMs = result.runtimeMs,
                 memoryKb = result.memoryKb,
                 byteLength = sourceCode.toByteArray().size,
+                shared = shareOnSubmit && result.isCorrect,
             )
         )
+
+        duelService.onSubmit(user.id, challenge.id, submission.id, result.isCorrect)
 
         var xpAwarded: Int? = null
         if (result.isCorrect && !alreadySolved) {
@@ -105,7 +116,7 @@ data class ExampleDto(
     val explanation: String?,
 )
 
-data class SubmitRequest(val sourceCode: String, val language: String)
+data class SubmitRequest(val sourceCode: String, val language: String, val shareOnSubmit: Boolean = false)
 
 data class SubmitResponse(
     val isCorrect: Boolean,

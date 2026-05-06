@@ -28,6 +28,6 @@ class ChallengeController(
         val challenge = challengeService.repo.findById(id).orElse(null)
             ?: return ResponseEntity.notFound().build()
         val user = userService.findOrCreate(jwt)
-        return ResponseEntity.ok(challengeService.submit(challenge, user, body.sourceCode, body.language))
+        return ResponseEntity.ok(challengeService.submit(challenge, user, body.sourceCode, body.language, body.shareOnSubmit))
     }
 }

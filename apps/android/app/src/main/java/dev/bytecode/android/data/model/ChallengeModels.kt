@@ -26,6 +26,7 @@ data class ExampleDto(
 data class ChallengeSubmitRequest(
     val sourceCode: String,
     val language: String,
+    val shareOnSubmit: Boolean = false,
 )
 
 @Serializable
@@ -142,3 +143,50 @@ data class FriendActionResponse(
 
 @Serializable
 data class FriendRequestBody(val handle: String)
+
+// ── Phase 4: discussion, solutions, duels ────────────────────────────────────
+
+@Serializable
+data class DiscussionPostDto(
+    val id: String,
+    val challengeId: String,
+    val authorName: String,
+    val body: String,
+    val upvotes: Int,
+    val isOwn: Boolean,
+    val createdAt: String,
+)
+
+@Serializable
+data class SharedSolutionDto(
+    val submissionId: String,
+    val authorName: String,
+    val sourceCode: String,
+    val language: String,
+    val runtimeMs: Int? = null,
+    val upvotes: Int,
+    val hasUpvoted: Boolean,
+    val submittedAt: String,
+)
+
+@Serializable
+data class DuelDto(
+    val id: String,
+    val challengeId: String,
+    val challengerName: String,
+    val opponentName: String,
+    val status: String,
+    val isChallenger: Boolean,
+    val winnerId: String? = null,
+    val createdAt: String,
+    val completedAt: String? = null,
+)
+
+@Serializable
+data class DuelActionResponse(val status: String, val message: String, val duelId: String? = null)
+
+@Serializable
+data class ChallengeFriendBody(val opponentId: String, val challengeId: String)
+
+@Serializable
+data class PostBody(val body: String)

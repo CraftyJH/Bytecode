@@ -83,13 +83,24 @@ import dev.bytecode.android.data.model.OnboardingProfile
 import dev.bytecode.android.data.model.PendingRequestDto
 import dev.bytecode.android.data.model.RankedBoardResponse
 import dev.bytecode.android.data.model.TestCaseResultDto
+import androidx.compose.material3.Checkbox
+import dev.bytecode.android.data.model.ChallengeDto
+import dev.bytecode.android.data.model.DiscussionPostDto
+import dev.bytecode.android.data.model.DuelDto
+import dev.bytecode.android.data.model.SharedSolutionDto
 import dev.bytecode.android.ui.challenge.ChallengeUiState
 import dev.bytecode.android.ui.challenge.ChallengeViewModel
+import dev.bytecode.android.ui.discussion.DiscussionUiState
+import dev.bytecode.android.ui.discussion.DiscussionViewModel
+import dev.bytecode.android.ui.duel.DuelUiState
+import dev.bytecode.android.ui.duel.DuelViewModel
 import dev.bytecode.android.ui.friends.FriendsUiState
 import dev.bytecode.android.ui.friends.FriendsViewModel
 import dev.bytecode.android.ui.leaderboard.LeaderboardTab
 import dev.bytecode.android.ui.leaderboard.LeaderboardUiState
 import dev.bytecode.android.ui.leaderboard.LeaderboardViewModel
+import dev.bytecode.android.ui.solution.SolutionUiState
+import dev.bytecode.android.ui.solution.SolutionViewModel
 import dev.bytecode.android.ui.state.AppUiState
 import dev.bytecode.android.ui.state.selectedLessonSummary
 import dev.bytecode.android.ui.theme.BytecodeTheme
@@ -120,6 +131,9 @@ class MainActivity : ComponentActivity() {
     private val challengeViewModel: ChallengeViewModel by koinViewModel()
     private val leaderboardViewModel: LeaderboardViewModel by koinViewModel()
     private val friendsViewModel: FriendsViewModel by koinViewModel()
+    private val discussionViewModel: DiscussionViewModel by koinViewModel()
+    private val solutionViewModel: SolutionViewModel by koinViewModel()
+    private val duelViewModel: DuelViewModel by koinViewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -133,11 +147,17 @@ class MainActivity : ComponentActivity() {
                     val challengeState by challengeViewModel.uiState.collectAsStateWithLifecycle()
                     val leaderboardState by leaderboardViewModel.uiState.collectAsStateWithLifecycle()
                     val friendsState by friendsViewModel.uiState.collectAsStateWithLifecycle()
+                    val discussionState by discussionViewModel.uiState.collectAsStateWithLifecycle()
+                    val solutionState by solutionViewModel.uiState.collectAsStateWithLifecycle()
+                    val duelState by duelViewModel.uiState.collectAsStateWithLifecycle()
                     AppScreen(
                         state = state,
                         challengeState = challengeState,
                         leaderboardState = leaderboardState,
                         friendsState = friendsState,
+                        discussionState = discussionState,
+                        solutionState = solutionState,
+                        duelState = duelState,
                         onContinueWelcome = { viewModel.completeWelcome() },
                         onOnboardingNext = { profile, step -> viewModel.onboardingNext(profile, step) },
                         onOnboardingBack = { profile, step -> viewModel.onboardingBack(profile, step) },
@@ -164,6 +184,7 @@ class MainActivity : ComponentActivity() {
                         onSubmitChallenge = { challengeViewModel.submit() },
                         onResetChallengeCode = { challengeViewModel.resetCode() },
                         onClearSubmitResult = { challengeViewModel.clearSubmitResult() },
+                        onToggleShareOnSubmit = { challengeViewModel.toggleShareOnSubmit() },
                         onLoadLeaderboard = { challengeViewModel.loadLeaderboard() },
                         onSelectLeaderboardTab = { tab -> leaderboardViewModel.selectTab(tab) },
                         onRefreshLeaderboard = { leaderboardViewModel.refresh() },
@@ -173,6 +194,18 @@ class MainActivity : ComponentActivity() {
                         onSendFriendRequest = { friendsViewModel.sendRequest() },
                         onAcceptFriendRequest = { id -> friendsViewModel.acceptRequest(id) },
                         onRemoveFriend = { id -> friendsViewModel.removeFriend(id) },
+                        onLoadDiscussion = { id -> discussionViewModel.loadPosts(id) },
+                        onDiscussionBodyChange = { text -> discussionViewModel.updateBody(text) },
+                        onPostDiscussion = { id -> discussionViewModel.postMessage(id) },
+                        onDeletePost = { cid, pid -> discussionViewModel.deletePost(cid, pid) },
+                        onUpvotePost = { cid, pid -> discussionViewModel.upvotePost(cid, pid) },
+                        onLoadSolutions = { id -> solutionViewModel.loadSolutions(id) },
+                        onUpvoteSolution = { cid, sid -> solutionViewModel.upvote(cid, sid) },
+                        onRemoveSolutionUpvote = { cid, sid -> solutionViewModel.removeUpvote(cid, sid) },
+                        onLoadDuels = { duelViewModel.load() },
+                        onChallengeFriend = { oid, cid -> duelViewModel.challengeFriend(oid, cid) },
+                        onAcceptDuel = { id -> duelViewModel.acceptDuel(id) },
+                        onDeclineDuel = { id -> duelViewModel.declineDuel(id) },
                     )
                 }
             }
@@ -186,6 +219,9 @@ private fun AppScreen(
     challengeState: ChallengeUiState,
     leaderboardState: LeaderboardUiState,
     friendsState: FriendsUiState,
+    discussionState: DiscussionUiState,
+    solutionState: SolutionUiState,
+    duelState: DuelUiState,
     onContinueWelcome: () -> Unit,
     onOnboardingNext: (OnboardingProfile, Int) -> Unit,
     onOnboardingBack: (OnboardingProfile, Int) -> Unit,
@@ -204,6 +240,7 @@ private fun AppScreen(
     onSubmitChallenge: () -> Unit,
     onResetChallengeCode: () -> Unit,
     onClearSubmitResult: () -> Unit,
+    onToggleShareOnSubmit: () -> Unit,
     onLoadLeaderboard: () -> Unit,
     onSelectLeaderboardTab: (LeaderboardTab) -> Unit,
     onRefreshLeaderboard: () -> Unit,
@@ -213,6 +250,18 @@ private fun AppScreen(
     onSendFriendRequest: () -> Unit,
     onAcceptFriendRequest: (String) -> Unit,
     onRemoveFriend: (String) -> Unit,
+    onLoadDiscussion: (String) -> Unit,
+    onDiscussionBodyChange: (String) -> Unit,
+    onPostDiscussion: (String) -> Unit,
+    onDeletePost: (String, String) -> Unit,
+    onUpvotePost: (String, String) -> Unit,
+    onLoadSolutions: (String) -> Unit,
+    onUpvoteSolution: (String, String) -> Unit,
+    onRemoveSolutionUpvote: (String, String) -> Unit,
+    onLoadDuels: () -> Unit,
+    onChallengeFriend: (String, String) -> Unit,
+    onAcceptDuel: (String) -> Unit,
+    onDeclineDuel: (String) -> Unit,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -375,6 +424,9 @@ private fun AppScreen(
             ) {
                 ChallengeDetailScreen(
                     challengeState = challengeState,
+                    discussionState = discussionState,
+                    solutionState = solutionState,
+                    duelState = duelState,
                     onBack = { navController.popBackStack() },
                     onOpenEditor = { id ->
                         navController.navigate(AppRoutes.codeEditor(id)) {
@@ -382,6 +434,18 @@ private fun AppScreen(
                         }
                     },
                     onLoadLeaderboard = onLoadLeaderboard,
+                    onLoadDiscussion = onLoadDiscussion,
+                    onDiscussionBodyChange = onDiscussionBodyChange,
+                    onPostDiscussion = onPostDiscussion,
+                    onDeletePost = onDeletePost,
+                    onUpvotePost = onUpvotePost,
+                    onLoadSolutions = onLoadSolutions,
+                    onUpvoteSolution = onUpvoteSolution,
+                    onRemoveSolutionUpvote = onRemoveSolutionUpvote,
+                    onLoadDuels = onLoadDuels,
+                    onChallengeFriend = onChallengeFriend,
+                    onAcceptDuel = onAcceptDuel,
+                    onDeclineDuel = onDeclineDuel,
                 )
             }
 
@@ -398,6 +462,7 @@ private fun AppScreen(
                     onUpdateCode = onUpdateChallengeCode,
                     onSubmit = onSubmitChallenge,
                     onReset = onResetChallengeCode,
+                    onToggleShare = onToggleShareOnSubmit,
                 )
             }
 
@@ -2384,14 +2449,32 @@ private fun DailyChallengeCard(
     }
 }
 
+private enum class ChallengeTab { Problem, Discuss, Solutions, Duel }
+
 @Composable
 private fun ChallengeDetailScreen(
     challengeState: ChallengeUiState,
+    discussionState: DiscussionUiState,
+    solutionState: SolutionUiState,
+    duelState: DuelUiState,
     onBack: () -> Unit,
     onOpenEditor: (String) -> Unit,
     onLoadLeaderboard: () -> Unit,
+    onLoadDiscussion: (String) -> Unit,
+    onDiscussionBodyChange: (String) -> Unit,
+    onPostDiscussion: (String) -> Unit,
+    onDeletePost: (String, String) -> Unit,
+    onUpvotePost: (String, String) -> Unit,
+    onLoadSolutions: (String) -> Unit,
+    onUpvoteSolution: (String, String) -> Unit,
+    onRemoveSolutionUpvote: (String, String) -> Unit,
+    onLoadDuels: () -> Unit,
+    onChallengeFriend: (String, String) -> Unit,
+    onAcceptDuel: (String) -> Unit,
+    onDeclineDuel: (String) -> Unit,
 ) {
     val challenge = challengeState.challenge
+    var activeTab by remember { mutableStateOf(ChallengeTab.Problem) }
 
     LaunchedEffect(challenge?.id) {
         if (challenge != null) onLoadLeaderboard()
@@ -2406,7 +2489,116 @@ private fun ChallengeDetailScreen(
             LoadingPlaceholder(lines = 4)
             return@AppScaffold
         }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Tab bar
+            ScrollableTabRow(
+                selectedTabIndex = activeTab.ordinal,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary,
+                edgePadding = 0.dp,
+            ) {
+                ChallengeTab.entries.forEach { tab ->
+                    val locked = tab != ChallengeTab.Problem && !challengeState.hasSolvedToday
+                    Tab(
+                        selected = activeTab == tab,
+                        onClick = { activeTab = tab },
+                        text = {
+                            Text(
+                                if (locked) "${tab.name} 🔒" else tab.name,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                    )
+                }
+            }
+
+            when (activeTab) {
+                ChallengeTab.Problem -> ChallengeProblemTab(
+                    challenge = challenge,
+                    challengeState = challengeState,
+                    onOpenEditor = onOpenEditor,
+                )
+                ChallengeTab.Discuss -> {
+                    if (!challengeState.hasSolvedToday) {
+                        SolveGateScreen()
+                    } else {
+                        LaunchedEffect(challenge.id) { onLoadDiscussion(challenge.id) }
+                        ChallengeDiscussTab(
+                            challengeId = challenge.id,
+                            discussionState = discussionState,
+                            onBodyChange = onDiscussionBodyChange,
+                            onPost = onPostDiscussion,
+                            onDelete = onDeletePost,
+                            onUpvote = onUpvotePost,
+                        )
+                    }
+                }
+                ChallengeTab.Solutions -> {
+                    if (!challengeState.hasSolvedToday) {
+                        SolveGateScreen()
+                    } else {
+                        LaunchedEffect(challenge.id) { onLoadSolutions(challenge.id) }
+                        ChallengeSolutionsTab(
+                            challengeId = challenge.id,
+                            solutionState = solutionState,
+                            onUpvote = onUpvoteSolution,
+                            onRemoveUpvote = onRemoveSolutionUpvote,
+                        )
+                    }
+                }
+                ChallengeTab.Duel -> {
+                    if (!challengeState.hasSolvedToday) {
+                        SolveGateScreen()
+                    } else {
+                        LaunchedEffect(Unit) { onLoadDuels() }
+                        ChallengeDuelTab(
+                            challengeId = challenge.id,
+                            duelState = duelState,
+                            onChallengeFriend = onChallengeFriend,
+                            onAccept = onAcceptDuel,
+                            onDecline = onDeclineDuel,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SolveGateScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("🔒", style = MaterialTheme.typography.displaySmall)
+            Text(
+                "Solve today's challenge to unlock",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChallengeProblemTab(
+    challenge: ChallengeDto,
+    challengeState: ChallengeUiState,
+    onOpenEditor: (String) -> Unit,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
             BytecodeSectionCard {
                 SectionHeader(title = "Problem", subtitle = "${challenge.baseXp} XP")
                 Spacer(modifier = Modifier.height(8.dp))
@@ -2415,7 +2607,9 @@ private fun ChallengeDetailScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            if (challenge.visibleExamples.isNotEmpty()) {
+        }
+        if (challenge.visibleExamples.isNotEmpty()) {
+            item {
                 BytecodeSectionCard {
                     SectionHeader(title = "Examples", subtitle = "Visible test cases")
                     Spacer(modifier = Modifier.height(8.dp))
@@ -2440,13 +2634,16 @@ private fun ChallengeDetailScreen(
                     }
                 }
             }
+        }
+        item {
             Button(
                 onClick = { onOpenEditor(challenge.id) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Open Editor")
             }
-            // Leaderboard
+        }
+        item {
             BytecodeSectionCard {
                 SectionHeader(
                     title = "Today's Leaderboard",
@@ -2482,17 +2679,9 @@ private fun ChallengeDetailScreen(
                                     Text(
                                         "#${i + 1}",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = when (i) {
-                                            0 -> MaterialTheme.colorScheme.primary
-                                            1 -> MaterialTheme.colorScheme.onSurfaceVariant
-                                            2 -> MaterialTheme.colorScheme.onSurfaceVariant
-                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
+                                        color = if (i == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    Text(
-                                        entry.displayName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
+                                    Text(entry.displayName, style = MaterialTheme.typography.bodyMedium)
                                 }
                                 val timeStr = remember(entry.solvedAt) {
                                     try {
@@ -2518,12 +2707,357 @@ private fun ChallengeDetailScreen(
 }
 
 @Composable
+private fun ChallengeDiscussTab(
+    challengeId: String,
+    discussionState: DiscussionUiState,
+    onBodyChange: (String) -> Unit,
+    onPost: (String) -> Unit,
+    onDelete: (String, String) -> Unit,
+    onUpvote: (String, String) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (discussionState.isLoading) {
+                item { LoadingPlaceholder(lines = 3) }
+            } else if (discussionState.posts.isEmpty()) {
+                item {
+                    Text(
+                        "No discussion yet — start the conversation!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+            } else {
+                items(discussionState.posts) { post ->
+                    DiscussionPostRow(
+                        post = post,
+                        onUpvote = { onUpvote(challengeId, post.id) },
+                        onDelete = if (post.isOwn) ({ onDelete(challengeId, post.id) }) else null,
+                    )
+                }
+            }
+        }
+        if (!discussionState.error.isNullOrBlank()) {
+            InfoBanner(text = discussionState.error, tone = BadgeTone.Warning, modifier = Modifier.padding(horizontal = 16.dp))
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BasicTextField(
+                    value = discussionState.body,
+                    onValueChange = onBodyChange,
+                    modifier = Modifier.weight(1f),
+                    textStyle = TextStyle(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    decorationBox = { inner ->
+                        if (discussionState.body.isEmpty()) {
+                            Text(
+                                "Add to the discussion…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        inner()
+                    },
+                )
+                Button(
+                    onClick = { onPost(challengeId) },
+                    enabled = discussionState.body.isNotBlank() && !discussionState.isSending,
+                ) {
+                    Text("Post")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiscussionPostRow(
+    post: DiscussionPostDto,
+    onUpvote: () -> Unit,
+    onDelete: (() -> Unit)?,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.small,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(post.authorName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = onUpvote, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) {
+                        Text("▲ ${post.upvotes}", style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (onDelete != null) {
+                        OutlinedButton(onClick = onDelete, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) {
+                            Text("Delete", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+            Text(post.body, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun ChallengeSolutionsTab(
+    challengeId: String,
+    solutionState: SolutionUiState,
+    onUpvote: (String, String) -> Unit,
+    onRemoveUpvote: (String, String) -> Unit,
+) {
+    if (solutionState.isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+    if (!solutionState.error.isNullOrBlank()) {
+        InfoBanner(text = solutionState.error, tone = BadgeTone.Warning, modifier = Modifier.padding(16.dp))
+        return
+    }
+    if (solutionState.solutions.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Text(
+                "No shared solutions yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items(solutionState.solutions) { sol ->
+            SharedSolutionCard(
+                solution = sol,
+                onUpvote = { onUpvote(challengeId, sol.submissionId) },
+                onRemoveUpvote = { onRemoveUpvote(challengeId, sol.submissionId) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SharedSolutionCard(
+    solution: SharedSolutionDto,
+    onUpvote: () -> Unit,
+    onRemoveUpvote: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(solution.authorName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        buildString {
+                            append(solution.language.replaceFirstChar { it.titlecase() })
+                            solution.runtimeMs?.let { append(" · ${it}ms") }
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedButton(
+                    onClick = if (solution.hasUpvoted) onRemoveUpvote else onUpvote,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        "${if (solution.hasUpvoted) "▼" else "▲"} ${solution.upvotes}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (solution.hasUpvoted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Text(
+                    solution.sourceCode,
+                    modifier = Modifier.padding(8.dp).fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = JetBrainsMonoFamily,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 20,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChallengeDuelTab(
+    challengeId: String,
+    duelState: DuelUiState,
+    onChallengeFriend: (String, String) -> Unit,
+    onAccept: (String) -> Unit,
+    onDecline: (String) -> Unit,
+) {
+    if (duelState.isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (duelState.pendingDuels.isNotEmpty()) {
+            item { SectionHeader(title = "Pending Duels", subtitle = "${duelState.pendingDuels.size}") }
+            items(duelState.pendingDuels) { duel ->
+                DuelCard(duel = duel, onAccept = { onAccept(duel.id) }, onDecline = { onDecline(duel.id) })
+            }
+        }
+        if (duelState.activeDuels.isNotEmpty()) {
+            item { SectionHeader(title = "Active Duels", subtitle = "${duelState.activeDuels.size}") }
+            items(duelState.activeDuels) { duel ->
+                DuelCard(duel = duel, onAccept = null, onDecline = null)
+            }
+        }
+        if (duelState.completedDuels.isNotEmpty()) {
+            item { SectionHeader(title = "Completed", subtitle = "${duelState.completedDuels.size}") }
+            items(duelState.completedDuels.take(5)) { duel ->
+                DuelCard(duel = duel, onAccept = null, onDecline = null)
+            }
+        }
+        if (duelState.friends.isNotEmpty()) {
+            item { SectionHeader(title = "Challenge a Friend", subtitle = "") }
+            items(duelState.friends) { friend ->
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = MaterialTheme.shapes.small,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(friend.displayName, style = MaterialTheme.typography.bodyMedium)
+                        OutlinedButton(
+                            onClick = { onChallengeFriend(friend.userId, challengeId) },
+                            enabled = !duelState.isChallenging,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        ) {
+                            Text("Duel", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+        }
+        if (duelState.pendingDuels.isEmpty() && duelState.activeDuels.isEmpty() && duelState.friends.isEmpty()) {
+            item {
+                Text(
+                    "No duels yet. Add friends to challenge them!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (!duelState.error.isNullOrBlank()) {
+            item { InfoBanner(text = duelState.error, tone = BadgeTone.Warning) }
+        }
+        if (!duelState.actionMessage.isNullOrBlank()) {
+            item { InfoBanner(text = duelState.actionMessage, tone = BadgeTone.Success) }
+        }
+    }
+}
+
+@Composable
+private fun DuelCard(
+    duel: DuelDto,
+    onAccept: (() -> Unit)?,
+    onDecline: (() -> Unit)?,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.small,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "${duel.challengerName} vs ${duel.opponentName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                AccessBadge(
+                    label = duel.status.replaceFirstChar { it.titlecase() },
+                    tone = when (duel.status) {
+                        "active" -> BadgeTone.Default
+                        "completed" -> BadgeTone.Success
+                        else -> BadgeTone.Default
+                    },
+                )
+            }
+            if (duel.winnerId != null) {
+                Text(
+                    "Winner: ${if (duel.isChallenger && duel.winnerId == duel.challengerName) "You" else duel.opponentName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (onAccept != null || onDecline != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onAccept != null && !duel.isChallenger) {
+                        Button(onClick = onAccept) { Text("Accept") }
+                    }
+                    if (onDecline != null && !duel.isChallenger) {
+                        OutlinedButton(onClick = onDecline) { Text("Decline") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun CodeEditorScreen(
     challengeState: ChallengeUiState,
     onBack: () -> Unit,
     onUpdateCode: (String) -> Unit,
     onSubmit: () -> Unit,
     onReset: () -> Unit,
+    onToggleShare: () -> Unit,
 ) {
     val challenge = challengeState.challenge
     val result = challengeState.submitResult
@@ -2586,6 +3120,25 @@ private fun CodeEditorScreen(
                     fontSize = MaterialTheme.typography.bodySmall.fontSize,
                 ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            )
+        }
+
+        // Share toggle
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleShare),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Checkbox(
+                checked = challengeState.shareOnSubmit,
+                onCheckedChange = { onToggleShare() },
+            )
+            Text(
+                "Share solution if correct",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 

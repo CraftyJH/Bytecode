@@ -50,12 +50,13 @@ class ChallengeRepository(context: android.content.Context) {
         sourceCode: String,
         language: String,
         accessToken: String,
+        shareOnSubmit: Boolean = false,
     ): Result<ChallengeSubmitResponse> =
         try {
             val response = client.post("${resolveBaseUrl()}/api/challenges/$challengeId/submit") {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
-                setBody(ChallengeSubmitRequest(sourceCode = sourceCode, language = language))
+                setBody(ChallengeSubmitRequest(sourceCode = sourceCode, language = language, shareOnSubmit = shareOnSubmit))
             }
             if (response.status.value !in 200..299) {
                 throw mapHttpFailure("submission", response.status, response.bodyAsText())

@@ -24,6 +24,8 @@ data class ChallengeUiState(
     val isSubmitting: Boolean = false,
     val leaderboard: DailyLeaderboardResponse? = null,
     val leaderboardLoading: Boolean = false,
+    val hasSolvedToday: Boolean = false,
+    val shareOnSubmit: Boolean = false,
 )
 
 class ChallengeViewModel(
@@ -77,6 +79,10 @@ class ChallengeViewModel(
         _uiState.update { it.copy(code = it.challenge?.starterCode ?: "", submitResult = null) }
     }
 
+    fun toggleShareOnSubmit() {
+        _uiState.update { it.copy(shareOnSubmit = !it.shareOnSubmit) }
+    }
+
     fun submit() {
         if (_uiState.value.isSubmitting) return
         val challenge = _uiState.value.challenge ?: return
@@ -88,10 +94,14 @@ class ChallengeViewModel(
                 sourceCode = _uiState.value.code,
                 language = challenge.language,
                 accessToken = token,
+                shareOnSubmit = _uiState.value.shareOnSubmit,
             ).fold(
                 onSuccess = { response ->
                     _uiState.update { it.copy(submitResult = response) }
-                    if (response.isCorrect) loadLeaderboard()
+                    if (response.isCorrect) {
+                        _uiState.update { it.copy(hasSolvedToday = true) }
+                        loadLeaderboard()
+                    }
                 },
                 onFailure = { t -> _uiState.update { it.copy(error = t.message) } },
             )
