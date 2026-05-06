@@ -1139,6 +1139,8 @@ private fun KeyValueRow(label: String, value: String) {
     }
 }
 
+private enum class BadgeTone { Default, Success, Warning }
+
 @Composable
 private fun AccessBadge(label: String, tone: BadgeTone) {
     val (container, content) = when (tone) {
