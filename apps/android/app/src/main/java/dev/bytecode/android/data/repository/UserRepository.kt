@@ -3,10 +3,6 @@ package dev.bytecode.android.data.repository
 import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.BackendUserState
 import dev.bytecode.android.data.model.BillingState
-import dev.bytecode.android.data.model.MobileCurriculumState
-import dev.bytecode.android.data.model.MobileLessonContent
-import dev.bytecode.android.data.model.RunCodeRequest
-import dev.bytecode.android.data.model.RunCodeResult
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -16,10 +12,8 @@ import io.ktor.client.plugins.ResponseException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.client.request.post
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -30,11 +24,7 @@ class UserRepository(context: android.content.Context) {
 
     private val client = HttpClient(OkHttp) {
         install(ContentNegotiation) {
-            json(
-                Json {
-                    ignoreUnknownKeys = true
-                },
-            )
+            json(Json { ignoreUnknownKeys = true })
         }
     }
 
@@ -47,10 +37,9 @@ class UserRepository(context: android.content.Context) {
             if (response.status.value !in 200..299) {
                 throw mapHttpFailure("profile", response.status, response.bodyAsText())
             }
-            val payload: BackendUserState = response.body()
-            Result.success(payload)
-        } catch (throwable: Throwable) {
-            Result.failure(mapRepositoryError("profile", throwable))
+            Result.success(response.body())
+        } catch (t: Throwable) {
+            Result.failure(mapError("profile", t))
         }
 
     suspend fun fetchBilling(accessToken: String): Result<BillingState> =
@@ -62,108 +51,31 @@ class UserRepository(context: android.content.Context) {
             if (response.status.value !in 200..299) {
                 throw mapHttpFailure("billing", response.status, response.bodyAsText())
             }
-            val payload: BillingState = response.body()
-            Result.success(payload)
-        } catch (throwable: Throwable) {
-            Result.failure(mapRepositoryError("billing", throwable))
+            Result.success(response.body())
+        } catch (t: Throwable) {
+            Result.failure(mapError("billing", t))
         }
 
-    suspend fun fetchCurriculum(accessToken: String): Result<MobileCurriculumState> =
-        try {
-            val response = client.get("${resolveWebApiBaseUrl()}/api/mobile/curriculum") {
-                header(HttpHeaders.Authorization, "Bearer $accessToken")
-                contentType(ContentType.Application.Json)
-            }
-            if (response.status.value !in 200..299) {
-                throw mapHttpFailure("curriculum", response.status, response.bodyAsText())
-            }
-            val payload: MobileCurriculumState = response.body()
-            Result.success(payload)
-        } catch (throwable: Throwable) {
-            Result.failure(mapRepositoryError("curriculum", throwable))
-        }
-
-    suspend fun fetchLesson(
-        accessToken: String,
-        trackSlug: String,
-        moduleSlug: String,
-        lessonSlug: String,
-    ): Result<MobileLessonContent> =
-        try {
-            val response = client.get("${resolveWebApiBaseUrl()}/api/mobile/lesson/$trackSlug/$moduleSlug/$lessonSlug") {
-                header(HttpHeaders.Authorization, "Bearer $accessToken")
-                contentType(ContentType.Application.Json)
-            }
-            if (response.status == HttpStatusCode.Forbidden) {
-                throw RepositoryFailure.PremiumRequired
-            }
-            if (response.status.value !in 200..299) {
-                throw mapHttpFailure("lesson", response.status, response.bodyAsText())
-            }
-            val payload: MobileLessonContent = response.body()
-            Result.success(payload)
-        } catch (throwable: Throwable) {
-            Result.failure(mapRepositoryError("lesson", throwable))
-        }
-
-    suspend fun runCode(
-        code: String,
-        language: String,
-    ): Result<RunCodeResult> =
-        try {
-            val response = client.post("${resolveWebApiBaseUrl()}/api/run") {
-                contentType(ContentType.Application.Json)
-                setBody(
-                    RunCodeRequest(
-                        code = code,
-                        language = if (language.equals("kotlin", ignoreCase = true)) "kotlin" else "java",
-                    ),
-                )
-            }
-            if (response.status.value !in 200..299) {
-                throw mapHttpFailure("code run", response.status, response.bodyAsText())
-            }
-            val payload: RunCodeResult = response.body()
-            Result.success(payload)
-        } catch (throwable: Throwable) {
-            Result.failure(mapRepositoryError("code run", throwable))
-        }
-
-    private fun mapRepositoryError(scope: String, throwable: Throwable): Throwable {
-        if (throwable is RepositoryFailure) {
-            return throwable
-        }
-        if (throwable is ClientRequestException) {
-            return mapHttpFailure(scope, throwable.response.status, null)
-        }
-        if (throwable is ResponseException) {
-            return mapHttpFailure(scope, throwable.response.status, null)
-        }
-        return RepositoryFailure.Network(
-            "Unable to load $scope. Check your connection and try again.",
-        )
+    private fun mapError(scope: String, t: Throwable): Throwable {
+        if (t is RepositoryFailure) return t
+        if (t is ClientRequestException) return mapHttpFailure(scope, t.response.status, null)
+        if (t is ResponseException) return mapHttpFailure(scope, t.response.status, null)
+        return RepositoryFailure.Network("Unable to load $scope. Check your connection and try again.")
     }
 
     private fun mapHttpFailure(scope: String, status: HttpStatusCode, body: String?): RepositoryFailure {
-        if (status == HttpStatusCode.Unauthorized || status == HttpStatusCode.Forbidden) {
-            return RepositoryFailure.AuthExpired
-        }
+        if (status == HttpStatusCode.Unauthorized || status == HttpStatusCode.Forbidden) return RepositoryFailure.AuthExpired
         val detail = body?.take(120)?.trim()
         return RepositoryFailure.Http(
             statusCode = status.value,
-            detail = if (detail.isNullOrBlank()) {
-                "Unable to load $scope (${status.value})."
-            } else {
-                "Unable to load $scope (${status.value}): $detail"
-            },
+            detail = if (detail.isNullOrBlank()) "Unable to load $scope (${status.value})."
+                     else "Unable to load $scope (${status.value}): $detail",
         )
     }
 
     private fun resolveWebApiBaseUrl(): String {
         val cached = sessionStore.readMobileRuntimeConfig()?.webBaseUrl?.trim().orEmpty()
-        if (cached.isNotBlank()) {
-            return cached.removeSuffix("/")
-        }
+        if (cached.isNotBlank()) return cached.removeSuffix("/")
         return AppConfig.WEB_BASE_URL.trim().removeSuffix("/")
     }
 }
