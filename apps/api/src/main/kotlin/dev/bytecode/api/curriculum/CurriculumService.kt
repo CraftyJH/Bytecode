@@ -38,6 +38,8 @@ class CurriculumService(
     }
 }
 
-private fun UserEntity.hasPremiumAccess(): Boolean =
-    role == UserRole.PREMIUM || role == UserRole.AUTHOR || role == UserRole.STAFF
-        || (premiumUntil != null && premiumUntil.isAfter(Instant.now()))
+private fun UserEntity.hasPremiumAccess(): Boolean {
+    val until = premiumUntil
+    return role == UserRole.PREMIUM || role == UserRole.AUTHOR || role == UserRole.STAFF
+        || (until != null && until.isAfter(Instant.now()))
+}

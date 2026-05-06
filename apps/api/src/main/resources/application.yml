@@ -38,6 +38,11 @@ server:
     include-message: on_param
     include-binding-errors: on_param
 
+judge0:
+  api-url: https://judge0-ce.p.rapidapi.com
+  api-host: judge0-ce.p.rapidapi.com
+  api-key: ${JUDGE0_API_KEY:3ed5ccf394mshdaecbd73442901fp167076jsn4a0f49eddef7}
+
 internal:
   billing:
     sync-token: ${BYTECODE_INTERNAL_BILLING_SYNC_TOKEN:}

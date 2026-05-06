@@ -1,0 +1,37 @@
+{
+  "challengeId": "2026-05-06-easy-java",
+  "languageId": 62,
+  "preamble": "import java.util.ArrayList;\nimport java.util.List;\nimport java.util.Collections;",
+  "testCases": [
+    {
+      "id": "tc1",
+      "visible": true,
+      "call": "new Solution().sumEvens(new ArrayList<>(List.of(1,2,3,4)))",
+      "expected": "6"
+    },
+    {
+      "id": "tc2",
+      "visible": true,
+      "call": "new Solution().sumEvens(new ArrayList<>(List.of(0,-2,5,10)))",
+      "expected": "8"
+    },
+    {
+      "id": "tc3",
+      "visible": false,
+      "call": "new Solution().sumEvens(new ArrayList<>())",
+      "expected": "0"
+    },
+    {
+      "id": "tc4",
+      "visible": false,
+      "call": "new Solution().sumEvens(new ArrayList<>(List.of(1,3,5,7)))",
+      "expected": "0"
+    },
+    {
+      "id": "tc5",
+      "visible": false,
+      "call": "new Solution().sumEvens(new ArrayList<>(List.of(2,4,6,8,10)))",
+      "expected": "30"
+    }
+  ]
+}

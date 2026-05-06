@@ -71,8 +71,12 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import dev.bytecode.android.config.AppConfig
+import dev.bytecode.android.data.model.ChallengeSubmitResponse
 import dev.bytecode.android.data.model.MobileLessonSummary
 import dev.bytecode.android.data.model.OnboardingProfile
+import dev.bytecode.android.data.model.TestCaseResultDto
+import dev.bytecode.android.ui.challenge.ChallengeUiState
+import dev.bytecode.android.ui.challenge.ChallengeViewModel
 import dev.bytecode.android.ui.state.AppUiState
 import dev.bytecode.android.ui.state.selectedLessonSummary
 import dev.bytecode.android.ui.theme.BytecodeTheme
@@ -86,13 +90,19 @@ private object AppRoutes {
     const val SignIn = "auth/sign-in"
     const val Main = "app/main"
     const val LessonPattern = "app/lesson/{track}/{module}/{lesson}"
+    const val ChallengeDetailPattern = "app/challenge/{challengeId}"
+    const val CodeEditorPattern = "app/challenge/{challengeId}/editor"
 
     fun lesson(track: String, module: String, lesson: String): String =
         "app/lesson/${Uri.encode(track)}/${Uri.encode(module)}/${Uri.encode(lesson)}"
+
+    fun challengeDetail(id: String): String = "app/challenge/${Uri.encode(id)}"
+    fun codeEditor(id: String): String = "app/challenge/${Uri.encode(id)}/editor"
 }
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by koinViewModel()
+    private val challengeViewModel: ChallengeViewModel by koinViewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,8 +113,10 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    val challengeState by challengeViewModel.uiState.collectAsStateWithLifecycle()
                     AppScreen(
                         state = state,
+                        challengeState = challengeState,
                         onContinueWelcome = { viewModel.completeWelcome() },
                         onOnboardingNext = { profile, step -> viewModel.onboardingNext(profile, step) },
                         onOnboardingBack = { profile, step -> viewModel.onboardingBack(profile, step) },
@@ -126,6 +138,11 @@ class MainActivity : ComponentActivity() {
                         onUpdateEditorCode = { code -> viewModel.updateEditorCode(code) },
                         onRunEditorCode = { viewModel.runEditorCode() },
                         onResetEditorCode = { viewModel.resetEditorCode() },
+                        onLoadChallenge = { challengeViewModel.loadToday() },
+                        onUpdateChallengeCode = { code -> challengeViewModel.updateCode(code) },
+                        onSubmitChallenge = { challengeViewModel.submit() },
+                        onResetChallengeCode = { challengeViewModel.resetCode() },
+                        onClearSubmitResult = { challengeViewModel.clearSubmitResult() },
                     )
                 }
             }
@@ -136,6 +153,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppScreen(
     state: AppUiState,
+    challengeState: ChallengeUiState,
     onContinueWelcome: () -> Unit,
     onOnboardingNext: (OnboardingProfile, Int) -> Unit,
     onOnboardingBack: (OnboardingProfile, Int) -> Unit,
@@ -149,6 +167,11 @@ private fun AppScreen(
     onUpdateEditorCode: (String) -> Unit,
     onRunEditorCode: () -> Unit,
     onResetEditorCode: () -> Unit,
+    onLoadChallenge: () -> Unit,
+    onUpdateChallengeCode: (String) -> Unit,
+    onSubmitChallenge: () -> Unit,
+    onResetChallengeCode: () -> Unit,
+    onClearSubmitResult: () -> Unit,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -270,6 +293,7 @@ private fun AppScreen(
                 } else {
                     MainShellScreen(
                         state = loggedInState,
+                        challengeState = challengeState,
                         onSignOut = onSignOut,
                         onRefresh = onRefresh,
                         onOpenLesson = { trackSlug, moduleSlug, lessonSlug ->
@@ -284,8 +308,45 @@ private fun AppScreen(
                         onUpdateEditorCode = onUpdateEditorCode,
                         onRunEditorCode = onRunEditorCode,
                         onResetEditorCode = onResetEditorCode,
+                        onLoadChallenge = onLoadChallenge,
+                        onOpenChallenge = { id ->
+                            navController.navigate(AppRoutes.challengeDetail(id)) {
+                                launchSingleTop = true
+                            }
+                        },
                     )
                 }
+            }
+
+            composable(
+                route = AppRoutes.ChallengeDetailPattern,
+                arguments = listOf(navArgument("challengeId") { type = NavType.StringType }),
+            ) {
+                ChallengeDetailScreen(
+                    challengeState = challengeState,
+                    onBack = { navController.popBackStack() },
+                    onOpenEditor = { id ->
+                        navController.navigate(AppRoutes.codeEditor(id)) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+
+            composable(
+                route = AppRoutes.CodeEditorPattern,
+                arguments = listOf(navArgument("challengeId") { type = NavType.StringType }),
+            ) {
+                CodeEditorScreen(
+                    challengeState = challengeState,
+                    onBack = {
+                        onClearSubmitResult()
+                        navController.popBackStack()
+                    },
+                    onUpdateCode = onUpdateChallengeCode,
+                    onSubmit = onSubmitChallenge,
+                    onReset = onResetChallengeCode,
+                )
             }
 
             composable(
@@ -662,21 +723,27 @@ private fun SignInScreen(
 @Composable
 private fun DashboardScreen(
     state: AppUiState.LoggedIn,
+    challengeState: ChallengeUiState,
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenBillingDetails: () -> Unit,
     onOpenLesson: (String, String, String) -> Unit,
     onOpenBilling: () -> Unit,
+    onLoadChallenge: () -> Unit,
+    onOpenChallenge: (String) -> Unit,
 ) {
     HomeScreen(
         state = state,
+        challengeState = challengeState,
         onSignOut = onSignOut,
         onRefresh = onRefresh,
         onOpenProfile = onOpenProfile,
         onOpenBillingDetails = onOpenBillingDetails,
         onOpenLesson = onOpenLesson,
         onOpenBilling = onOpenBilling,
+        onLoadChallenge = onLoadChallenge,
+        onOpenChallenge = onOpenChallenge,
     )
 }
 
@@ -689,6 +756,7 @@ private enum class MainTab {
 @Composable
 private fun MainShellScreen(
     state: AppUiState.LoggedIn,
+    challengeState: ChallengeUiState,
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
     onOpenLesson: (String, String, String) -> Unit,
@@ -696,6 +764,8 @@ private fun MainShellScreen(
     onUpdateEditorCode: (String) -> Unit,
     onRunEditorCode: () -> Unit,
     onResetEditorCode: () -> Unit,
+    onLoadChallenge: () -> Unit,
+    onOpenChallenge: (String) -> Unit,
 ) {
     var activeTab by remember { mutableStateOf(MainTab.Home) }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -708,12 +778,15 @@ private fun MainShellScreen(
             when (activeTab) {
                 MainTab.Home -> HomeScreen(
                     state = state,
+                    challengeState = challengeState,
                     onSignOut = onSignOut,
                     onRefresh = onRefresh,
                     onOpenProfile = { activeTab = MainTab.Account },
                     onOpenBillingDetails = { activeTab = MainTab.Account },
                     onOpenLesson = onOpenLesson,
                     onOpenBilling = onOpenBilling,
+                    onLoadChallenge = onLoadChallenge,
+                    onOpenChallenge = onOpenChallenge,
                 )
                 MainTab.Curriculum -> CurriculumScreen(
                     state = state,
@@ -782,13 +855,18 @@ private fun AppBottomNav(
 @Composable
 private fun HomeScreen(
     state: AppUiState.LoggedIn,
+    challengeState: ChallengeUiState,
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenBillingDetails: () -> Unit,
     onOpenLesson: (String, String, String) -> Unit,
     onOpenBilling: () -> Unit,
+    onLoadChallenge: () -> Unit,
+    onOpenChallenge: (String) -> Unit,
 ) {
+    LaunchedEffect(Unit) { onLoadChallenge() }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -796,6 +874,12 @@ private fun HomeScreen(
         contentPadding = PaddingValues(vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        item {
+            DailyChallengeCard(
+                challengeState = challengeState,
+                onOpen = onOpenChallenge,
+            )
+        }
         item {
             BytecodeSectionCard {
                 Text("Welcome back", style = MaterialTheme.typography.headlineSmall)
@@ -2154,5 +2238,318 @@ private fun LessonContentRenderer(content: String) {
             }
         }
         Spacer(modifier = Modifier.height(6.dp))
+    }
+}
+
+// ── Daily Challenge screens ───────────────────────────────────────────────────
+
+@Composable
+private fun DailyChallengeCard(
+    challengeState: ChallengeUiState,
+    onOpen: (String) -> Unit,
+) {
+    BytecodeSectionCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Daily Challenge", style = MaterialTheme.typography.titleLarge)
+            if (challengeState.challenge != null) {
+                AccessBadge(
+                    label = challengeState.challenge.difficulty.replaceFirstChar { it.titlecase() },
+                    tone = when (challengeState.challenge.difficulty) {
+                        "easy" -> BadgeTone.Success
+                        "intermediate" -> BadgeTone.Warning
+                        else -> BadgeTone.Warning
+                    },
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        when {
+            challengeState.isLoading -> {
+                LoadingPlaceholder(lines = 2)
+            }
+            challengeState.error != null -> {
+                InfoBanner(text = challengeState.error, tone = BadgeTone.Warning)
+            }
+            challengeState.challenge != null -> {
+                val c = challengeState.challenge
+                Text(
+                    c.title,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "${c.baseXp} XP · ${c.language.replaceFirstChar { it.titlecase() }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { onOpen(c.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Solve Today's Challenge")
+                }
+            }
+            else -> {
+                Text(
+                    "No challenge available today.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChallengeDetailScreen(
+    challengeState: ChallengeUiState,
+    onBack: () -> Unit,
+    onOpenEditor: (String) -> Unit,
+) {
+    val challenge = challengeState.challenge
+    AppScaffold(
+        title = challenge?.title ?: "Today's Challenge",
+        subtitle = challenge?.let { "${it.difficulty.replaceFirstChar { c -> c.titlecase() }} · ${it.language.replaceFirstChar { c -> c.titlecase() }}" },
+        onBack = onBack,
+    ) {
+        if (challenge == null) {
+            LoadingPlaceholder(lines = 4)
+            return@AppScaffold
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            BytecodeSectionCard {
+                SectionHeader(title = "Problem", subtitle = "${challenge.baseXp} XP")
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    challenge.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            if (challenge.visibleExamples.isNotEmpty()) {
+                BytecodeSectionCard {
+                    SectionHeader(title = "Examples", subtitle = "Visible test cases")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    challenge.visibleExamples.forEachIndexed { i, ex ->
+                        if (i > 0) Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = MaterialTheme.shapes.small,
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                KeyValueRow("Input", ex.input)
+                                KeyValueRow("Output", ex.output)
+                                if (!ex.explanation.isNullOrBlank()) {
+                                    Text(
+                                        ex.explanation,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Button(
+                onClick = { onOpenEditor(challenge.id) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Open Editor")
+            }
+        }
+    }
+}
+
+@Composable
+private fun CodeEditorScreen(
+    challengeState: ChallengeUiState,
+    onBack: () -> Unit,
+    onUpdateCode: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onReset: () -> Unit,
+) {
+    val challenge = challengeState.challenge
+    val result = challengeState.submitResult
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Header bar
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.medium,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    challenge?.title ?: "Editor",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                if (challenge != null) {
+                    AccessBadge(
+                        label = challenge.language.replaceFirstChar { it.titlecase() },
+                        tone = BadgeTone.Default,
+                    )
+                }
+            }
+        }
+
+        // Code editor
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.medium,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
+        ) {
+            BasicTextField(
+                value = challengeState.code,
+                onValueChange = onUpdateCode,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                textStyle = TextStyle(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontFamily = JetBrainsMonoFamily,
+                    fontSize = MaterialTheme.typography.bodySmall.fontSize,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            )
+        }
+
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedButton(
+                onClick = onReset,
+                modifier = Modifier.weight(1f),
+                enabled = !challengeState.isSubmitting,
+            ) {
+                Text("Reset")
+            }
+            Button(
+                onClick = onSubmit,
+                modifier = Modifier.weight(1f),
+                enabled = !challengeState.isSubmitting && challengeState.code.isNotBlank(),
+            ) {
+                if (challengeState.isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.width(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Submit")
+                }
+            }
+        }
+
+        // Error banner
+        if (!challengeState.error.isNullOrBlank()) {
+            InfoBanner(text = challengeState.error, tone = BadgeTone.Warning)
+        }
+
+        // Submit result panel
+        if (result != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = if (result.isCorrect)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                else
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                shape = MaterialTheme.shapes.medium,
+                border = BorderStroke(
+                    1.dp,
+                    if (result.isCorrect) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    else MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        if (result.isCorrect) "All tests passed!" else "Some tests failed",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (result.isCorrect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    )
+                    if (!result.compileError.isNullOrBlank()) {
+                        Text(
+                            "Compile error: ${result.compileError}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = JetBrainsMonoFamily,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        result.visibleResults.forEach { tc ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                Text(
+                                    if (tc.passed) "✓" else "✗",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (tc.passed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Expected: ${tc.expected}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (!tc.actual.isNullOrBlank()) {
+                                        Text(
+                                            "Got: ${tc.actual}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (tc.passed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                    if (!tc.error.isNullOrBlank()) {
+                                        Text(
+                                            "Error: ${tc.error}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (result.hiddenTotal > 0) {
+                            Text(
+                                "Hidden tests: ${result.hiddenPass}/${result.hiddenTotal} passed",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        result.runtimeMs?.let { ms ->
+                            Text(
+                                "Runtime: ${ms}ms",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
