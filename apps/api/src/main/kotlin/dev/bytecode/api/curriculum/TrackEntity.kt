@@ -21,6 +21,6 @@ class TrackEntity(
     val description: String? = null,
 
     @OneToMany(mappedBy = "track", fetch = FetchType.LAZY)
-    @OrderBy("\"order\" ASC")
+    @OrderBy("`order` ASC")
     val modules: List<ModuleEntity> = emptyList(),
 )

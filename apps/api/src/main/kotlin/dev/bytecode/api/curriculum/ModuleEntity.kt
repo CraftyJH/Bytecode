@@ -27,6 +27,6 @@ class ModuleEntity(
     val isPremium: Boolean = false,
 
     @OneToMany(mappedBy = "module", fetch = FetchType.LAZY)
-    @OrderBy("\"order\" ASC")
+    @OrderBy("`order` ASC")
     val lessons: List<LessonEntity> = emptyList(),
 )
