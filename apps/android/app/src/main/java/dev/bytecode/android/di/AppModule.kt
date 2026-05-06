@@ -6,9 +6,11 @@ import dev.bytecode.android.data.repository.AuthRepository
 import dev.bytecode.android.data.repository.ChallengeRepository
 import dev.bytecode.android.data.repository.LeaderboardRepository
 import dev.bytecode.android.data.repository.SessionStore
+import dev.bytecode.android.data.repository.BadgeRepository
 import dev.bytecode.android.data.repository.SocialRepository
 import dev.bytecode.android.data.repository.UserRepository
 import dev.bytecode.android.ui.MainViewModel
+import dev.bytecode.android.ui.badges.BadgesViewModel
 import dev.bytecode.android.ui.challenge.ChallengeViewModel
 import dev.bytecode.android.ui.discussion.DiscussionViewModel
 import dev.bytecode.android.ui.duel.DuelViewModel
@@ -40,6 +42,7 @@ val appModule = module {
     single { ChallengeRepository(androidContext()) }
     single { LeaderboardRepository(androidContext()) }
     single { SocialRepository(androidContext()) }
+    single { BadgeRepository(androidContext()) }
 
     // ── ViewModels ────────────────────────────────────────────────────────────
 
@@ -50,4 +53,5 @@ val appModule = module {
     viewModel { DiscussionViewModel(androidApplication(), get(), get()) }
     viewModel { SolutionViewModel(androidApplication(), get(), get()) }
     viewModel { DuelViewModel(androidApplication(), get(), get(), get()) }
+    viewModel { BadgesViewModel(androidApplication(), get(), get()) }
 }

@@ -39,6 +39,7 @@ data class ChallengeSubmitResponse(
     val memoryKb: Int? = null,
     val compileError: String? = null,
     val xpAwarded: Int? = null,
+    val badgesEarned: List<BadgeEarnedDto> = emptyList(),
 )
 
 @Serializable
@@ -190,3 +191,23 @@ data class ChallengeFriendBody(val opponentId: String, val challengeId: String)
 
 @Serializable
 data class PostBody(val body: String)
+
+// ── Phase 4: badges ───────────────────────────────────────────────────────────
+
+@Serializable
+data class BadgeEarnedDto(
+    val id: String,
+    val name: String,
+    val description: String,
+)
+
+@Serializable
+data class BadgeResponse(
+    val id: String,
+    val name: String,
+    val description: String,
+    val category: String,
+    val dotTier: Int,
+    val earned: Boolean,
+    val earnedAt: String? = null,
+)

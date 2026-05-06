@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -72,6 +73,10 @@ import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.MilitaryTech
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.ui.text.style.TextOverflow
@@ -99,6 +104,8 @@ import dev.bytecode.android.ui.friends.FriendsViewModel
 import dev.bytecode.android.ui.leaderboard.LeaderboardTab
 import dev.bytecode.android.ui.leaderboard.LeaderboardUiState
 import dev.bytecode.android.ui.leaderboard.LeaderboardViewModel
+import dev.bytecode.android.ui.badges.BadgesUiState
+import dev.bytecode.android.ui.badges.BadgesViewModel
 import dev.bytecode.android.ui.solution.SolutionUiState
 import dev.bytecode.android.ui.solution.SolutionViewModel
 import dev.bytecode.android.ui.state.AppUiState
@@ -134,6 +141,7 @@ class MainActivity : ComponentActivity() {
     private val discussionViewModel: DiscussionViewModel by koinViewModel()
     private val solutionViewModel: SolutionViewModel by koinViewModel()
     private val duelViewModel: DuelViewModel by koinViewModel()
+    private val badgesViewModel: BadgesViewModel by koinViewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -150,6 +158,7 @@ class MainActivity : ComponentActivity() {
                     val discussionState by discussionViewModel.uiState.collectAsStateWithLifecycle()
                     val solutionState by solutionViewModel.uiState.collectAsStateWithLifecycle()
                     val duelState by duelViewModel.uiState.collectAsStateWithLifecycle()
+                    val badgesState by badgesViewModel.uiState.collectAsStateWithLifecycle()
                     AppScreen(
                         state = state,
                         challengeState = challengeState,
@@ -158,6 +167,7 @@ class MainActivity : ComponentActivity() {
                         discussionState = discussionState,
                         solutionState = solutionState,
                         duelState = duelState,
+                        badgesState = badgesState,
                         onContinueWelcome = { viewModel.completeWelcome() },
                         onOnboardingNext = { profile, step -> viewModel.onboardingNext(profile, step) },
                         onOnboardingBack = { profile, step -> viewModel.onboardingBack(profile, step) },
@@ -206,6 +216,8 @@ class MainActivity : ComponentActivity() {
                         onChallengeFriend = { oid, cid -> duelViewModel.challengeFriend(oid, cid) },
                         onAcceptDuel = { id -> duelViewModel.acceptDuel(id) },
                         onDeclineDuel = { id -> duelViewModel.declineDuel(id) },
+                        onLoadBadges = { badgesViewModel.load() },
+                        onSelectBadge = { id -> badgesViewModel.selectBadge(id) },
                     )
                 }
             }
@@ -222,6 +234,7 @@ private fun AppScreen(
     discussionState: DiscussionUiState,
     solutionState: SolutionUiState,
     duelState: DuelUiState,
+    badgesState: BadgesUiState,
     onContinueWelcome: () -> Unit,
     onOnboardingNext: (OnboardingProfile, Int) -> Unit,
     onOnboardingBack: (OnboardingProfile, Int) -> Unit,
@@ -262,6 +275,8 @@ private fun AppScreen(
     onChallengeFriend: (String, String) -> Unit,
     onAcceptDuel: (String) -> Unit,
     onDeclineDuel: (String) -> Unit,
+    onLoadBadges: () -> Unit,
+    onSelectBadge: (String?) -> Unit,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -414,6 +429,9 @@ private fun AppScreen(
                         onSendFriendRequest = onSendFriendRequest,
                         onAcceptFriendRequest = onAcceptFriendRequest,
                         onRemoveFriend = onRemoveFriend,
+                        badgesState = badgesState,
+                        onLoadBadges = onLoadBadges,
+                        onSelectBadge = onSelectBadge,
                     )
                 }
             }
@@ -868,6 +886,7 @@ private enum class MainTab {
     Home,
     Curriculum,
     Leaderboards,
+    Badges,
     Account,
 }
 
@@ -894,6 +913,9 @@ private fun MainShellScreen(
     onSendFriendRequest: () -> Unit,
     onAcceptFriendRequest: (String) -> Unit,
     onRemoveFriend: (String) -> Unit,
+    badgesState: BadgesUiState,
+    onLoadBadges: () -> Unit,
+    onSelectBadge: (String?) -> Unit,
 ) {
     var activeTab by remember { mutableStateOf(MainTab.Home) }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -932,6 +954,11 @@ private fun MainShellScreen(
                     onAcceptFriendRequest = onAcceptFriendRequest,
                     onRemoveFriend = onRemoveFriend,
                 )
+                MainTab.Badges -> BadgesScreen(
+                    badgesState = badgesState,
+                    onLoad = onLoadBadges,
+                    onSelectBadge = onSelectBadge,
+                )
                 MainTab.Account -> AccountScreen(
                     state = state,
                     onSignOut = onSignOut,
@@ -960,6 +987,7 @@ private fun AppBottomNav(
         Triple(MainTab.Home, "Home", Icons.Outlined.Home),
         Triple(MainTab.Curriculum, "Learn", Icons.Outlined.MenuBook),
         Triple(MainTab.Leaderboards, "Ranks", Icons.Outlined.EmojiEvents),
+        Triple(MainTab.Badges, "Badges", Icons.Outlined.MilitaryTech),
         Triple(MainTab.Account, "Account", Icons.Outlined.AccountCircle),
     )
     NavigationBar(
@@ -3201,8 +3229,13 @@ private fun CodeEditorScreen(
                             style = MaterialTheme.typography.titleSmall,
                             color = if (result.isCorrect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         )
-                        if (result.xpAwarded != null && result.xpAwarded > 0) {
-                            AccessBadge(label = "+${result.xpAwarded} XP", tone = BadgeTone.Success)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (result.xpAwarded != null && result.xpAwarded > 0) {
+                                AccessBadge(label = "+${result.xpAwarded} XP", tone = BadgeTone.Success)
+                            }
+                            result.badgesEarned.forEach { badge ->
+                                AccessBadge(label = "🏅 ${badge.name}", tone = BadgeTone.Success)
+                            }
                         }
                     }
                     if (!result.compileError.isNullOrBlank()) {
@@ -3688,6 +3721,218 @@ private fun FriendRow(
                 }
             }
             OutlinedButton(onClick = onRemove) { Text("Remove") }
+        }
+    }
+}
+
+// ── Badges screen ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun BadgesScreen(
+    badgesState: BadgesUiState,
+    onLoad: () -> Unit,
+    onSelectBadge: (String?) -> Unit,
+) {
+    LaunchedEffect(Unit) { onLoad() }
+
+    val selected = badgesState.selectedBadgeId?.let { id ->
+        badgesState.badges.firstOrNull { it.id == id }
+    }
+
+    if (selected != null) {
+        BadgeDetailSheet(badge = selected, onDismiss = { onSelectBadge(null) })
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        item {
+            Text("Badges", style = MaterialTheme.typography.headlineSmall)
+        }
+
+        if (badgesState.isLoading) {
+            item {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        }
+
+        if (!badgesState.error.isNullOrBlank()) {
+            item {
+                Text(
+                    badgesState.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+
+        val categories = badgesState.badges
+            .groupBy { it.category }
+            .entries
+            .sortedBy { it.key }
+
+        categories.forEach { (category, badges) ->
+            item {
+                Text(
+                    category.replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            item {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 600.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    userScrollEnabled = false,
+                ) {
+                    items(badges) { badge ->
+                        BadgeTile(badge = badge, onClick = { onSelectBadge(badge.id) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BadgeTile(
+    badge: dev.bytecode.android.data.model.BadgeResponse,
+    onClick: () -> Unit,
+) {
+    val earned = badge.earned
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = if (earned) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            1.dp,
+            if (earned) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = if (earned) Icons.Outlined.MilitaryTech else Icons.Outlined.MilitaryTech,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = if (earned) MaterialTheme.colorScheme.primary
+                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+            )
+            Text(
+                badge.name,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (earned) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            // Dot tier
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                repeat(5) { i ->
+                    val filled = earned && i < badge.dotTier
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .background(
+                                color = if (filled) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                                shape = androidx.compose.foundation.shape.CircleShape,
+                            ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BadgeDetailSheet(
+    badge: dev.bytecode.android.data.model.BadgeResponse,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .clickable(enabled = false, onClick = {}),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MilitaryTech,
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp),
+                    tint = if (badge.earned) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                )
+                Text(badge.name, style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    badge.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                // Dot tier
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    repeat(5) { i ->
+                        val filled = badge.earned && i < badge.dotTier
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(
+                                    color = if (filled) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                ),
+                        )
+                    }
+                }
+                if (badge.earned && badge.earnedAt != null) {
+                    Text(
+                        "Earned ${badge.earnedAt.take(10)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else if (!badge.earned) {
+                    Text(
+                        "Not yet earned",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("Close")
+                }
+            }
         }
     }
 }

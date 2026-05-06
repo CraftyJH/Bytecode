@@ -1,6 +1,8 @@
 package dev.bytecode.api.challenge
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import dev.bytecode.api.badge.BadgeDefinition
+import dev.bytecode.api.badge.BadgeEvaluator
 import dev.bytecode.api.execution.Grader
 import dev.bytecode.api.leaderboard.RedisLeaderboardService
 import dev.bytecode.api.social.DuelService
@@ -21,6 +23,7 @@ class ChallengeService(
     private val objectMapper: ObjectMapper,
     private val leaderboard: RedisLeaderboardService,
     private val duelService: DuelService,
+    private val badgeEvaluator: BadgeEvaluator,
 ) {
     fun getToday(): ChallengeEntity? = repo.findByReleaseDate(LocalDate.now())
 
@@ -55,11 +58,14 @@ class ChallengeService(
         duelService.onSubmit(user.id, challenge.id, submission.id, result.isCorrect)
 
         var xpAwarded: Int? = null
+        var newBadges: List<BadgeDefinition> = emptyList()
+
         if (result.isCorrect && !alreadySolved) {
             user.xpTotal += challenge.baseXp
             userRepo.save(user)
             xpAwarded = challenge.baseXp
             leaderboard.onSolve(user.id, challenge.baseXp, challenge.language, challenge.difficulty)
+            newBadges = badgeEvaluator.evaluate(user, submission)
         }
 
         return SubmitResponse(
@@ -73,6 +79,7 @@ class ChallengeService(
             memoryKb = result.memoryKb,
             compileError = result.compileError,
             xpAwarded = xpAwarded,
+            badgesEarned = newBadges.map { BadgeEarnedDto(it.id, it.name, it.description) },
         )
     }
 
@@ -118,6 +125,8 @@ data class ExampleDto(
 
 data class SubmitRequest(val sourceCode: String, val language: String, val shareOnSubmit: Boolean = false)
 
+data class BadgeEarnedDto(val id: String, val name: String, val description: String)
+
 data class SubmitResponse(
     val isCorrect: Boolean,
     val visibleResults: List<TestCaseResultDto>,
@@ -127,6 +136,7 @@ data class SubmitResponse(
     val memoryKb: Int?,
     val compileError: String?,
     val xpAwarded: Int?,
+    val badgesEarned: List<BadgeEarnedDto> = emptyList(),
 )
 
 data class TestCaseResultDto(
