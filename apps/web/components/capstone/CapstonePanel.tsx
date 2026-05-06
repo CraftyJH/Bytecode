@@ -8,7 +8,7 @@ import { Play, Send, ChevronDown, ChevronRight, Trophy, RotateCcw, Lightbulb } f
 import type { GradeResult } from "@/lib/capstone";
 
 const CodeEditor = dynamic(
-  () => import("@/components/lesson/CodeEditor").then((m) => m.CodeEditor),
+  () => import("@/components/lesson/CodeEditorCM").then((m) => m.CodeEditor),
   { ssr: false },
 );
 

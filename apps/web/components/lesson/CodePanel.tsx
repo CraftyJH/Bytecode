@@ -6,7 +6,7 @@ import { Play, CheckCircle, XCircle, Loader2, MessageSquare, RotateCcw } from "l
 import type { RunResult } from "@/app/api/run/route";
 
 const CodeEditor = dynamic(
-  () => import("./CodeEditor").then((m) => m.CodeEditor),
+  () => import("./CodeEditorCM").then((m) => m.CodeEditor),
   {
     ssr: false,
     loading: () => (

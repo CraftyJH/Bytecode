@@ -6,7 +6,7 @@ import { Play, Loader2, RotateCcw, Trash2, Save, FolderOpen } from "lucide-react
 import type { RunResult } from "@/app/api/run/route";
 
 const CodeEditor = dynamic(
-  () => import("@/components/lesson/CodeEditor").then((m) => m.CodeEditor),
+  () => import("@/components/lesson/CodeEditorCM").then((m) => m.CodeEditor),
   {
     ssr: false,
     loading: () => (
