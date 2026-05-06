@@ -75,6 +75,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.MilitaryTech
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.ScrollableTabRow
@@ -3739,67 +3740,60 @@ private fun BadgesScreen(
         badgesState.badges.firstOrNull { it.id == id }
     }
 
-    if (selected != null) {
-        BadgeDetailSheet(badge = selected, onDismiss = { onSelectBadge(null) })
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        item {
-            Text("Badges", style = MaterialTheme.typography.headlineSmall)
-        }
-
-        if (badgesState.isLoading) {
-            item {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(vertical = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text("Badges", style = MaterialTheme.typography.headlineSmall)
             }
-        }
 
-        if (!badgesState.error.isNullOrBlank()) {
-            item {
-                Text(
-                    badgesState.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-
-        val categories = badgesState.badges
-            .groupBy { it.category }
-            .entries
-            .sortedBy { it.key }
-
-        categories.forEach { (category, badges) ->
-            item {
-                Text(
-                    category.replaceFirstChar { it.uppercase() },
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            item {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 600.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    userScrollEnabled = false,
-                ) {
-                    items(badges) { badge ->
-                        BadgeTile(badge = badge, onClick = { onSelectBadge(badge.id) })
+            if (badgesState.isLoading) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
                 }
             }
+
+            val errorMsg = badgesState.error
+            if (!errorMsg.isNullOrBlank()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        errorMsg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            val categories = badgesState.badges
+                .groupBy { it.category }
+                .entries
+                .sortedBy { it.key }
+
+            categories.forEach { (category, badges) ->
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        category.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                items(badges) { badge ->
+                    BadgeTile(badge = badge, onClick = { onSelectBadge(badge.id) })
+                }
+            }
+        }
+
+        if (selected != null) {
+            BadgeDetailSheet(badge = selected, onDismiss = { onSelectBadge(null) })
         }
     }
 }
