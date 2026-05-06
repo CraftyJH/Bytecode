@@ -1,7 +1,5 @@
 package dev.bytecode.android.di
 
-import androidx.room.Room
-import dev.bytecode.android.data.local.AppDatabase
 import dev.bytecode.android.data.repository.AuthRepository
 import dev.bytecode.android.data.repository.ChallengeRepository
 import dev.bytecode.android.data.repository.LeaderboardRepository
@@ -23,16 +21,6 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
-
-    // ── Infrastructure ────────────────────────────────────────────────────────
-
-    single {
-        Room.databaseBuilder(
-            androidContext(),
-            AppDatabase::class.java,
-            "bytecode.db",
-        ).build()
-    }
 
     // ── Repositories ──────────────────────────────────────────────────────────
 
