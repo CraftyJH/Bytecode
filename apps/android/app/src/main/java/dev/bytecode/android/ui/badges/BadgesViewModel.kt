@@ -32,10 +32,12 @@ class BadgesViewModel(
         if (_uiState.value.isLoading) return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val token = authRepo.validAccessTokenResult().getOrNull()
-            if (token == null) {
-                _uiState.update { it.copy(isLoading = false, error = "Session expired. Please sign in again.") }
-                return@launch
+            val token = when (val r = authRepo.validAccessTokenResult()) {
+                is AuthRepository.AccessTokenResult.Success -> r.accessToken
+                else -> {
+                    _uiState.update { it.copy(isLoading = false, error = "Session expired. Please sign in again.") }
+                    return@launch
+                }
             }
             badgeRepo.fetchBadges(token)
                 .onSuccess { badges ->
