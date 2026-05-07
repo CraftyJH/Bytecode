@@ -4,9 +4,10 @@ export const runtime = "nodejs";
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { userId: string } },
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   const token = parseBearerToken(request.headers);
   if (!token) return unauthorized();
-  return proxyDelete(`/api/friends/${params.userId}`, token);
+  const { userId } = await params;
+  return proxyDelete(`/api/friends/${userId}`, token);
 }

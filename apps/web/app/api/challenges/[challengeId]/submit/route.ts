@@ -11,10 +11,11 @@ const fallback = {
 
 export async function POST(
   request: Request,
-  { params }: { params: { challengeId: string } },
+  { params }: { params: Promise<{ challengeId: string }> },
 ) {
   const token = parseBearerToken(request.headers);
   if (!token) return unauthorized();
+  const { challengeId } = await params;
   const body = (await request.json()) as unknown;
-  return proxyPost(`/api/challenges/${params.challengeId}/submit`, token, body, fallback);
+  return proxyPost(`/api/challenges/${challengeId}/submit`, token, body, fallback);
 }

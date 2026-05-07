@@ -4,9 +4,10 @@ export const runtime = "nodejs";
 
 export async function GET(
   request: Request,
-  { params }: { params: { language: string } },
+  { params }: { params: Promise<{ language: string }> },
 ) {
   const token = parseBearerToken(request.headers);
   if (!token) return unauthorized();
-  return proxyGet(`/api/leaderboard/lang/${params.language}`, token, { board: params.language, entries: [] });
+  const { language } = await params;
+  return proxyGet(`/api/leaderboard/lang/${language}`, token, { board: language, entries: [] });
 }

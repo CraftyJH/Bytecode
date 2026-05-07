@@ -4,9 +4,10 @@ export const runtime = "nodejs";
 
 export async function POST(
   request: Request,
-  { params }: { params: { duelId: string } },
+  { params }: { params: Promise<{ duelId: string }> },
 ) {
   const token = parseBearerToken(request.headers);
   if (!token) return unauthorized();
-  return proxyPost(`/api/duels/${params.duelId}/accept`, token, {}, { status: "accepted", message: "Duel accepted" });
+  const { duelId } = await params;
+  return proxyPost(`/api/duels/${duelId}/accept`, token, {}, { status: "accepted", message: "Duel accepted" });
 }

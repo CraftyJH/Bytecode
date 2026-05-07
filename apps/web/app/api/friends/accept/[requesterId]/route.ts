@@ -4,9 +4,10 @@ export const runtime = "nodejs";
 
 export async function POST(
   request: Request,
-  { params }: { params: { requesterId: string } },
+  { params }: { params: Promise<{ requesterId: string }> },
 ) {
   const token = parseBearerToken(request.headers);
   if (!token) return unauthorized();
-  return proxyPost(`/api/friends/accept/${params.requesterId}`, token, {}, { status: "accepted", message: "Friend request accepted" });
+  const { requesterId } = await params;
+  return proxyPost(`/api/friends/accept/${requesterId}`, token, {}, { status: "accepted", message: "Friend request accepted" });
 }
