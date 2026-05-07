@@ -1,6 +1,9 @@
 import { Smartphone, QrCode } from "lucide-react";
 import { fetchAndroidReleaseMeta } from "@/lib/android-release";
 
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0";
+const buildSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? "local").slice(0, 7);
+
 export async function AppDownload() {
   const release = await fetchAndroidReleaseMeta();
 
@@ -25,9 +28,9 @@ export async function AppDownload() {
               <span className="text-accent">with you.</span>
             </h2>
             <p className="text-lg text-prose-muted leading-relaxed mb-8 max-w-md">
-              Study on the bus, code on your lunch break. The Bytecode mobile app gives you the full
-              learning experience — lessons, quizzes, and a touch-optimised code editor — right in
-              your pocket.
+              Tackle daily coding challenges, climb the leaderboard, and earn badges — on the bus,
+              on your lunch break, anywhere. The Bytecode app brings the full challenge experience
+              to your phone.
             </p>
 
             <div className="flex flex-wrap gap-3 items-start">
@@ -54,14 +57,14 @@ export async function AppDownload() {
                   Android APK
                   <span className="text-xs opacity-80">(download)</span>
                 </a>
-                {release && (
-                  <p
-                    className="text-xs text-prose-faint pl-1"
-                    style={{ fontFamily: "var(--font-mono)" }}
-                  >
-                    v{release.version} · {release.builtAt}
-                  </p>
-                )}
+                <p
+                  className="text-xs text-prose-faint pl-1"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  {release
+                    ? `app v${release.version} · ${release.builtAt}`
+                    : `web v${appVersion} · ${buildSha}`}
+                </p>
               </div>
             </div>
           </div>

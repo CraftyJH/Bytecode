@@ -26,8 +26,9 @@ export default async function AndroidDownloadPage() {
               Download Bytecode for Android
             </h1>
             <p className="text-base lg:text-lg text-prose-muted max-w-2xl mb-8">
-              Install the latest Bytecode Android APK directly to your phone, then sign in with your
-              Bytecode account.
+              Install the latest Bytecode Android APK directly to your phone. Tackle daily coding
+              challenges, earn XP and badges, and compete on the leaderboard — then sign in with
+              your Bytecode account to sync your progress.
             </p>
 
             <div className="flex flex-wrap gap-3 items-start">

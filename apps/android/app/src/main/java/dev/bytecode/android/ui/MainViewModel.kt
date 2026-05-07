@@ -37,27 +37,28 @@ class MainViewModel(
                 return@launch
             }
             when (val r = authRepository.validAccessTokenResult()) {
-                is AuthRepository.AccessTokenResult.Success -> refreshWithToken(r.accessToken)
+                is AuthRepository.AccessTokenResult.Success -> {
+                    if (!sessionStore.isOnboardingComplete()) {
+                        _uiState.value = AppUiState.Onboarding(profile = sessionStore.readOnboardingProfile())
+                    } else {
+                        refreshWithToken(r.accessToken)
+                    }
+                }
                 is AuthRepository.AccessTokenResult.MissingSession ->
-                    if (sessionStore.isOnboardingComplete()) _uiState.value = AppUiState.LoggedOut()
-                    else _uiState.value = AppUiState.Onboarding(profile = sessionStore.readOnboardingProfile())
+                    _uiState.value = AppUiState.LoggedOut()
                 is AuthRepository.AccessTokenResult.SessionExpired ->
-                    if (sessionStore.isOnboardingComplete()) _uiState.value = AppUiState.LoggedOut(error = sessionExpiredMessage)
-                    else _uiState.value = AppUiState.Onboarding(profile = sessionStore.readOnboardingProfile())
+                    _uiState.value = AppUiState.LoggedOut(error = sessionExpiredMessage)
                 is AuthRepository.AccessTokenResult.NetworkError ->
-                    if (sessionStore.isOnboardingComplete()) _uiState.value = AppUiState.LoggedOut(error = r.message)
-                    else _uiState.value = AppUiState.Onboarding(profile = sessionStore.readOnboardingProfile())
+                    _uiState.value = AppUiState.LoggedOut(error = r.message)
                 is AuthRepository.AccessTokenResult.UnknownError ->
-                    if (sessionStore.isOnboardingComplete()) _uiState.value = AppUiState.LoggedOut(error = r.message)
-                    else _uiState.value = AppUiState.Onboarding(profile = sessionStore.readOnboardingProfile())
+                    _uiState.value = AppUiState.LoggedOut(error = r.message)
             }
         }
     }
 
     fun completeWelcome() {
         sessionStore.markWelcomeSeen()
-        if (sessionStore.isOnboardingComplete()) refresh()
-        else _uiState.value = AppUiState.Onboarding(profile = sessionStore.readOnboardingProfile())
+        _uiState.value = AppUiState.LoggedOut()
     }
 
     fun onboardingNext(profile: OnboardingProfile, step: Int) {
@@ -77,7 +78,13 @@ class MainViewModel(
         viewModelScope.launch {
             _uiState.value = AppUiState.LoggedOut(loading = true)
             authRepository.signIn(email, password)
-                .onSuccess { refresh() }
+                .onSuccess {
+                    if (!sessionStore.isOnboardingComplete()) {
+                        _uiState.value = AppUiState.Onboarding(profile = sessionStore.readOnboardingProfile())
+                    } else {
+                        refresh()
+                    }
+                }
                 .onFailure { _uiState.value = AppUiState.LoggedOut(error = it.message ?: "Unable to sign in.") }
         }
     }
