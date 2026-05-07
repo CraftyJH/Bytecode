@@ -102,7 +102,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
 import dev.bytecode.android.BuildConfig
@@ -301,6 +303,9 @@ class MainActivity : ComponentActivity() {
                     val duelState by duelViewModel.uiState.collectAsStateWithLifecycle()
                     val badgesState by badgesViewModel.uiState.collectAsStateWithLifecycle()
                     Box(modifier = Modifier.fillMaxSize()) {
+                    LaunchedEffect(Unit) {
+                        challengeViewModel.xpAwardedEvent.collect { xp -> viewModel.addXp(xp) }
+                    }
                     AppScreen(
                         updateAvailable = updateAvailable,
                         updateDownloadUrl = updateDownloadUrl,
@@ -612,6 +617,7 @@ private fun AppScreen(
                         onClearSubmitResult()
                         navController.popBackStack()
                     },
+                    onClearResult = onClearSubmitResult,
                     onUpdateCode = onUpdateChallengeCode,
                     onSubmit = onSubmitChallenge,
                     onReset = onResetChallengeCode,
@@ -2862,13 +2868,9 @@ private fun DuelCard(
 }
 
 @Composable
-private fun SuccessOverlay(onDismiss: () -> Unit) {
+private fun SuccessOverlay(onReturnHome: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        visible = true
-        delay(2500)
-        onDismiss()
-    }
+    LaunchedEffect(Unit) { visible = true }
     val scale by animateFloatAsState(
         targetValue = if (visible) 1f else 0.5f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
@@ -2882,14 +2884,15 @@ private fun SuccessOverlay(onDismiss: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .alpha(alpha)
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f))
-            .clickable(onClick = onDismiss),
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.92f)),
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.scale(scale),
+            modifier = Modifier
+                .scale(scale)
+                .padding(horizontal = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Box(
                 modifier = Modifier
@@ -2908,19 +2911,20 @@ private fun SuccessOverlay(onDismiss: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Text(
-                "Tap to dismiss",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Button(
+                onClick = onReturnHome,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Well done! Return home.")
+            }
         }
     }
 }
 
 @Composable
 private fun SyntaxHighlightedField(
-    value: String,
-    onValueChange: (String) -> Unit,
+    tfv: TextFieldValue,
+    onTfvChange: (TextFieldValue) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val keywordColor = MaterialTheme.colorScheme.primary
@@ -2930,20 +2934,12 @@ private fun SyntaxHighlightedField(
     val typeColor = Color(0xFF7BA8C7)
     val defaultColor = MaterialTheme.colorScheme.onSurface
 
-    var tfv by remember { mutableStateOf(TextFieldValue(text = value)) }
-    LaunchedEffect(value) {
-        if (tfv.text != value) tfv = TextFieldValue(text = value)
-    }
-
     BasicTextField(
         value = TextFieldValue(
             annotatedString = highlightCode(tfv.text, keywordColor, stringColor, numberColor, commentColor, typeColor, defaultColor),
             selection = tfv.selection,
         ),
-        onValueChange = { newTfv ->
-            tfv = newTfv
-            onValueChange(newTfv.text)
-        },
+        onValueChange = onTfvChange,
         modifier = modifier,
         textStyle = TextStyle(
             fontFamily = JetBrainsMonoFamily,
@@ -2957,6 +2953,7 @@ private fun SyntaxHighlightedField(
 private fun CodeEditorScreen(
     challengeState: ChallengeUiState,
     onBack: () -> Unit,
+    onClearResult: () -> Unit,
     onUpdateCode: (String) -> Unit,
     onSubmit: () -> Unit,
     onReset: () -> Unit,
@@ -2964,10 +2961,13 @@ private fun CodeEditorScreen(
 ) {
     val challenge = challengeState.challenge
     val result = challengeState.submitResult
-    var overlayDismissed by remember { mutableStateOf(false) }
-    val showOverlay = result?.isCorrect == true && !overlayDismissed
-    LaunchedEffect(result?.isCorrect) {
-        if (result?.isCorrect != true) overlayDismissed = false
+    val showOverlay = result?.isCorrect == true
+
+    var tfv by remember { mutableStateOf(TextFieldValue(text = challengeState.code)) }
+    LaunchedEffect(challengeState.code) {
+        if (tfv.text != challengeState.code) {
+            tfv = TextFieldValue(text = challengeState.code, selection = TextRange(challengeState.code.length))
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -3018,8 +3018,11 @@ private fun CodeEditorScreen(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
         ) {
             SyntaxHighlightedField(
-                value = challengeState.code,
-                onValueChange = onUpdateCode,
+                tfv = tfv,
+                onTfvChange = { newTfv ->
+                    tfv = newTfv
+                    onUpdateCode(newTfv.text)
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(12.dp),
@@ -3049,7 +3052,13 @@ private fun CodeEditorScreen(
             items(snippets.size) { i ->
                 val (insert, label) = snippets[i]
                 Surface(
-                    onClick = { onUpdateCode(challengeState.code + insert) },
+                    onClick = {
+                        val cursor = tfv.selection.end
+                        val newText = tfv.text.substring(0, cursor) + insert + tfv.text.substring(cursor)
+                        val newPos = cursor + insert.length
+                        tfv = TextFieldValue(text = newText, selection = TextRange(newPos))
+                        onUpdateCode(newText)
+                    },
                     shape = MaterialTheme.shapes.extraSmall,
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
@@ -3117,7 +3126,9 @@ private fun CodeEditorScreen(
         // Submit result panel
         if (result != null) {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 260.dp),
                 color = if (result.isCorrect)
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                 else
@@ -3130,7 +3141,9 @@ private fun CodeEditorScreen(
                 ),
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Row(
@@ -3143,9 +3156,21 @@ private fun CodeEditorScreen(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = if (result.isCorrect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f),
                         )
                         if (result.xpAwarded != null && result.xpAwarded > 0) {
                             AccessBadge(label = "+${result.xpAwarded} XP", tone = BadgeTone.Success)
+                        }
+                        IconButton(
+                            onClick = onClearResult,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
                     }
                     // Badge earn row — shown prominently when badges are awarded
@@ -3248,7 +3273,7 @@ private fun CodeEditorScreen(
         }
     }
     if (showOverlay) {
-        SuccessOverlay(onDismiss = { overlayDismissed = true })
+        SuccessOverlay(onReturnHome = onBack)
     }
     }
 }

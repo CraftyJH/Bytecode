@@ -10,9 +10,11 @@ import dev.bytecode.android.data.model.DailyLeaderboardResponse
 import dev.bytecode.android.data.repository.AuthRepository
 import dev.bytecode.android.data.repository.ChallengeRepository
 import dev.bytecode.android.data.repository.SessionStore
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -41,6 +43,9 @@ class ChallengeViewModel(
 
     private val _uiState = MutableStateFlow(ChallengeUiState())
     val uiState: StateFlow<ChallengeUiState> = _uiState.asStateFlow()
+
+    private val _xpAwardedChannel = Channel<Int>(Channel.BUFFERED)
+    val xpAwardedEvent = _xpAwardedChannel.receiveAsFlow()
 
     fun loadDaily() {
         if (_uiState.value.dailyLoading) return
@@ -119,8 +124,9 @@ class ChallengeViewModel(
             ).fold(
                 onSuccess = { response ->
                     _uiState.update { it.copy(submitResult = response) }
-                    if (response.isCorrect) {
+                    if (response.isCorrect && !_uiState.value.hasSolvedToday) {
                         _uiState.update { it.copy(hasSolvedToday = true) }
+                        response.xpAwarded?.takeIf { it > 0 }?.let { _xpAwardedChannel.trySend(it) }
                         loadLeaderboard()
                     }
                 },

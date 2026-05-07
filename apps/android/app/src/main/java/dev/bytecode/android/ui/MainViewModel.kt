@@ -129,6 +129,13 @@ class MainViewModel(
         }
     }
 
+    fun addXp(amount: Int) {
+        val current = _uiState.value
+        if (current is AppUiState.LoggedIn) {
+            _uiState.value = current.copy(user = current.user.copy(xpTotal = current.user.xpTotal + amount))
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             when (val r = authRepository.validAccessTokenResult()) {
