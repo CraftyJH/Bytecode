@@ -13,31 +13,39 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private val BADGE_CATALOG: List<BadgeResponse> = listOf(
-    // Streaks
-    BadgeResponse("streak-3",   "3-Day Streak",    "Solve a challenge 3 days in a row",    "Streaks",    1, false),
-    BadgeResponse("streak-7",   "Week Warrior",    "Solve a challenge 7 days in a row",    "Streaks",    2, false),
-    BadgeResponse("streak-30",  "Monthly Grind",   "Solve a challenge 30 days in a row",   "Streaks",    3, false),
-    BadgeResponse("streak-100", "Centurion",       "Solve a challenge 100 days in a row",  "Streaks",    5, false),
-    // Challenges
-    BadgeResponse("solve-1",    "First Blood",     "Solve your very first challenge",       "Challenges", 1, false),
-    BadgeResponse("solve-10",   "Ten Down",        "Solve 10 challenges",                  "Challenges", 2, false),
-    BadgeResponse("solve-50",   "Half Century",    "Solve 50 challenges",                  "Challenges", 3, false),
-    BadgeResponse("solve-100",  "Centurion Coder", "Solve 100 challenges",                 "Challenges", 4, false),
-    BadgeResponse("solve-500",  "Elite Coder",     "Solve 500 challenges",                 "Challenges", 5, false),
-    // Difficulty
-    BadgeResponse("diff-easy",   "Getting Started", "Solve your first Easy challenge",     "Difficulty", 1, false),
-    BadgeResponse("diff-med",    "Stepping Up",     "Solve your first Intermediate challenge", "Difficulty", 2, false),
-    BadgeResponse("diff-hard",   "Hard Mode",       "Solve your first Hard challenge",     "Difficulty", 3, false),
-    // Speed
-    BadgeResponse("speed-5",    "Quick Draw",      "Solve a challenge in under 5 minutes", "Speed",      2, false),
-    BadgeResponse("speed-1",    "One Minute Hero", "Solve a challenge in under 1 minute",  "Speed",      4, false),
-    // Social
-    BadgeResponse("duel-1",     "First Duel",      "Complete your first duel",             "Social",     1, false),
-    BadgeResponse("duel-win",   "Duel Champion",   "Win a duel",                           "Social",     2, false),
-    BadgeResponse("friend-1",   "Team Player",     "Add your first friend",                "Social",     1, false),
-    // XP
-    BadgeResponse("xp-1000",    "Thousand Points", "Earn 1,000 total XP",                 "XP",         2, false),
-    BadgeResponse("xp-10000",   "XP Legend",       "Earn 10,000 total XP",                "XP",         4, false),
+    // ── Completion ──────────────────────────────────────────────────────────────
+    BadgeResponse("solve-1",    "First Solve",      "Solve your very first challenge",      "Completion",          1, false),
+    BadgeResponse("solve-10",   "Ten Down",         "Solve 10 challenges",                  "Completion",          2, false),
+    BadgeResponse("solve-50",   "Half Century",     "Solve 50 challenges",                  "Completion",          3, false),
+    BadgeResponse("solve-100",  "Centurion",        "Solve 100 challenges",                 "Completion",          4, false),
+    BadgeResponse("solve-500",  "Elite Coder",      "Solve 500 challenges",                 "Completion",          5, false),
+    // ── Difficulty Mastery ──────────────────────────────────────────────────────
+    BadgeResponse("diff-easy",  "Easy Rider",       "Solve 50 Easy challenges",             "Difficulty Mastery",  2, false),
+    BadgeResponse("diff-med",   "Intermediate Reader", "Solve 50 Intermediate challenges",  "Difficulty Mastery",  3, false),
+    BadgeResponse("diff-hard",  "Hard Mode",        "Solve 50 Hard challenges",             "Difficulty Mastery",  4, false),
+    // ── Category Mastery ────────────────────────────────────────────────────────
+    BadgeResponse("cat-concurrency", "Concurrent Mind",   "Solve 25 Concurrency challenges", "Category Mastery",   3, false),
+    BadgeResponse("cat-streams",     "Stream Surgeon",    "Solve 25 Streams challenges",     "Category Mastery",   3, false),
+    BadgeResponse("cat-coroutines",  "Coroutine Captain", "Solve 25 Coroutine challenges",   "Category Mastery",   3, false),
+    BadgeResponse("cat-compose",     "Compose Composer",  "Solve 25 Compose challenges",     "Category Mastery",   3, false),
+    BadgeResponse("cat-spring",      "Spring in Step",    "Solve 25 Spring Boot challenges", "Category Mastery",   3, false),
+    // ── Language ────────────────────────────────────────────────────────────────
+    BadgeResponse("lang-bilingual",  "Bilingual",    "Solve 25 Java + 25 Kotlin challenges", "Language",           3, false),
+    BadgeResponse("lang-idiom-diff", "Idiom Differ", "Complete 10 Java↔Kotlin paired solves","Language",           4, false),
+    // ── Discovery ───────────────────────────────────────────────────────────────
+    BadgeResponse("disc-oneliner",   "One-Liner",    "Submit a correct solution in ≤ 1 executable line", "Discovery", 3, false),
+    BadgeResponse("disc-bughunter", "Bug Hunter",    "Correctly solve a Find-the-Bug challenge", "Discovery",        2, false),
+    BadgeResponse("disc-speedread", "Speed Reader",  "Correctly solve a Hard challenge in < 30 seconds", "Discovery", 4, false),
+    // ── Social ──────────────────────────────────────────────────────────────────
+    BadgeResponse("soc-helpful",     "Helpful",      "Receive 10 upvotes on your shared solutions", "Social",        2, false),
+    BadgeResponse("soc-mentor",      "Mentor",       "Have 5 of your solutions become top-voted", "Social",          4, false),
+    BadgeResponse("soc-connected",   "Connected",    "Add 5 friends",                        "Social",              2, false),
+    BadgeResponse("soc-league-climb","League Climber","Be promoted in 3 consecutive league weeks", "Social",         3, false),
+    // ── Seasonal / Event ────────────────────────────────────────────────────────
+    BadgeResponse("event-advent-2026","Advent 2026", "Participate in Advent of Bytecode 2026","Seasonal",           3, false),
+    // ── Founding Member ─────────────────────────────────────────────────────────
+    BadgeResponse("founding-day1",   "Day 1",        "Joined Bytecode on launch day",        "Founding Member",    5, false),
+    BadgeResponse("founding-beta",   "Beta Hunter",  "Joined the closed beta and gave feedback", "Founding Member", 4, false),
 )
 
 data class BadgesUiState(
@@ -73,13 +81,12 @@ class BadgesViewModel(
                     val merged = BADGE_CATALOG.map { catalogBadge ->
                         earnedById[catalogBadge.id] ?: catalogBadge
                     }
-                    // Append any server-side badges not in the local catalog
                     val catalogIds = BADGE_CATALOG.map { it.id }.toSet()
                     val extras = earned.filter { it.id !in catalogIds }
                     _uiState.update { it.copy(isLoading = false, badges = merged + extras) }
                 }
                 .onFailure { err ->
-                    // Silently keep catalog — don't wipe what we have with an error
+                    // Keep catalog visible — silently note the error
                     _uiState.update { it.copy(isLoading = false, error = err.message) }
                 }
         }

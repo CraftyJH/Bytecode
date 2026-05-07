@@ -134,6 +134,7 @@ private object AppRoutes {
     const val Onboarding = "auth/onboarding"
     const val SignIn = "auth/sign-in"
     const val Main = "app/main"
+    const val Archive = "app/archive"
     const val ChallengeDetailPattern = "app/challenge/{challengeId}"
     const val CodeEditorPattern = "app/challenge/{challengeId}/editor"
 
@@ -417,6 +418,9 @@ private fun AppScreen(
                         onOpenBilling = onOpenBilling,
                         onLoadChallenge = onLoadChallenge,
                         onSelectChallenge = onSelectChallenge,
+                        onOpenArchive = {
+                            navController.navigate(AppRoutes.Archive) { launchSingleTop = true }
+                        },
                         onOpenChallenge = { id ->
                             navController.navigate(AppRoutes.challengeDetail(id)) {
                                 launchSingleTop = true
@@ -482,6 +486,10 @@ private fun AppScreen(
                     onReset = onResetChallengeCode,
                     onToggleShare = onToggleShareOnSubmit,
                 )
+            }
+
+            composable(route = AppRoutes.Archive) {
+                ArchiveScreen(onBack = { navController.popBackStack() })
             }
 
         }
@@ -846,6 +854,7 @@ private fun MainShellScreen(
     onOpenBilling: () -> Unit,
     onLoadChallenge: () -> Unit,
     onSelectChallenge: (dev.bytecode.android.data.model.ChallengeDto) -> Unit,
+    onOpenArchive: () -> Unit,
     onOpenChallenge: (String) -> Unit,
     onSelectLeaderboardTab: (LeaderboardTab) -> Unit,
     onRefreshLeaderboard: () -> Unit,
@@ -875,10 +884,12 @@ private fun MainShellScreen(
                         onSelectChallenge(dto)
                         onOpenChallenge(dto.id)
                     },
+                    onOpenArchive = onOpenArchive,
                 )
                 MainTab.Leaderboards -> LeaderboardsScreen(
                     leaderboardState = leaderboardState,
                     friendsState = friendsState,
+                    hasFriends = friendsState.friends.isNotEmpty(),
                     onSelectTab = onSelectLeaderboardTab,
                     onRefresh = onRefreshLeaderboard,
                     onLoadMyRanks = onLoadMyRanks,
@@ -1020,6 +1031,7 @@ private fun HomeScreen(
     challengeState: ChallengeUiState,
     onLoadChallenge: () -> Unit,
     onSelectChallenge: (dev.bytecode.android.data.model.ChallengeDto) -> Unit,
+    onOpenArchive: () -> Unit,
 ) {
     LaunchedEffect(Unit) { onLoadChallenge() }
 
@@ -1134,6 +1146,47 @@ private fun HomeScreen(
                     challenge = daily?.hard,
                     onSelect = onSelectChallenge,
                 )
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                onClick = onOpenArchive,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text(
+                            "Past Challenges",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            "Browse the archive",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(
+                        Icons.Outlined.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .then(
+                                Modifier.scale(scaleX = -1f, scaleY = 1f)
+                            ),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -1286,6 +1339,9 @@ private fun ProfileScreen(
             }
         }
         item {
+            ProfileSettingsCard()
+        }
+        item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1307,6 +1363,64 @@ private fun ProfileScreen(
     }
 }
 
+
+@Composable
+private fun ProfileSettingsCard() {
+    var leaderboardVisible by remember { mutableStateOf(true) }
+    var dailyReminder by remember { mutableStateOf(false) }
+    var friendActivity by remember { mutableStateOf(true) }
+
+    BytecodeSectionCard {
+        SectionHeader(title = "Settings", subtitle = "Preferences")
+        Spacer(modifier = Modifier.height(8.dp))
+        SettingsToggleRow(
+            label = "Show me on leaderboards",
+            description = "Others can see your rank on public boards",
+            checked = leaderboardVisible,
+            onCheckedChange = { leaderboardVisible = it },
+        )
+        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+        SettingsToggleRow(
+            label = "Daily challenge reminder",
+            description = "Get notified when today's challenges are ready",
+            checked = dailyReminder,
+            onCheckedChange = { dailyReminder = it },
+        )
+        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+        SettingsToggleRow(
+            label = "Friend activity notifications",
+            description = "Know when friends solve challenges or accept duels",
+            checked = friendActivity,
+            onCheckedChange = { friendActivity = it },
+        )
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    label: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        androidx.compose.material3.Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    }
+}
 
 @Composable
 private fun FloatingSettingsButton(modifier: Modifier = Modifier) {
@@ -1757,19 +1871,44 @@ private fun SolveGateScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(32.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
         ) {
-            Text("🔒", style = MaterialTheme.typography.displaySmall)
-            Text(
-                "Solve today's challenge to unlock",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                ) {
+                    Icon(
+                        Icons.Outlined.Info,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .size(36.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    "Solve First to Unlock",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Complete today's challenge to see the discussion, community solutions, and duels.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
         }
     }
 }
@@ -2216,11 +2355,26 @@ private fun DuelCard(
                 )
             }
             if (duel.winnerId != null) {
-                Text(
-                    "Winner: ${if (duel.isChallenger && duel.winnerId == duel.challengerName) "You" else duel.opponentName}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                val winnerLabel = when {
+                    duel.isChallenger && duel.winnerId == duel.challengerName -> "You won! 🏆"
+                    !duel.isChallenger && duel.winnerId == duel.opponentName -> "You won! 🏆"
+                    duel.isChallenger -> "${duel.opponentName} won"
+                    else -> "${duel.challengerName} won"
+                }
+                Surface(
+                    shape = MaterialTheme.shapes.extraSmall,
+                    color = if (winnerLabel.startsWith("You")) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    Text(
+                        winnerLabel,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (winnerLabel.startsWith("You")) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
             if (onAccept != null || onDecline != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2309,6 +2463,45 @@ private fun CodeEditorScreen(
             )
         }
 
+        // Snippet bar — quick-insert buttons above the action row
+        androidx.compose.foundation.lazy.LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp),
+        ) {
+            val snippets = listOf(
+                "    " to "Tab",
+                "{" to "{",
+                "}" to "}",
+                "(" to "(",
+                ")" to ")",
+                ";" to ";",
+                "->" to "->",
+                "it" to "it",
+                "val " to "val",
+                "var " to "var",
+                "fun " to "fun",
+                "return " to "return",
+            )
+            items(snippets.size) { i ->
+                val (insert, label) = snippets[i]
+                Surface(
+                    onClick = { onUpdateCode(challengeState.code + insert) },
+                    shape = MaterialTheme.shapes.extraSmall,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                ) {
+                    Text(
+                        label,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = JetBrainsMonoFamily,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
+
         // Share toggle
         Row(
             modifier = Modifier
@@ -2383,16 +2576,50 @@ private fun CodeEditorScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            if (result.isCorrect) "All tests passed!" else "Some tests failed",
+                            if (result.isCorrect) "✓ All tests passed!" else "✗ Some tests failed",
                             style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = if (result.isCorrect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            if (result.xpAwarded != null && result.xpAwarded > 0) {
-                                AccessBadge(label = "+${result.xpAwarded} XP", tone = BadgeTone.Success)
-                            }
-                            result.badgesEarned.forEach { badge ->
-                                AccessBadge(label = "🏅 ${badge.name}", tone = BadgeTone.Success)
+                        if (result.xpAwarded != null && result.xpAwarded > 0) {
+                            AccessBadge(label = "+${result.xpAwarded} XP", tone = BadgeTone.Success)
+                        }
+                    }
+                    // Badge earn row — shown prominently when badges are awarded
+                    if (result.badgesEarned.isNotEmpty()) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    "Badge${if (result.badgesEarned.size > 1) "s" else ""} earned!",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                result.badgesEarned.forEach { badge ->
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.MilitaryTech,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Column {
+                                            Text(badge.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                            Text(badge.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -2462,9 +2689,10 @@ private fun CodeEditorScreen(
 // ── Leaderboards screen ───────────────────────────────────────────────────────
 
 private val leaderboardTabs = listOf(
+    LeaderboardTab.PersonalBest,
+    LeaderboardTab.Friends,
     LeaderboardTab.Weekly,
     LeaderboardTab.Global,
-    LeaderboardTab.Friends,
     LeaderboardTab.Java,
     LeaderboardTab.Kotlin,
     LeaderboardTab.Easy,
@@ -2473,6 +2701,7 @@ private val leaderboardTabs = listOf(
 )
 
 private fun LeaderboardTab.label() = when (this) {
+    LeaderboardTab.PersonalBest -> "My Stats"
     LeaderboardTab.Global -> "All-time"
     LeaderboardTab.Weekly -> "This week"
     LeaderboardTab.Java -> "Java"
@@ -2487,6 +2716,7 @@ private fun LeaderboardTab.label() = when (this) {
 private fun LeaderboardsScreen(
     leaderboardState: LeaderboardUiState,
     friendsState: FriendsUiState,
+    hasFriends: Boolean,
     onSelectTab: (LeaderboardTab) -> Unit,
     onRefresh: () -> Unit,
     onLoadMyRanks: () -> Unit,
@@ -2497,8 +2727,10 @@ private fun LeaderboardsScreen(
     onRemoveFriend: (String) -> Unit,
 ) {
     LaunchedEffect(Unit) {
-        onSelectTab(leaderboardState.activeTab)
         onLoadMyRanks()
+        // Friends-first default when user has friends; otherwise This Week
+        val initial = if (hasFriends) LeaderboardTab.Friends else LeaderboardTab.Weekly
+        onSelectTab(initial)
     }
 
     val activeIndex = leaderboardTabs.indexOf(leaderboardState.activeTab).coerceAtLeast(0)
@@ -2515,16 +2747,17 @@ private fun LeaderboardsScreen(
                 leaderboardState.myRanks?.let { ranks ->
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        ranks.globalRank?.let { rank ->
+                        ranks.weeklyRank?.let { rank ->
+                            val label = if (rank <= 10) "This week #$rank" else "This week #$rank"
                             Text(
-                                "Global #$rank",
+                                label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
-                        ranks.weeklyRank?.let { rank ->
+                        ranks.globalRank?.let { rank ->
                             Text(
-                                "This week #$rank",
+                                "All-time #$rank",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -2558,8 +2791,9 @@ private fun LeaderboardsScreen(
         }
 
         // Board content
-        if (leaderboardState.activeTab == LeaderboardTab.Friends) {
-            FriendsLeaderboardContent(
+        when (leaderboardState.activeTab) {
+            LeaderboardTab.PersonalBest -> PersonalBestContent(myRanks = leaderboardState.myRanks)
+            LeaderboardTab.Friends -> FriendsLeaderboardContent(
                 friendsState = friendsState,
                 onLoadFriends = onLoadFriends,
                 onFriendHandleChange = onFriendHandleChange,
@@ -2567,14 +2801,94 @@ private fun LeaderboardsScreen(
                 onAcceptFriendRequest = onAcceptFriendRequest,
                 onRemoveFriend = onRemoveFriend,
             )
-        } else {
-            val board = leaderboardState.boards[leaderboardState.activeTab]
-            RankedBoardContent(
-                board = board,
-                isLoading = leaderboardState.isLoading,
-                error = leaderboardState.error,
-                onRefresh = onRefresh,
+            else -> {
+                val board = leaderboardState.boards[leaderboardState.activeTab]
+                RankedBoardContent(
+                    board = board,
+                    isLoading = leaderboardState.isLoading,
+                    error = leaderboardState.error,
+                    onRefresh = onRefresh,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonalBestContent(myRanks: dev.bytecode.android.data.model.MyRanksResponse?) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Text(
+                "Your Stats",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
+        }
+        if (myRanks == null) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                }
+            }
+        } else {
+            item {
+                BytecodeSectionCard {
+                    SectionHeader(title = "This Week", subtitle = "Resets every Monday 00:00 UTC")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (myRanks.weeklyRank != null) {
+                        KeyValueRow("Your rank", "#${myRanks.weeklyRank}")
+                        KeyValueRow("Your score", "${myRanks.weeklyScore} XP")
+                    } else {
+                        Text(
+                            "Solve a challenge this week to appear on the board.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            item {
+                BytecodeSectionCard {
+                    SectionHeader(title = "All-time", subtitle = "Your lifetime position")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (myRanks.globalRank != null) {
+                        KeyValueRow("Your rank", "#${myRanks.globalRank}")
+                        KeyValueRow("Total XP", "${myRanks.globalScore} XP")
+                    } else {
+                        Text(
+                            "Complete a challenge to earn your first XP.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "The default leaderboard shows your progress vs. yourself.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "Switch to Friends, This Week, or All-time to compare with others.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -3083,6 +3397,147 @@ private fun BadgeDetailSheet(
                 OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                     Text("Close")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArchiveScreen(onBack: () -> Unit) {
+    val difficulties = listOf("All", "Easy", "Intermediate", "Hard")
+    val languages = listOf("All", "Java", "Kotlin")
+    var selectedDifficulty by remember { mutableStateOf("All") }
+    var selectedLanguage by remember { mutableStateOf("All") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.navigationBars),
+    ) {
+        // Top bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back")
+            }
+            Text(
+                "Challenge Archive",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+        HorizontalDivider()
+
+        // Filter chips
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(
+                "Difficulty",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            androidx.compose.foundation.lazy.LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(difficulties) { diff ->
+                    val selected = selectedDifficulty == diff
+                    Surface(
+                        onClick = { selectedDifficulty = diff },
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                else MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(
+                            1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        ),
+                    ) {
+                        Text(
+                            diff,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                "Language",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            androidx.compose.foundation.lazy.LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(languages) { lang ->
+                    val selected = selectedLanguage == lang
+                    Surface(
+                        onClick = { selectedLanguage = lang },
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                else MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(
+                            1.dp,
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        ),
+                    ) {
+                        Text(
+                            lang,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        }
+        HorizontalDivider()
+
+        // Empty state
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                ) {
+                    Icon(
+                        Icons.Outlined.EmojiEvents,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .size(40.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    "Archive coming soon",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Past challenges will appear here after each day's challenge expires. Check back after your first week!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
             }
         }
     }

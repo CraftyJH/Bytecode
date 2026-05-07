@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class LeaderboardTab { Global, Weekly, Java, Kotlin, Easy, Intermediate, Hard, Friends }
+enum class LeaderboardTab { PersonalBest, Friends, Weekly, Global, Java, Kotlin, Easy, Intermediate, Hard }
 
 data class LeaderboardUiState(
     val activeTab: LeaderboardTab = LeaderboardTab.Weekly,
@@ -36,14 +36,16 @@ class LeaderboardViewModel(
 
     fun selectTab(tab: LeaderboardTab) {
         _uiState.update { it.copy(activeTab = tab) }
-        if (_uiState.value.boards[tab] == null && tab != LeaderboardTab.Friends) {
-            loadBoard(tab)
-        } else if (tab == LeaderboardTab.Friends && _uiState.value.friendsBoard == null) {
-            loadFriends()
+        when {
+            tab == LeaderboardTab.PersonalBest -> { /* data comes from myRanks, no separate fetch */ }
+            tab == LeaderboardTab.Friends && _uiState.value.friendsBoard == null -> loadFriends()
+            tab != LeaderboardTab.Friends && tab != LeaderboardTab.PersonalBest
+                    && _uiState.value.boards[tab] == null -> loadBoard(tab)
         }
     }
 
     fun loadBoard(tab: LeaderboardTab = _uiState.value.activeTab) {
+        if (tab == LeaderboardTab.PersonalBest || tab == LeaderboardTab.Friends) return
         if (_uiState.value.isLoading) return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -56,7 +58,7 @@ class LeaderboardViewModel(
                 LeaderboardTab.Easy -> leaderboardRepository.fetchByDifficulty("easy", token)
                 LeaderboardTab.Intermediate -> leaderboardRepository.fetchByDifficulty("intermediate", token)
                 LeaderboardTab.Hard -> leaderboardRepository.fetchByDifficulty("hard", token)
-                LeaderboardTab.Friends -> { loadFriends(); return@launch }
+                else -> return@launch
             }
             result.fold(
                 onSuccess = { board ->
@@ -76,6 +78,11 @@ class LeaderboardViewModel(
                 onFailure = { /* non-critical */ },
             )
         }
+    }
+
+    fun selectInitialTab(hasFriends: Boolean) {
+        val preferred = if (hasFriends) LeaderboardTab.Friends else LeaderboardTab.Weekly
+        selectTab(preferred)
     }
 
     private fun loadFriends() {
