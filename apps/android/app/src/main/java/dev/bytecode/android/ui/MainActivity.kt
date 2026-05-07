@@ -2225,17 +2225,41 @@ private fun ChallengeDetailScreen(
         if (challenge != null) onLoadLeaderboard()
     }
 
-    AppScaffold(
-        title = challenge?.title ?: "Today's Challenge",
-        subtitle = challenge?.let { "${it.difficulty.replaceFirstChar { c -> c.titlecase() }} · ${it.language.replaceFirstChar { c -> c.titlecase() }}" },
-        onBack = onBack,
-    ) {
-        if (challenge == null) {
-            LoadingPlaceholder(lines = 4)
-            return@AppScaffold
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Fixed header bar — replaces AppScaffold so tab content LazyColumns
+        // get a constrained height and don't crash with unbounded constraints.
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(challenge?.title ?: "Today's Challenge", style = MaterialTheme.typography.titleLarge)
+                    val subtitle = challenge?.let {
+                        "${it.difficulty.replaceFirstChar { c -> c.titlecase() }} · ${it.language.replaceFirstChar { c -> c.titlecase() }}"
+                    }
+                    if (!subtitle.isNullOrBlank()) {
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Tab bar
+
+        if (challenge == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
             ScrollableTabRow(
                 selectedTabIndex = activeTab.ordinal,
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -2258,52 +2282,54 @@ private fun ChallengeDetailScreen(
                 }
             }
 
-            when (activeTab) {
-                ChallengeTab.Problem -> ChallengeProblemTab(
-                    challenge = challenge,
-                    challengeState = challengeState,
-                    onOpenEditor = onOpenEditor,
-                )
-                ChallengeTab.Discuss -> {
-                    if (!challengeState.hasSolvedToday) {
-                        SolveGateScreen()
-                    } else {
-                        LaunchedEffect(challenge.id) { onLoadDiscussion(challenge.id) }
-                        ChallengeDiscussTab(
-                            challengeId = challenge.id,
-                            discussionState = discussionState,
-                            onBodyChange = onDiscussionBodyChange,
-                            onPost = onPostDiscussion,
-                            onDelete = onDeletePost,
-                            onUpvote = onUpvotePost,
-                        )
+            Box(modifier = Modifier.weight(1f)) {
+                when (activeTab) {
+                    ChallengeTab.Problem -> ChallengeProblemTab(
+                        challenge = challenge,
+                        challengeState = challengeState,
+                        onOpenEditor = onOpenEditor,
+                    )
+                    ChallengeTab.Discuss -> {
+                        if (!challengeState.hasSolvedToday) {
+                            SolveGateScreen()
+                        } else {
+                            LaunchedEffect(challenge.id) { onLoadDiscussion(challenge.id) }
+                            ChallengeDiscussTab(
+                                challengeId = challenge.id,
+                                discussionState = discussionState,
+                                onBodyChange = onDiscussionBodyChange,
+                                onPost = onPostDiscussion,
+                                onDelete = onDeletePost,
+                                onUpvote = onUpvotePost,
+                            )
+                        }
                     }
-                }
-                ChallengeTab.Solutions -> {
-                    if (!challengeState.hasSolvedToday) {
-                        SolveGateScreen()
-                    } else {
-                        LaunchedEffect(challenge.id) { onLoadSolutions(challenge.id) }
-                        ChallengeSolutionsTab(
-                            challengeId = challenge.id,
-                            solutionState = solutionState,
-                            onUpvote = onUpvoteSolution,
-                            onRemoveUpvote = onRemoveSolutionUpvote,
-                        )
+                    ChallengeTab.Solutions -> {
+                        if (!challengeState.hasSolvedToday) {
+                            SolveGateScreen()
+                        } else {
+                            LaunchedEffect(challenge.id) { onLoadSolutions(challenge.id) }
+                            ChallengeSolutionsTab(
+                                challengeId = challenge.id,
+                                solutionState = solutionState,
+                                onUpvote = onUpvoteSolution,
+                                onRemoveUpvote = onRemoveSolutionUpvote,
+                            )
+                        }
                     }
-                }
-                ChallengeTab.Duel -> {
-                    if (!challengeState.hasSolvedToday) {
-                        SolveGateScreen()
-                    } else {
-                        LaunchedEffect(Unit) { onLoadDuels() }
-                        ChallengeDuelTab(
-                            challengeId = challenge.id,
-                            duelState = duelState,
-                            onChallengeFriend = onChallengeFriend,
-                            onAccept = onAcceptDuel,
-                            onDecline = onDeclineDuel,
-                        )
+                    ChallengeTab.Duel -> {
+                        if (!challengeState.hasSolvedToday) {
+                            SolveGateScreen()
+                        } else {
+                            LaunchedEffect(Unit) { onLoadDuels() }
+                            ChallengeDuelTab(
+                                challengeId = challenge.id,
+                                duelState = duelState,
+                                onChallengeFriend = onChallengeFriend,
+                                onAccept = onAcceptDuel,
+                                onDecline = onDeclineDuel,
+                            )
+                        }
                     }
                 }
             }
