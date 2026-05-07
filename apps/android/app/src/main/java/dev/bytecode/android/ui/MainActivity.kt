@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import org.koin.androidx.viewmodel.ext.android.viewModel as koinViewModel
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -152,6 +153,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             BytecodeTheme(darkTheme = true) {
                 Surface(
@@ -161,6 +163,8 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val state by viewModel.uiState.collectAsStateWithLifecycle()
+                    val updateAvailable by viewModel.updateAvailable.collectAsStateWithLifecycle()
+                    val updateDownloadUrl by viewModel.updateDownloadUrl.collectAsStateWithLifecycle()
                     val challengeState by challengeViewModel.uiState.collectAsStateWithLifecycle()
                     val leaderboardState by leaderboardViewModel.uiState.collectAsStateWithLifecycle()
                     val friendsState by friendsViewModel.uiState.collectAsStateWithLifecycle()
@@ -170,6 +174,9 @@ class MainActivity : ComponentActivity() {
                     val badgesState by badgesViewModel.uiState.collectAsStateWithLifecycle()
                     Box(modifier = Modifier.fillMaxSize()) {
                     AppScreen(
+                        updateAvailable = updateAvailable,
+                        updateDownloadUrl = updateDownloadUrl,
+                        onDismissUpdate = { viewModel.dismissUpdate() },
                         state = state,
                         challengeState = challengeState,
                         leaderboardState = leaderboardState,
@@ -189,7 +196,8 @@ class MainActivity : ComponentActivity() {
                             startActivity(Intent(Intent.ACTION_VIEW,
                                 Uri.parse("${AppConfig.WEB_BASE_URL}/me/billing")))
                         },
-                        onLoadChallenge = { challengeViewModel.loadToday() },
+                        onLoadChallenge = { challengeViewModel.loadDaily() },
+                        onSelectChallenge = { dto -> challengeViewModel.selectChallenge(dto) },
                         onUpdateChallengeCode = { code -> challengeViewModel.updateCode(code) },
                         onSubmitChallenge = { challengeViewModel.submit() },
                         onResetChallengeCode = { challengeViewModel.resetCode() },
@@ -219,12 +227,6 @@ class MainActivity : ComponentActivity() {
                         onLoadBadges = { badgesViewModel.load() },
                         onSelectBadge = { id -> badgesViewModel.selectBadge(id) },
                     )
-                        FloatingSettingsButton(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 8.dp, end = 12.dp),
-                        )
-                    }
                 }
             }
         }
@@ -234,6 +236,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppScreen(
     state: AppUiState,
+    updateAvailable: Boolean,
+    updateDownloadUrl: String?,
+    onDismissUpdate: () -> Unit,
     challengeState: ChallengeUiState,
     leaderboardState: LeaderboardUiState,
     friendsState: FriendsUiState,
@@ -250,6 +255,7 @@ private fun AppScreen(
     onRefresh: () -> Unit,
     onOpenBilling: () -> Unit,
     onLoadChallenge: () -> Unit,
+    onSelectChallenge: (dev.bytecode.android.data.model.ChallengeDto) -> Unit,
     onUpdateChallengeCode: (String) -> Unit,
     onSubmitChallenge: () -> Unit,
     onResetChallengeCode: () -> Unit,
@@ -399,6 +405,9 @@ private fun AppScreen(
                 } else {
                     MainShellScreen(
                         state = loggedInState,
+                        updateAvailable = updateAvailable,
+                        updateDownloadUrl = updateDownloadUrl,
+                        onDismissUpdate = onDismissUpdate,
                         challengeState = challengeState,
                         leaderboardState = leaderboardState,
                         friendsState = friendsState,
@@ -407,6 +416,7 @@ private fun AppScreen(
                         onRefresh = onRefresh,
                         onOpenBilling = onOpenBilling,
                         onLoadChallenge = onLoadChallenge,
+                        onSelectChallenge = onSelectChallenge,
                         onOpenChallenge = { id ->
                             navController.navigate(AppRoutes.challengeDetail(id)) {
                                 launchSingleTop = true
@@ -825,6 +835,9 @@ private enum class MainTab {
 @Composable
 private fun MainShellScreen(
     state: AppUiState.LoggedIn,
+    updateAvailable: Boolean,
+    updateDownloadUrl: String?,
+    onDismissUpdate: () -> Unit,
     challengeState: ChallengeUiState,
     leaderboardState: LeaderboardUiState,
     friendsState: FriendsUiState,
@@ -832,6 +845,7 @@ private fun MainShellScreen(
     onRefresh: () -> Unit,
     onOpenBilling: () -> Unit,
     onLoadChallenge: () -> Unit,
+    onSelectChallenge: (dev.bytecode.android.data.model.ChallengeDto) -> Unit,
     onOpenChallenge: (String) -> Unit,
     onSelectLeaderboardTab: (LeaderboardTab) -> Unit,
     onRefreshLeaderboard: () -> Unit,
@@ -857,7 +871,10 @@ private fun MainShellScreen(
                     state = state,
                     challengeState = challengeState,
                     onLoadChallenge = onLoadChallenge,
-                    onOpenChallenge = onOpenChallenge,
+                    onSelectChallenge = { dto ->
+                        onSelectChallenge(dto)
+                        onOpenChallenge(dto.id)
+                    },
                 )
                 MainTab.Leaderboards -> LeaderboardsScreen(
                     leaderboardState = leaderboardState,
@@ -898,6 +915,58 @@ private fun MainShellScreen(
             activeTab = activeTab,
             onSelectTab = { activeTab = it },
         )
+
+        if (updateAvailable) {
+            UpdateBanner(
+                downloadUrl = updateDownloadUrl,
+                onDismiss = onDismissUpdate,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpdateBanner(
+    downloadUrl: String?,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.95f))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = "Update available",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.weight(1f),
+        )
+        if (downloadUrl != null) {
+            TextButton(
+                onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl)))
+                },
+            ) {
+                Text(
+                    "Download",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+        }
+        IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+            Text(
+                "✕",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
     }
 }
 
@@ -950,9 +1019,11 @@ private fun HomeScreen(
     state: AppUiState.LoggedIn,
     challengeState: ChallengeUiState,
     onLoadChallenge: () -> Unit,
-    onOpenChallenge: (String) -> Unit,
+    onSelectChallenge: (dev.bytecode.android.data.model.ChallengeDto) -> Unit,
 ) {
     LaunchedEffect(Unit) { onLoadChallenge() }
+
+    val daily = challengeState.dailyChallenges
 
     LazyColumn(
         modifier = Modifier
@@ -1022,10 +1093,124 @@ private fun HomeScreen(
             }
         }
         item {
-            DailyChallengeCard(
-                challengeState = challengeState,
-                onOpen = onOpenChallenge,
+            Text(
+                "Today's Challenges",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
+        }
+        if (challengeState.dailyLoading) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                }
+            }
+        } else if (challengeState.dailyError != null) {
+            item {
+                Text(
+                    challengeState.dailyError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        } else {
+            item {
+                DifficultyCard(
+                    difficulty = "Easy",
+                    challenge = daily?.easy,
+                    onSelect = onSelectChallenge,
+                )
+            }
+            item {
+                DifficultyCard(
+                    difficulty = "Intermediate",
+                    challenge = daily?.intermediate,
+                    onSelect = onSelectChallenge,
+                )
+            }
+            item {
+                DifficultyCard(
+                    difficulty = "Hard",
+                    challenge = daily?.hard,
+                    onSelect = onSelectChallenge,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DifficultyCard(
+    difficulty: String,
+    challenge: dev.bytecode.android.data.model.ChallengeDto?,
+    onSelect: (dev.bytecode.android.data.model.ChallengeDto) -> Unit,
+) {
+    val difficultyColor = when (difficulty.lowercase()) {
+        "easy" -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
+        "intermediate", "medium" -> androidx.compose.ui.graphics.Color(0xFFFFC107)
+        else -> androidx.compose.ui.graphics.Color(0xFFF44336)
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, difficultyColor.copy(alpha = 0.4f)),
+        onClick = { challenge?.let { onSelect(it) } },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = MaterialTheme.shapes.extraSmall,
+                        color = difficultyColor.copy(alpha = 0.15f),
+                    ) {
+                        Text(
+                            difficulty,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = difficultyColor,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                if (challenge != null) {
+                    Text(
+                        challenge.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        "${challenge.baseXp} XP · ${challenge.language.replaceFirstChar { it.titlecase() }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        "No challenge today",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (challenge != null) {
+                Text(
+                    "›",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -1056,6 +1241,7 @@ private fun ProfileScreen(
     onRefresh: () -> Unit,
     onOpenBilling: () -> Unit,
 ) {
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1112,6 +1298,12 @@ private fun ProfileScreen(
                 }
             }
         }
+    }
+        FloatingSettingsButton(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(bottom = 16.dp, start = 16.dp),
+        )
     }
 }
 

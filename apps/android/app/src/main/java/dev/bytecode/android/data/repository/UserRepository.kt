@@ -1,8 +1,10 @@
 package dev.bytecode.android.data.repository
 
 import dev.bytecode.android.config.AppConfig
+import dev.bytecode.android.data.model.AndroidVersionInfo
 import dev.bytecode.android.data.model.BackendUserState
 import dev.bytecode.android.data.model.BillingState
+import dev.bytecode.android.data.model.MobileVersionResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -54,6 +56,17 @@ class UserRepository(context: android.content.Context) {
             Result.success(response.body())
         } catch (t: Throwable) {
             Result.failure(mapError("billing", t))
+        }
+
+    suspend fun fetchLatestVersion(): Result<AndroidVersionInfo> =
+        try {
+            val response = client.get("${resolveWebApiBaseUrl()}/api/mobile/version")
+            if (response.status.value !in 200..299) {
+                throw mapHttpFailure("version", response.status, response.bodyAsText())
+            }
+            Result.success(response.body<MobileVersionResponse>().android)
+        } catch (t: Throwable) {
+            Result.failure(mapError("version", t))
         }
 
     private fun mapError(scope: String, t: Throwable): Throwable {

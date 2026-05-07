@@ -4,6 +4,7 @@ import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.ChallengeDto
 import dev.bytecode.android.data.model.ChallengeSubmitRequest
 import dev.bytecode.android.data.model.ChallengeSubmitResponse
+import dev.bytecode.android.data.model.DailyChallengesResponse
 import dev.bytecode.android.data.model.DailyLeaderboardResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -43,6 +44,19 @@ class ChallengeRepository(context: android.content.Context) {
             Result.success(response.body())
         } catch (t: Throwable) {
             Result.failure(mapRepositoryError("today's challenge", t))
+        }
+
+    suspend fun fetchDaily(accessToken: String): Result<DailyChallengesResponse> =
+        try {
+            val response = client.get("${resolveBaseUrl()}/api/challenges/daily") {
+                header(HttpHeaders.Authorization, "Bearer $accessToken")
+            }
+            if (response.status.value !in 200..299) {
+                throw mapHttpFailure("daily challenges", response.status, response.bodyAsText())
+            }
+            Result.success(response.body())
+        } catch (t: Throwable) {
+            Result.failure(mapRepositoryError("daily challenges", t))
         }
 
     suspend fun submit(

@@ -4,6 +4,19 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class AndroidVersionInfo(
+    val latestVersion: String,
+    val latestVersionCode: Int,
+    val downloadUrl: String,
+    val mandatory: Boolean = false,
+)
+
+@Serializable
+data class MobileVersionResponse(
+    val android: AndroidVersionInfo,
+)
+
+@Serializable
 data class SignInRequest(
     val email: String,
     val password: String,

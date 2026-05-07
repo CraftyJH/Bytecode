@@ -3,6 +3,13 @@ package dev.bytecode.android.data.model
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class DailyChallengesResponse(
+    val easy: ChallengeDto? = null,
+    val intermediate: ChallengeDto? = null,
+    val hard: ChallengeDto? = null,
+)
+
+@Serializable
 data class ChallengeDto(
     val id: String,
     val title: String,

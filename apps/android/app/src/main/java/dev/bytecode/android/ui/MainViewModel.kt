@@ -3,6 +3,7 @@ package dev.bytecode.android.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.bytecode.android.BuildConfig
 import dev.bytecode.android.data.model.OnboardingProfile
 import dev.bytecode.android.data.repository.AuthRepository
 import dev.bytecode.android.data.repository.RepositoryFailure
@@ -24,10 +25,32 @@ class MainViewModel(
     private val _uiState = MutableStateFlow<AppUiState>(AppUiState.Loading)
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
+    private val _updateAvailable = MutableStateFlow(false)
+    val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
+
+    private val _updateDownloadUrl = MutableStateFlow<String?>(null)
+    val updateDownloadUrl: StateFlow<String?> = _updateDownloadUrl.asStateFlow()
+
     private val sessionExpiredMessage = "Session expired. Please sign in again."
 
     init {
         bootstrap()
+        checkForUpdate()
+    }
+
+    private fun checkForUpdate() {
+        viewModelScope.launch {
+            userRepository.fetchLatestVersion().getOrNull()?.let { info ->
+                if (info.latestVersionCode > BuildConfig.VERSION_CODE) {
+                    _updateAvailable.value = true
+                    _updateDownloadUrl.value = info.downloadUrl
+                }
+            }
+        }
+    }
+
+    fun dismissUpdate() {
+        _updateAvailable.value = false
     }
 
     private fun bootstrap() {

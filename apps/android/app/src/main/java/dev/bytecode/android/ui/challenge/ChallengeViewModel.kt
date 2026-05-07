@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.bytecode.android.data.model.ChallengeDto
 import dev.bytecode.android.data.model.ChallengeSubmitResponse
+import dev.bytecode.android.data.model.DailyChallengesResponse
 import dev.bytecode.android.data.model.DailyLeaderboardResponse
 import dev.bytecode.android.data.repository.AuthRepository
 import dev.bytecode.android.data.repository.ChallengeRepository
@@ -16,6 +17,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ChallengeUiState(
+    val dailyChallenges: DailyChallengesResponse? = null,
+    val dailyLoading: Boolean = false,
+    val dailyError: String? = null,
     val challenge: ChallengeDto? = null,
     val code: String = "",
     val isLoading: Boolean = false,
@@ -37,6 +41,23 @@ class ChallengeViewModel(
 
     private val _uiState = MutableStateFlow(ChallengeUiState())
     val uiState: StateFlow<ChallengeUiState> = _uiState.asStateFlow()
+
+    fun loadDaily() {
+        if (_uiState.value.dailyLoading) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(dailyLoading = true, dailyError = null) }
+            val token = resolveToken() ?: return@launch
+            challengeRepository.fetchDaily(token).fold(
+                onSuccess = { resp -> _uiState.update { it.copy(dailyChallenges = resp) } },
+                onFailure = { t -> _uiState.update { it.copy(dailyError = t.message) } },
+            )
+            _uiState.update { it.copy(dailyLoading = false) }
+        }
+    }
+
+    fun selectChallenge(dto: ChallengeDto) {
+        _uiState.update { it.copy(challenge = dto, code = dto.starterCode, submitResult = null) }
+    }
 
     fun loadToday() {
         if (_uiState.value.isLoading) return
