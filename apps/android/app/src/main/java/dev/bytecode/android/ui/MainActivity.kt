@@ -93,8 +93,15 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.delay
 import dev.bytecode.android.BuildConfig
 import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.ChallengeSubmitResponse
@@ -126,6 +133,123 @@ import dev.bytecode.android.ui.solution.SolutionViewModel
 import dev.bytecode.android.ui.state.AppUiState
 import dev.bytecode.android.ui.theme.BytecodeTheme
 import dev.bytecode.android.ui.theme.JetBrainsMonoFamily
+
+private val JAVA_KEYWORDS = setOf(
+    "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char",
+    "class", "const", "continue", "default", "do", "double", "else", "enum",
+    "extends", "final", "finally", "float", "for", "goto", "if", "implements",
+    "import", "instanceof", "int", "interface", "long", "native", "new", "null",
+    "package", "private", "protected", "public", "return", "short", "static",
+    "strictfp", "super", "switch", "synchronized", "this", "throw", "throws",
+    "transient", "true", "false", "try", "void", "volatile", "while",
+    "fun", "val", "var", "when", "object", "companion", "data", "sealed",
+    "open", "override", "suspend", "inline", "reified", "by", "in", "out",
+    "where", "init", "constructor", "it", "is", "as", "typealias", "lateinit",
+    "crossinline", "noinline", "vararg", "external",
+)
+
+private fun highlightCode(
+    code: String,
+    keywordColor: Color,
+    stringColor: Color,
+    numberColor: Color,
+    commentColor: Color,
+    typeColor: Color,
+    defaultColor: Color,
+): AnnotatedString = buildAnnotatedString {
+    var i = 0
+    val n = code.length
+    while (i < n) {
+        when {
+            // Line comment
+            i + 1 < n && code[i] == '/' && code[i + 1] == '/' -> {
+                val end = code.indexOf('\n', i).let { if (it == -1) n else it }
+                pushStyle(SpanStyle(color = commentColor))
+                append(code.substring(i, end))
+                pop(); i = end
+            }
+            // Block comment
+            i + 1 < n && code[i] == '/' && code[i + 1] == '*' -> {
+                val end = code.indexOf("*/", i + 2).let { if (it == -1) n else it + 2 }
+                pushStyle(SpanStyle(color = commentColor))
+                append(code.substring(i, end))
+                pop(); i = end
+            }
+            // String literal
+            code[i] == '"' -> {
+                var j = i + 1
+                while (j < n) {
+                    if (code[j] == '\\') { j += 2; continue }
+                    if (code[j] == '"') { j++; break }
+                    j++
+                }
+                pushStyle(SpanStyle(color = stringColor))
+                append(code.substring(i, j))
+                pop(); i = j
+            }
+            // Char literal
+            code[i] == '\'' -> {
+                var j = i + 1
+                while (j < n) {
+                    if (code[j] == '\\') { j += 2; continue }
+                    if (code[j] == '\'') { j++; break }
+                    j++
+                }
+                pushStyle(SpanStyle(color = stringColor))
+                append(code.substring(i, j))
+                pop(); i = j
+            }
+            // Annotation
+            code[i] == '@' -> {
+                var j = i + 1
+                while (j < n && (code[j].isLetterOrDigit() || code[j] == '_')) j++
+                pushStyle(SpanStyle(color = numberColor))
+                append(code.substring(i, j))
+                pop(); i = j
+            }
+            // Number
+            code[i].isDigit() -> {
+                var j = i + 1
+                if (code[i] == '0' && j < n && (code[j] == 'x' || code[j] == 'X')) {
+                    j++
+                    while (j < n && code[j].isLetterOrDigit()) j++
+                } else {
+                    while (j < n && (code[j].isDigit() || code[j] == '.' || code[j] == '_' ||
+                                code[j] == 'L' || code[j] == 'f' || code[j] == 'F')) j++
+                }
+                pushStyle(SpanStyle(color = numberColor))
+                append(code.substring(i, j))
+                pop(); i = j
+            }
+            // Identifier
+            code[i].isLetter() || code[i] == '_' -> {
+                var j = i + 1
+                while (j < n && (code[j].isLetterOrDigit() || code[j] == '_')) j++
+                val word = code.substring(i, j)
+                when {
+                    word in JAVA_KEYWORDS -> {
+                        pushStyle(SpanStyle(color = keywordColor, fontWeight = FontWeight.SemiBold))
+                        append(word); pop()
+                    }
+                    word[0].isUpperCase() -> {
+                        pushStyle(SpanStyle(color = typeColor))
+                        append(word); pop()
+                    }
+                    else -> {
+                        pushStyle(SpanStyle(color = defaultColor))
+                        append(word); pop()
+                    }
+                }
+                i = j
+            }
+            else -> {
+                pushStyle(SpanStyle(color = defaultColor))
+                append(code[i].toString())
+                pop(); i++
+            }
+        }
+    }
+}
 
 private object AppRoutes {
     const val AuthGraph = "auth"
@@ -227,6 +351,7 @@ class MainActivity : ComponentActivity() {
                         onDeclineDuel = { id -> duelViewModel.declineDuel(id) },
                         onLoadBadges = { badgesViewModel.load() },
                         onSelectBadge = { id -> badgesViewModel.selectBadge(id) },
+                        onUpdateHandle = { handle -> viewModel.updateHandle(handle) },
                     )
                     }
                 }
@@ -286,6 +411,7 @@ private fun AppScreen(
     onDeclineDuel: (String) -> Unit,
     onLoadBadges: () -> Unit,
     onSelectBadge: (String?) -> Unit,
+    onUpdateHandle: (String) -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -437,6 +563,7 @@ private fun AppScreen(
                         onRemoveFriend = onRemoveFriend,
                         onLoadBadges = onLoadBadges,
                         onSelectBadge = onSelectBadge,
+                        onUpdateHandle = onUpdateHandle,
                     )
                 }
             }
@@ -868,6 +995,7 @@ private fun MainShellScreen(
     badgesState: BadgesUiState,
     onLoadBadges: () -> Unit,
     onSelectBadge: (String?) -> Unit,
+    onUpdateHandle: (String) -> Unit = {},
 ) {
     var activeTab by remember { mutableStateOf(MainTab.Home) }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -902,6 +1030,7 @@ private fun MainShellScreen(
                 )
                 MainTab.Badges -> BadgesScreen(
                     badgesState = badgesState,
+                    userXpTotal = state.user.xpTotal,
                     onLoad = onLoadBadges,
                     onSelectBadge = onSelectBadge,
                 )
@@ -918,6 +1047,7 @@ private fun MainShellScreen(
                     onSignOut = onSignOut,
                     onRefresh = onRefresh,
                     onOpenBilling = onOpenBilling,
+                    onUpdateHandle = onUpdateHandle,
                 )
             }
         }
@@ -1294,7 +1424,10 @@ private fun ProfileScreen(
     onSignOut: () -> Unit,
     onRefresh: () -> Unit,
     onOpenBilling: () -> Unit,
+    onUpdateHandle: (String) -> Unit = {},
 ) {
+    var handleInput by remember(state.user.handle) { mutableStateOf(state.user.handle ?: "") }
+    var handleSaved by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
         modifier = Modifier
@@ -1306,7 +1439,7 @@ private fun ProfileScreen(
         item {
             BytecodeSectionCard {
                 SectionHeader(
-                    title = state.user.email?.substringBefore("@") ?: "Profile",
+                    title = state.user.handle ?: state.user.email?.substringBefore("@") ?: "Profile",
                     subtitle = state.user.email ?: "",
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -1329,6 +1462,36 @@ private fun ProfileScreen(
                 val billing = state.billing
                 KeyValueRow("Plan", billing?.plan ?: "free")
                 KeyValueRow("Premium until", billing?.premiumUntil ?: state.user.premiumUntil ?: "—")
+            }
+        }
+        item {
+            BytecodeSectionCard {
+                SectionHeader(title = "Display name", subtitle = "Shown on leaderboards and to friends")
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = handleInput,
+                    onValueChange = {
+                        handleInput = it
+                        handleSaved = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Choose a display name") },
+                    label = { Text("Name") },
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (handleInput.isNotBlank()) {
+                            onUpdateHandle(handleInput.trim())
+                            handleSaved = true
+                        }
+                    },
+                    enabled = handleInput.isNotBlank() && handleInput.trim() != state.user.handle,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (handleSaved) "Saved!" else "Save name")
+                }
             }
         }
         item {
@@ -2392,6 +2555,98 @@ private fun DuelCard(
 }
 
 @Composable
+private fun SuccessOverlay(onDismiss: () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+        delay(2500)
+        onDismiss()
+    }
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.5f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "successScale",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        label = "successAlpha",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .alpha(alpha)
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.scale(scale),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("✓", style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
+            }
+            Text(
+                "All tests passed!",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                "Tap to dismiss",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SyntaxHighlightedField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val keywordColor = MaterialTheme.colorScheme.primary
+    val stringColor = Color(0xFFA8C77B)
+    val numberColor = Color(0xFFC77BA8)
+    val commentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val typeColor = Color(0xFF7BA8C7)
+    val defaultColor = MaterialTheme.colorScheme.onSurface
+
+    var tfv by remember { mutableStateOf(TextFieldValue(text = value)) }
+    LaunchedEffect(value) {
+        if (tfv.text != value) tfv = TextFieldValue(text = value)
+    }
+
+    BasicTextField(
+        value = TextFieldValue(
+            annotatedString = highlightCode(tfv.text, keywordColor, stringColor, numberColor, commentColor, typeColor, defaultColor),
+            selection = tfv.selection,
+        ),
+        onValueChange = { newTfv ->
+            tfv = newTfv
+            onValueChange(newTfv.text)
+        },
+        modifier = modifier,
+        textStyle = TextStyle(
+            fontFamily = JetBrainsMonoFamily,
+            fontSize = MaterialTheme.typography.bodySmall.fontSize,
+        ),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+    )
+}
+
+@Composable
 private fun CodeEditorScreen(
     challengeState: ChallengeUiState,
     onBack: () -> Unit,
@@ -2402,7 +2657,13 @@ private fun CodeEditorScreen(
 ) {
     val challenge = challengeState.challenge
     val result = challengeState.submitResult
+    var overlayDismissed by remember { mutableStateOf(false) }
+    val showOverlay = result?.isCorrect == true && !overlayDismissed
+    LaunchedEffect(result?.isCorrect) {
+        if (result?.isCorrect != true) overlayDismissed = false
+    }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -2449,18 +2710,12 @@ private fun CodeEditorScreen(
             shape = MaterialTheme.shapes.medium,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
         ) {
-            BasicTextField(
+            SyntaxHighlightedField(
                 value = challengeState.code,
                 onValueChange = onUpdateCode,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(12.dp),
-                textStyle = TextStyle(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontFamily = JetBrainsMonoFamily,
-                    fontSize = MaterialTheme.typography.bodySmall.fontSize,
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             )
         }
 
@@ -2684,6 +2939,10 @@ private fun CodeEditorScreen(
                 }
             }
         }
+    }
+    if (showOverlay) {
+        SuccessOverlay(onDismiss = { overlayDismissed = true })
+    }
     }
 }
 
@@ -3042,6 +3301,7 @@ private fun FriendsLeaderboardContent(
     onRemoveFriend: (String) -> Unit,
 ) {
     LaunchedEffect(Unit) { onLoadFriends() }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LazyColumn(
         modifier = Modifier
@@ -3081,6 +3341,19 @@ private fun FriendsLeaderboardContent(
                     } else {
                         Text("Send request")
                     }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, "Join me on Bytecode — daily coding challenges for Java & Kotlin! https://bytecode.dev/get-the-app")
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Invite a friend"))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Share invite link")
                 }
             }
         }
@@ -3203,6 +3476,7 @@ private fun FriendRow(
 @Composable
 private fun BadgesScreen(
     badgesState: BadgesUiState,
+    userXpTotal: Int = 0,
     onLoad: () -> Unit,
     onSelectBadge: (String?) -> Unit,
 ) {
@@ -3259,7 +3533,7 @@ private fun BadgesScreen(
                     )
                 }
                 items(badges) { badge ->
-                    BadgeTile(badge = badge, onClick = { onSelectBadge(badge.id) })
+                    BadgeTile(badge = badge, userXpTotal = userXpTotal, onClick = { onSelectBadge(badge.id) })
                 }
             }
         }
@@ -3273,9 +3547,25 @@ private fun BadgesScreen(
 @Composable
 private fun BadgeTile(
     badge: dev.bytecode.android.data.model.BadgeResponse,
+    userXpTotal: Int = 0,
     onClick: () -> Unit,
 ) {
     val earned = badge.earned
+    val estimatedSolves = userXpTotal / 10
+    val progressHint: String? = if (!earned) {
+        when (badge.id) {
+            "solve-1"   -> "$estimatedSolves/1"
+            "solve-10"  -> "$estimatedSolves/10"
+            "solve-50"  -> "$estimatedSolves/50"
+            "solve-100" -> "$estimatedSolves/100"
+            "solve-500" -> "$estimatedSolves/500"
+            "diff-easy" -> "$estimatedSolves/50"
+            "diff-med"  -> "$estimatedSolves/50"
+            "diff-hard" -> "$estimatedSolves/50"
+            else -> null
+        }
+    } else null
+
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -3294,7 +3584,7 @@ private fun BadgeTile(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Icon(
-                imageVector = if (earned) Icons.Outlined.MilitaryTech else Icons.Outlined.MilitaryTech,
+                imageVector = Icons.Outlined.MilitaryTech,
                 contentDescription = null,
                 modifier = Modifier.size(28.dp),
                 tint = if (earned) MaterialTheme.colorScheme.primary
@@ -3309,6 +3599,14 @@ private fun BadgeTile(
                 overflow = TextOverflow.Ellipsis,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
+            if (progressHint != null) {
+                Text(
+                    progressHint,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
             // Dot tier
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 repeat(5) { i ->

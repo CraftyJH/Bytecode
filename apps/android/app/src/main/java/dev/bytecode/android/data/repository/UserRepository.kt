@@ -16,6 +16,8 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.patch
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -56,6 +58,22 @@ class UserRepository(context: android.content.Context) {
             Result.success(response.body())
         } catch (t: Throwable) {
             Result.failure(mapError("billing", t))
+        }
+
+    suspend fun updateHandle(accessToken: String, handle: String): Result<Unit> =
+        try {
+            val escapedHandle = handle.replace("\\", "\\\\").replace("\"", "\\\"")
+            val response = client.patch("${resolveWebApiBaseUrl()}/api/mobile/profile/handle") {
+                header(HttpHeaders.Authorization, "Bearer $accessToken")
+                contentType(ContentType.Application.Json)
+                setBody("""{"handle":"$escapedHandle"}""")
+            }
+            if (response.status.value !in 200..299) {
+                throw mapHttpFailure("update-handle", response.status, response.bodyAsText())
+            }
+            Result.success(Unit)
+        } catch (t: Throwable) {
+            Result.failure(mapError("update-handle", t))
         }
 
     suspend fun fetchLatestVersion(): Result<AndroidVersionInfo> =

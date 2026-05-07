@@ -74,6 +74,7 @@ data class BackendUserState(
     val streakCount: Int = 0,
     @SerialName("xpTotal")
     val xpTotal: Int = 0,
+    val handle: String? = null,
 )
 
 @Serializable

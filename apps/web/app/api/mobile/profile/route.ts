@@ -62,6 +62,8 @@ function buildFallbackProfile(accessToken: string) {
     role: payload ? fallbackRoleFromClaims(payload) : "user",
     premiumUntil,
     streakCount: 0,
+    xpTotal: 0,
+    handle: null as string | null,
   };
 }
 
@@ -94,12 +96,16 @@ export async function GET(request: Request) {
       role?: string;
       premiumUntil?: string | null;
       streakCount?: number;
+      xpTotal?: number;
+      name?: string | null;
     };
     return NextResponse.json({
       email: profile.email ?? fallbackProfile.email,
       role: profile.role ?? fallbackProfile.role,
       premiumUntil: profile.premiumUntil ?? null,
       streakCount: profile.streakCount ?? 0,
+      xpTotal: profile.xpTotal ?? 0,
+      handle: profile.name ?? null,
     });
   } catch {
     return NextResponse.json(fallbackProfile);

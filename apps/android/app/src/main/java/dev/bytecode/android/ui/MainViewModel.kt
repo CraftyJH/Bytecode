@@ -119,6 +119,16 @@ class MainViewModel(
         }
     }
 
+    fun updateHandle(handle: String) {
+        viewModelScope.launch {
+            val token = when (val r = authRepository.validAccessTokenResult()) {
+                is AuthRepository.AccessTokenResult.Success -> r.accessToken
+                else -> return@launch
+            }
+            userRepository.updateHandle(token, handle).onSuccess { refresh() }
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             when (val r = authRepository.validAccessTokenResult()) {
