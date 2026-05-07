@@ -228,6 +228,7 @@ class MainActivity : ComponentActivity() {
                         onLoadBadges = { badgesViewModel.load() },
                         onSelectBadge = { id -> badgesViewModel.selectBadge(id) },
                     )
+                    }
                 }
             }
         }
