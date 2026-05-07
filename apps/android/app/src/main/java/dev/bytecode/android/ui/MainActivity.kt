@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,9 +27,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -72,16 +77,24 @@ import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.MilitaryTech
 import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.style.TextOverflow
+import dev.bytecode.android.BuildConfig
 import dev.bytecode.android.config.AppConfig
 import dev.bytecode.android.data.model.ChallengeSubmitResponse
 import dev.bytecode.android.data.model.FriendDto
@@ -142,7 +155,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             BytecodeTheme(darkTheme = true) {
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.statusBars),
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -153,6 +168,7 @@ class MainActivity : ComponentActivity() {
                     val solutionState by solutionViewModel.uiState.collectAsStateWithLifecycle()
                     val duelState by duelViewModel.uiState.collectAsStateWithLifecycle()
                     val badgesState by badgesViewModel.uiState.collectAsStateWithLifecycle()
+                    Box(modifier = Modifier.fillMaxSize()) {
                     AppScreen(
                         state = state,
                         challengeState = challengeState,
@@ -203,6 +219,12 @@ class MainActivity : ComponentActivity() {
                         onLoadBadges = { badgesViewModel.load() },
                         onSelectBadge = { id -> badgesViewModel.selectBadge(id) },
                     )
+                        FloatingSettingsButton(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 8.dp, end = 12.dp),
+                        )
+                    }
                 }
             }
         }
@@ -484,7 +506,7 @@ private fun LoadingScreen(message: String) {
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = "Mobile Learning",
+                    text = "Code. Compete. Climb.",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -494,6 +516,12 @@ private fun LoadingScreen(message: String) {
                     text = message,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "v${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
             }
         }
@@ -1087,6 +1115,96 @@ private fun ProfileScreen(
     }
 }
 
+
+@Composable
+private fun FloatingSettingsButton(modifier: Modifier = Modifier) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showAppInfo by remember { mutableStateOf(false) }
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.80f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label = "settings_scale",
+        finishedListener = { pressed = false },
+    )
+
+    Box(modifier = modifier) {
+        IconButton(
+            onClick = {
+                pressed = true
+                menuExpanded = true
+            },
+            modifier = Modifier
+                .scale(scale)
+                .background(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                    shape = CircleShape,
+                ),
+        ) {
+            Icon(
+                Icons.Outlined.Settings,
+                contentDescription = "Settings",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("App Info") },
+                onClick = {
+                    menuExpanded = false
+                    showAppInfo = true
+                },
+                leadingIcon = {
+                    Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
+            )
+        }
+    }
+
+    if (showAppInfo) {
+        AppInfoDialog(onDismiss = { showAppInfo = false })
+    }
+}
+
+@Composable
+private fun AppInfoDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("App Info") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "v${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        KeyValueRow("Version", BuildConfig.VERSION_NAME)
+                        KeyValueRow("Version code", BuildConfig.VERSION_CODE.toString())
+                        KeyValueRow("Build type", BuildConfig.BUILD_TYPE.replaceFirstChar { it.titlecase() })
+                        KeyValueRow("Package", BuildConfig.APPLICATION_ID)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
+    )
+}
 
 @Composable
 private fun BytecodeSectionCard(content: @Composable () -> Unit) {
