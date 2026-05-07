@@ -105,6 +105,11 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
 import dev.bytecode.android.BuildConfig
@@ -285,7 +290,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            BytecodeTheme(darkTheme = true) {
+            BytecodeTheme(darkTheme = false) {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1174,235 +1179,275 @@ private fun HomeScreen(
     onOpenArchive: () -> Unit,
 ) {
     LaunchedEffect(Unit) { onLoadChallenge() }
-
     val daily = challengeState.dailyChallenges
+    val isLoading = challengeState.dailyLoading
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 32.dp),
     ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(
-                        "Hey, ${state.user.email?.substringBefore("@") ?: "there"}!",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        "Ready to code?",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                ) {
-                    Text(
-                        "${state.user.xpTotal} XP",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-        }
-        item {
-            BytecodeSectionCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Outlined.LocalFireDepartment,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp),
-                    )
-                    Column {
-                        Text(
-                            "${state.user.streakCount} day streak",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            "Keep it going!",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-        item {
-            Text(
-                "Today's Challenges",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        if (challengeState.dailyLoading) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                }
-            }
-        } else if (challengeState.dailyError != null) {
+        item { HomeHeaderSection(xpTotal = state.user.xpTotal, streakCount = state.user.streakCount) }
+
+        if (challengeState.dailyError != null) {
             item {
                 Text(
                     challengeState.dailyError,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-        } else {
-            item {
-                DifficultyCard(
+        }
+
+        item {
+            Text(
+                "Today's Challenges",
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ChallengeCategoryCard(
+                    modifier = Modifier.weight(1f),
                     difficulty = "Easy",
                     challenge = daily?.easy,
+                    isLoading = isLoading,
                     onSelect = onSelectChallenge,
                 )
-            }
-            item {
-                DifficultyCard(
+                ChallengeCategoryCard(
+                    modifier = Modifier.weight(1f),
                     difficulty = "Intermediate",
                     challenge = daily?.intermediate,
+                    isLoading = isLoading,
                     onSelect = onSelectChallenge,
                 )
-            }
-            item {
-                DifficultyCard(
+                ChallengeCategoryCard(
+                    modifier = Modifier.weight(1f),
                     difficulty = "Hard",
                     challenge = daily?.hard,
+                    isLoading = isLoading,
                     onSelect = onSelectChallenge,
                 )
             }
         }
+
         item {
-            Spacer(modifier = Modifier.height(4.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
-                onClick = onOpenArchive,
+            DailyByteCard(
+                challenge = daily?.intermediate ?: daily?.easy ?: daily?.hard,
+                isLoading = isLoading,
+                onSelect = onSelectChallenge,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeHeaderSection(xpTotal: Int, streakCount: Int) {
+    val orange = MaterialTheme.colorScheme.primary
+    val progress = (xpTotal % 200) / 200f
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Bytecode",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text(
-                            "Past Challenges",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            "Browse the archive",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                if (streakCount > 0) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.LocalFireDepartment, null, tint = orange, modifier = Modifier.size(18.dp))
+                        Text("$streakCount", style = MaterialTheme.typography.labelMedium, color = orange, fontWeight = FontWeight.Bold)
                     }
-                    Icon(
-                        Icons.Outlined.ArrowBack,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .then(
-                                Modifier.scale(scaleX = -1f, scaleY = 1f)
-                            ),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                }
+                Icon(Icons.Outlined.Settings, "Settings", modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "$xpTotal XP",
+                style = MaterialTheme.typography.bodyMedium,
+                color = orange,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "· ${(progress * 100).toInt()}% to next milestone",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction = progress.coerceIn(0.02f, 1f))
+                    .fillMaxHeight()
+                    .clip(CircleShape)
+                    .background(orange),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChallengeCategoryCard(
+    modifier: Modifier = Modifier,
+    difficulty: String,
+    challenge: dev.bytecode.android.data.model.ChallengeDto?,
+    isLoading: Boolean,
+    onSelect: (dev.bytecode.android.data.model.ChallengeDto) -> Unit,
+) {
+    val (iconColor, icon) = when (difficulty.lowercase()) {
+        "easy" -> Color(0xFF4CAF50) to Icons.Outlined.Lightbulb
+        "intermediate" -> Color(0xFFFF9800) to Icons.Outlined.Code
+        else -> Color(0xFFF44336) to Icons.Outlined.Psychology
+    }
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp,
+        onClick = { challenge?.let { onSelect(it) } },
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(iconColor.copy(alpha = 0.15f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = iconColor, modifier = Modifier.size(22.dp))
+            }
+            Text(
+                "$difficulty\nChallenges",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+            )
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxWidth().height(10.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape))
+                Box(modifier = Modifier.width(36.dp).height(10.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape))
+            } else if (challenge != null) {
+                Text(
+                    challenge.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Surface(
+                    color = iconColor.copy(alpha = 0.12f),
+                    shape = MaterialTheme.shapes.extraSmall,
+                ) {
+                    Text(
+                        "${challenge.baseXp} XP",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = iconColor,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
+            } else {
+                Text("—", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
 @Composable
-private fun DifficultyCard(
-    difficulty: String,
+private fun DailyByteCard(
     challenge: dev.bytecode.android.data.model.ChallengeDto?,
+    isLoading: Boolean,
     onSelect: (dev.bytecode.android.data.model.ChallengeDto) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val difficultyColor = when (difficulty.lowercase()) {
-        "easy" -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
-        "intermediate", "medium" -> androidx.compose.ui.graphics.Color(0xFFFFC107)
-        else -> androidx.compose.ui.graphics.Color(0xFFF44336)
-    }
+    val orange = MaterialTheme.colorScheme.primary
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, difficultyColor.copy(alpha = 0.4f)),
-        onClick = { challenge?.let { onSelect(it) } },
+        shadowElevation = 2.dp,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(orange.copy(alpha = 0.12f), MaterialTheme.shapes.medium),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.extraSmall,
-                        color = difficultyColor.copy(alpha = 0.15f),
-                    ) {
+                    Text(
+                        "</>",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = orange,
+                        fontFamily = JetBrainsMonoFamily,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Daily Byte", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (isLoading) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(modifier = Modifier.fillMaxWidth(0.65f).height(12.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape))
+                    } else if (challenge != null) {
                         Text(
-                            difficulty,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = difficultyColor,
-                            fontWeight = FontWeight.SemiBold,
+                            challenge.title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                if (challenge != null) {
-                    Text(
-                        challenge.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "${challenge.baseXp} XP · ${challenge.language.replaceFirstChar { it.titlecase() }}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Text(
-                        "No challenge today",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
-            if (challenge != null) {
-                Text(
-                    "›",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (!isLoading && challenge != null) {
+                Button(
+                    onClick = { onSelect(challenge) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = orange),
+                ) {
+                    Text("Solve Now  (${challenge.baseXp} XP)", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }
