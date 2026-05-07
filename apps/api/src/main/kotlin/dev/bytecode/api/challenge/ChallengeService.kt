@@ -27,6 +27,15 @@ class ChallengeService(
 ) {
     fun getToday(): ChallengeEntity? = repo.findByReleaseDate(LocalDate.now())
 
+    fun getDaily(): DailyChallengesDto {
+        val today = LocalDate.now()
+        return DailyChallengesDto(
+            easy = repo.findByReleaseDateAndDifficulty(today, "easy")?.let { toDto(it) },
+            intermediate = repo.findByReleaseDateAndDifficulty(today, "intermediate")?.let { toDto(it) },
+            hard = repo.findByReleaseDateAndDifficulty(today, "hard")?.let { toDto(it) },
+        )
+    }
+
     @Transactional
     fun submit(
         challenge: ChallengeEntity,
@@ -104,6 +113,12 @@ class ChallengeService(
         )
     }
 }
+
+data class DailyChallengesDto(
+    val easy: ChallengeDto?,
+    val intermediate: ChallengeDto?,
+    val hard: ChallengeDto?,
+)
 
 data class ChallengeDto(
     val id: String,

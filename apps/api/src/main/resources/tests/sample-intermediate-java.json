@@ -1,0 +1,43 @@
+{
+  "challengeId": "sample-intermediate-java",
+  "languageId": 62,
+  "preamble": "",
+  "testCases": [
+    {
+      "id": "tc1",
+      "visible": true,
+      "call": "new Solution().fib(0)",
+      "expected": "0"
+    },
+    {
+      "id": "tc2",
+      "visible": true,
+      "call": "new Solution().fib(1)",
+      "expected": "1"
+    },
+    {
+      "id": "tc3",
+      "visible": true,
+      "call": "new Solution().fib(5)",
+      "expected": "5"
+    },
+    {
+      "id": "tc4",
+      "visible": false,
+      "call": "new Solution().fib(2)",
+      "expected": "1"
+    },
+    {
+      "id": "tc5",
+      "visible": false,
+      "call": "new Solution().fib(10)",
+      "expected": "55"
+    },
+    {
+      "id": "tc6",
+      "visible": false,
+      "call": "new Solution().fib(15)",
+      "expected": "610"
+    }
+  ]
+}

@@ -13,34 +13,83 @@ class ChallengeBootstrap(
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
-        val releaseDate = LocalDate.of(2026, 5, 6)
-        if (challengeRepo.findByReleaseDate(releaseDate) != null) return
+        val today = LocalDate.now()
+        upsert(
+            id = "sample-easy-java",
+            date = today,
+            difficulty = "easy",
+            language = "java",
+            title = "Reverse a String",
+            baseXp = 10,
+            metadata = """
+                {
+                  "description": "Given a string, return it reversed. For example, \"hello\" becomes \"olleh\".",
+                  "starterCode": "class Solution {\n    public String reverse(String s) {\n        // Your code here\n        return \"\";\n    }\n}",
+                  "visibleExamples": [
+                    {"input": "\"hello\"", "output": "\"olleh\""},
+                    {"input": "\"world\"", "output": "\"dlrow\""},
+                    {"input": "\"a\"", "output": "\"a\""}
+                  ]
+                }
+            """.trimIndent(),
+        )
+        upsert(
+            id = "sample-intermediate-java",
+            date = today,
+            difficulty = "intermediate",
+            language = "java",
+            title = "Fibonacci Number",
+            baseXp = 15,
+            metadata = """
+                {
+                  "description": "Return the nth Fibonacci number (0-indexed). fib(0)=0, fib(1)=1, fib(2)=1, fib(3)=2, etc.",
+                  "starterCode": "class Solution {\n    public int fib(int n) {\n        // Your code here\n        return 0;\n    }\n}",
+                  "visibleExamples": [
+                    {"input": "0", "output": "0"},
+                    {"input": "1", "output": "1"},
+                    {"input": "5", "output": "5", "explanation": "0,1,1,2,3,5"}
+                  ]
+                }
+            """.trimIndent(),
+        )
+        upsert(
+            id = "sample-hard-java",
+            date = today,
+            difficulty = "hard",
+            language = "java",
+            title = "Valid Parentheses",
+            baseXp = 25,
+            metadata = """
+                {
+                  "description": "Given a string of '(', ')', '{', '}', '[', ']', return true if every opener is closed in the correct order.",
+                  "starterCode": "import java.util.Stack;\n\nclass Solution {\n    public boolean isValid(String s) {\n        // Your code here\n        return false;\n    }\n}",
+                  "visibleExamples": [
+                    {"input": "\"()\"", "output": "true"},
+                    {"input": "\"()[{}]\"", "output": "true"},
+                    {"input": "\"(]\"", "output": "false"},
+                    {"input": "\"([)]\"", "output": "false"}
+                  ]
+                }
+            """.trimIndent(),
+        )
+    }
 
-        val metadata = """
-            {
-              "description": "Given a list of integers, return the sum of all even numbers in the list. Return 0 if there are no even numbers.",
-              "starterCode": "import java.util.ArrayList;\nimport java.util.List;\n\nclass Solution {\n    public int sumEvens(ArrayList<Integer> nums) {\n        // Your code here\n        return 0;\n    }\n}",
-              "visibleExamples": [
-                {"input": "[1, 2, 3, 4]", "output": "6", "explanation": "2 + 4 = 6"},
-                {"input": "[0, -2, 5, 10]", "output": "8", "explanation": "0 + (-2) + 10 = 8"}
-              ]
-            }
-        """.trimIndent()
-
+    private fun upsert(
+        id: String,
+        date: LocalDate,
+        difficulty: String,
+        language: String,
+        title: String,
+        baseXp: Int,
+        metadata: String,
+    ) {
         jdbc.update(
             """
             INSERT INTO challenges (id, release_date, difficulty, language, type, title, tags, tracks, base_xp, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, '{}'::text[], '{}'::text[], ?, ?::jsonb)
-            ON CONFLICT (id) DO NOTHING
+            VALUES (?, ?, ?, ?, 'function', ?, '{}'::text[], '{}'::text[], ?, ?::jsonb)
+            ON CONFLICT (id) DO UPDATE SET release_date = EXCLUDED.release_date
             """.trimIndent(),
-            "2026-05-06-easy-java",
-            releaseDate,
-            "easy",
-            "java",
-            "function",
-            "Sum Even Numbers",
-            10,
-            metadata,
+            id, date, difficulty, language, title, baseXp, metadata,
         )
     }
 }

@@ -41,6 +41,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -1426,85 +1429,363 @@ private fun ProfileScreen(
     onOpenBilling: () -> Unit,
     onUpdateHandle: (String) -> Unit = {},
 ) {
+    val displayName = state.user.handle
+        ?: state.user.email?.substringBefore("@")
+        ?: "there"
+    val billingPlan = state.billing?.plan ?: "free"
+
     var handleInput by remember(state.user.handle) { mutableStateOf(state.user.handle ?: "") }
     var handleSaved by remember { mutableStateOf(false) }
-    Box(modifier = Modifier.fillMaxSize()) {
+    var settingsExpanded by remember { mutableStateOf(false) }
+    var accountExpanded by remember { mutableStateOf(false) }
+    var appSettingsExpanded by remember { mutableStateOf(false) }
+    var statsExpanded by remember { mutableStateOf(false) }
+    var leaderboardVisible by remember { mutableStateOf(true) }
+    var dailyReminder by remember { mutableStateOf(false) }
+    var friendActivity by remember { mutableStateOf(true) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(top = 20.dp, bottom = 80.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+
+        // ── 1. Screen title ─────────────────────────────────────────────────
         item {
-            BytecodeSectionCard {
-                SectionHeader(
-                    title = state.user.handle ?: state.user.email?.substringBefore("@") ?: "Profile",
-                    subtitle = state.user.email ?: "",
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                val billingPlan = state.billing?.plan ?: "free"
-                AccessBadge(
-                    label = if (billingPlan == "premium") "Premium" else "Free",
-                    tone = if (billingPlan == "premium") BadgeTone.Success else BadgeTone.Default,
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "Account",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
+
+        // ── 2. Welcome banner ───────────────────────────────────────────────
         item {
-            BytecodeSectionCard {
-                SectionHeader(title = "Stats", subtitle = "Your progress")
-                Spacer(modifier = Modifier.height(8.dp))
-                KeyValueRow(
-                    "Streak",
-                    "${state.user.streakCount} day${if (state.user.streakCount == 1) "" else "s"}",
-                )
-                KeyValueRow("Total XP", "${state.user.xpTotal} XP")
-                val billing = state.billing
-                KeyValueRow("Plan", billing?.plan ?: "free")
-                KeyValueRow("Premium until", billing?.premiumUntil ?: state.user.premiumUntil ?: "—")
-            }
-        }
-        item {
-            BytecodeSectionCard {
-                SectionHeader(title = "Display name", subtitle = "Shown on leaderboards and to friends")
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = handleInput,
-                    onValueChange = {
-                        handleInput = it
-                        handleSaved = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("Choose a display name") },
-                    label = { Text("Name") },
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        if (handleInput.isNotBlank()) {
-                            onUpdateHandle(handleInput.trim())
-                            handleSaved = true
-                        }
-                    },
-                    enabled = handleInput.isNotBlank() && handleInput.trim() != state.user.handle,
-                    modifier = Modifier.fillMaxWidth(),
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Text(if (handleSaved) "Saved!" else "Save name")
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Welcome back,",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    AccessBadge(
+                        label = if (billingPlan == "premium") "Premium" else "Free",
+                        tone = if (billingPlan == "premium") BadgeTone.Success else BadgeTone.Default,
+                    )
                 }
             }
         }
+
+        // ── 3. Settings (collapsible) ───────────────────────────────────────
         item {
-            Button(
-                onClick = onOpenBilling,
-                modifier = Modifier.fillMaxWidth(),
+            Surface(
+                modifier = Modifier.fillMaxWidth().animateContentSize(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
             ) {
-                Text("Manage billing on web")
+                Column {
+                    // Header row — tap to expand/collapse
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { settingsExpanded = !settingsExpanded }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            Icons.Outlined.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            "Settings",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            if (settingsExpanded) Icons.Outlined.KeyboardArrowDown else Icons.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    if (settingsExpanded) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                        // ── Account sub-section ─────────────────────────────
+                        Column(modifier = Modifier.animateContentSize()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { accountExpanded = !accountExpanded }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.AccountCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    "Account",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    if (accountExpanded) Icons.Outlined.KeyboardArrowDown else Icons.Outlined.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+
+                            if (accountExpanded) {
+                                Column(
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp)
+                                        .padding(bottom = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    // Email (read-only)
+                                    OutlinedTextField(
+                                        value = state.user.email ?: "",
+                                        onValueChange = {},
+                                        modifier = Modifier.fillMaxWidth(),
+                                        readOnly = true,
+                                        singleLine = true,
+                                        label = { Text("Email") },
+                                    )
+                                    // Display name
+                                    OutlinedTextField(
+                                        value = handleInput,
+                                        onValueChange = { handleInput = it; handleSaved = false },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        label = { Text("Display name") },
+                                        placeholder = { Text("Choose a name") },
+                                    )
+                                    Button(
+                                        onClick = {
+                                            if (handleInput.isNotBlank()) {
+                                                onUpdateHandle(handleInput.trim())
+                                                handleSaved = true
+                                            }
+                                        },
+                                        enabled = handleInput.isNotBlank() && handleInput.trim() != state.user.handle,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(if (handleSaved) "Saved!" else "Save display name")
+                                    }
+                                    // Billing / plan — link to web
+                                    OutlinedButton(
+                                        onClick = onOpenBilling,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.OpenInNew,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Manage billing on bytecode.dev")
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                        // ── Application sub-section ─────────────────────────
+                        Column(modifier = Modifier.animateContentSize()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { appSettingsExpanded = !appSettingsExpanded }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    "Application",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    if (appSettingsExpanded) Icons.Outlined.KeyboardArrowDown else Icons.Outlined.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+
+                            if (appSettingsExpanded) {
+                                Column(
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp)
+                                        .padding(bottom = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                                ) {
+                                    SettingsToggleRow(
+                                        label = "Show me on leaderboards",
+                                        description = "Others can see your rank on public boards",
+                                        checked = leaderboardVisible,
+                                        onCheckedChange = { leaderboardVisible = it },
+                                    )
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 4.dp),
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f),
+                                    )
+                                    SettingsToggleRow(
+                                        label = "Daily challenge reminder",
+                                        description = "Get notified when today's challenges are ready",
+                                        checked = dailyReminder,
+                                        onCheckedChange = { dailyReminder = it },
+                                    )
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 4.dp),
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f),
+                                    )
+                                    SettingsToggleRow(
+                                        label = "Friend activity",
+                                        description = "Know when friends solve challenges or accept duels",
+                                        checked = friendActivity,
+                                        onCheckedChange = { friendActivity = it },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
+
+        // ── 4. Stats (collapsible) ──────────────────────────────────────────
         item {
-            ProfileSettingsCard()
+            Surface(
+                modifier = Modifier.fillMaxWidth().animateContentSize(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { statsExpanded = !statsExpanded }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            Icons.Outlined.EmojiEvents,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            "Your stats",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            if (statsExpanded) Icons.Outlined.KeyboardArrowDown else Icons.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    if (statsExpanded) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            StatRow(
+                                icon = Icons.Outlined.LocalFireDepartment,
+                                label = "Streak",
+                                value = "${state.user.streakCount} day${if (state.user.streakCount == 1) "" else "s"}",
+                                iconTint = MaterialTheme.colorScheme.error,
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.07f))
+                            StatRow(
+                                icon = Icons.Outlined.EmojiEvents,
+                                label = "Total XP",
+                                value = "${state.user.xpTotal} XP",
+                                iconTint = MaterialTheme.colorScheme.primary,
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.07f))
+                            StatRow(
+                                icon = Icons.Outlined.MilitaryTech,
+                                label = "Plan",
+                                value = (state.billing?.plan ?: "free").replaceFirstChar { it.titlecase() },
+                                iconTint = if (billingPlan == "premium") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            val premiumUntil = state.billing?.premiumUntil ?: state.user.premiumUntil
+                            if (premiumUntil != null) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.07f))
+                                StatRow(
+                                    icon = Icons.Outlined.Info,
+                                    label = "Premium until",
+                                    value = premiumUntil.take(10),
+                                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        // ── 5. Action buttons ───────────────────────────────────────────────
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1513,49 +1794,49 @@ private fun ProfileScreen(
                 OutlinedButton(onClick = onRefresh, modifier = Modifier.weight(1f)) {
                     Text("Refresh")
                 }
-                OutlinedButton(onClick = onSignOut, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = onSignOut,
+                    modifier = Modifier.weight(1f),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                ) {
                     Text("Sign out")
                 }
             }
         }
     }
-        FloatingSettingsButton(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(bottom = 16.dp, start = 16.dp),
-        )
-    }
 }
 
-
 @Composable
-private fun ProfileSettingsCard() {
-    var leaderboardVisible by remember { mutableStateOf(true) }
-    var dailyReminder by remember { mutableStateOf(false) }
-    var friendActivity by remember { mutableStateOf(true) }
-
-    BytecodeSectionCard {
-        SectionHeader(title = "Settings", subtitle = "Preferences")
-        Spacer(modifier = Modifier.height(8.dp))
-        SettingsToggleRow(
-            label = "Show me on leaderboards",
-            description = "Others can see your rank on public boards",
-            checked = leaderboardVisible,
-            onCheckedChange = { leaderboardVisible = it },
+private fun StatRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    iconTint: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = iconTint,
         )
-        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-        SettingsToggleRow(
-            label = "Daily challenge reminder",
-            description = "Get notified when today's challenges are ready",
-            checked = dailyReminder,
-            onCheckedChange = { dailyReminder = it },
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
         )
-        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-        SettingsToggleRow(
-            label = "Friend activity notifications",
-            description = "Know when friends solve challenges or accept duels",
-            checked = friendActivity,
-            onCheckedChange = { friendActivity = it },
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }
@@ -1571,7 +1852,7 @@ private fun SettingsToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 4.dp),
+            .padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {

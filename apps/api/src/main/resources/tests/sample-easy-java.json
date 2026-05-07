@@ -1,0 +1,43 @@
+{
+  "challengeId": "sample-easy-java",
+  "languageId": 62,
+  "preamble": "",
+  "testCases": [
+    {
+      "id": "tc1",
+      "visible": true,
+      "call": "new Solution().reverse(\"hello\")",
+      "expected": "olleh"
+    },
+    {
+      "id": "tc2",
+      "visible": true,
+      "call": "new Solution().reverse(\"world\")",
+      "expected": "dlrow"
+    },
+    {
+      "id": "tc3",
+      "visible": true,
+      "call": "new Solution().reverse(\"a\")",
+      "expected": "a"
+    },
+    {
+      "id": "tc4",
+      "visible": false,
+      "call": "new Solution().reverse(\"\")",
+      "expected": ""
+    },
+    {
+      "id": "tc5",
+      "visible": false,
+      "call": "new Solution().reverse(\"racecar\")",
+      "expected": "racecar"
+    },
+    {
+      "id": "tc6",
+      "visible": false,
+      "call": "new Solution().reverse(\"abcde\")",
+      "expected": "edcba"
+    }
+  ]
+}

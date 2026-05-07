@@ -19,6 +19,10 @@ class ChallengeController(
         return ResponseEntity.ok(challengeService.toDto(challenge))
     }
 
+    @GetMapping("/daily")
+    fun getDaily(@AuthenticationPrincipal jwt: Jwt): ResponseEntity<DailyChallengesDto> =
+        ResponseEntity.ok(challengeService.getDaily())
+
     @PostMapping("/{id}/submit")
     fun submit(
         @PathVariable id: String,

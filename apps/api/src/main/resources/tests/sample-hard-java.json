@@ -1,0 +1,49 @@
+{
+  "challengeId": "sample-hard-java",
+  "languageId": 62,
+  "preamble": "import java.util.Stack;",
+  "testCases": [
+    {
+      "id": "tc1",
+      "visible": true,
+      "call": "new Solution().isValid(\"()\")",
+      "expected": "true"
+    },
+    {
+      "id": "tc2",
+      "visible": true,
+      "call": "new Solution().isValid(\"()[{}]\")",
+      "expected": "true"
+    },
+    {
+      "id": "tc3",
+      "visible": true,
+      "call": "new Solution().isValid(\"(]\")",
+      "expected": "false"
+    },
+    {
+      "id": "tc4",
+      "visible": true,
+      "call": "new Solution().isValid(\"([)]\")",
+      "expected": "false"
+    },
+    {
+      "id": "tc5",
+      "visible": false,
+      "call": "new Solution().isValid(\"\")",
+      "expected": "true"
+    },
+    {
+      "id": "tc6",
+      "visible": false,
+      "call": "new Solution().isValid(\"{[]}\")",
+      "expected": "true"
+    },
+    {
+      "id": "tc7",
+      "visible": false,
+      "call": "new Solution().isValid(\"((\")",
+      "expected": "false"
+    }
+  ]
+}
