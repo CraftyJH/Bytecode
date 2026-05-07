@@ -1,11 +1,15 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { fetchAndroidReleaseMeta } from "@/lib/android-release";
+import { getSiteSetting } from "@/lib/site-settings";
 
 export const metadata = { title: "Android Download — Bytecode" };
 
 export default async function AndroidDownloadPage() {
-  const release = await fetchAndroidReleaseMeta();
+  const [release, downloadDisabled] = await Promise.all([
+    fetchAndroidReleaseMeta(),
+    getSiteSetting<boolean>("android_download_disabled", false),
+  ]);
 
   return (
     <>
@@ -32,7 +36,22 @@ export default async function AndroidDownloadPage() {
             </p>
 
             <div className="flex flex-wrap gap-3 items-start">
-              {release?.apkUrl ? (
+              {downloadDisabled ? (
+                <div className="flex flex-col gap-1.5">
+                  <span
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm font-medium border text-prose-faint cursor-not-allowed select-none"
+                    style={{ borderColor: "var(--border-emphasis)" }}
+                  >
+                    Download Android APK
+                  </span>
+                  <p
+                    className="text-xs pl-1"
+                    style={{ fontFamily: "var(--font-mono)", color: "var(--color-warning, #f59e0b)" }}
+                  >
+                    ⚠ Temporarily disabled — check back shortly.
+                  </p>
+                </div>
+              ) : release?.apkUrl ? (
                 <div className="flex flex-col gap-1.5">
                   <a
                     href={release.apkUrl}

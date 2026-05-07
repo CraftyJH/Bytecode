@@ -53,11 +53,15 @@ export async function fetchAndroidReleaseMeta(): Promise<AndroidReleaseMeta | nu
 
     if (!builtAt) return null;
 
+    const tagName = (release.tag_name as string | undefined) ?? "android-latest";
+
     return {
       version,
       builtAt,
       apkUrl: apkAsset?.browser_download_url ?? null,
-      releaseUrl: (release.html_url as string | undefined) ?? null,
+      // Construct the canonical releases/tag URL — html_url can resolve to a
+      // commit hash when GitHub follows the tag ref instead of the release page.
+      releaseUrl: `https://github.com/CraftyJH/Bytecode/releases/tag/${tagName}`,
     };
   } catch {
     return null;
